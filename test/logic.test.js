@@ -123,8 +123,8 @@ test('candidate validation: new to Full Speed, adult, valid ID', () => {
 
   const hiredPhone = L.validateCandidate({ ...base, mobile: '01151307016' }, w);
   assert.match(hiredPhone.errors.mobile, /مسجل عندنا/);
-  const headcountPhone = L.validateCandidate({ ...base, mobile: '01066768975' }, w);
-  assert.match(headcountPhone.errors.mobile, /مسجل عندنا/);
+  // Being in Headcount alone is not "worked here before" (new arrivals are added there too)
+  assert.equal(L.validateCandidate({ ...base, mobile: '01066768975' }, w).ok, true);
   const sameId = L.validateCandidate({ ...base, nationalId: '29901010100011' }, w);
   assert.match(sameId.errors.nationalId, /مترشح قبل كده/);
   const minor = L.validateCandidate({ ...base, nationalId: '31001010100017' }, w);

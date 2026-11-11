@@ -174,3 +174,38 @@ test('daily report email goes to REPORT_EMAILS only when set', () => {
   assert.equal(env.ctx.__mails.length, 1);
   assert.match(env.ctx.__mails[0].htmlBody, /تقرير/);
 });
+
+test('Hiring tracker: official hire date, SV, SP; old riders are not referrals', () => {
+  const tabs = sheet();
+  tabs['Hiring tracker'] = [
+    ['Dates', 'Rider ID', 'Zones', 'Rider Name:_', 'Phone Number:_', 'Status', 'SV', 'Has SP ?', 'Vehicle'],
+    ['11/10/2026', 5037565, 'Maadi', 'Mahmoud Ashraf _FULL SPEED_BC', 1151307016, 'Inactive', 'Ali Sayed Maadi', 'With SP', 'Bicycle'],
+    ['11/9/2026', 5031339, 'Nasr city', 'Belal Mohamed _FULL SPEED', 1220211045, 'Inactive', 'Raafat', 'No SP', 'Bike'],
+    ['11/2/2026', 5099999, 'Haram', 'Only In Tracker _FULL SPEED', 1012345678, 'Inactive', 'Saadawe Haram', 'With SP', 'Bike']
+  ];
+  tabs.Headcount.push([4999001, 'Just Arrived Rider', 'Haram', 'Saadawe', 'Full Speed', 201099988877, 'Bike', '', 6, 'Active']);
+  // Someone who was hired on 2 Nov, then "referred" on 5 Nov
+  tabs['New Applicants'].push(['11/5/2026 10:00:00', 4722422, 'متعين قبل كده', 1012345678, 29905050100016, 'x', 'Haram', '', '', '', '', 'جديد', '', '']);
+  const env = makeEnv(tabs);
+  const report = env.ctx.setupFullSpeed();
+  const temp = report.find((r) => /owner/.test(r)).match(/المؤقتة (\S+)/)[1];
+  const token = ownerToken(env, temp);
+  const d = plain(env.api('adminData', { token }).data);
+  const r = Object.fromEntries(d.riders.map((x) => [x.code, x]));
+  assert.equal(r['5037565'].hireDate, '2026-11-10');            // tracker date beats Normal Riders Handle (8 Nov)
+  assert.equal(r['5037565'].sv, 'Ali Sayed Maadi');
+  assert.equal(r['5037565'].ownerSv, 'Kabo Maadi');              // referrer's SPV from Headcount
+  assert.equal(r['5031339'].sp, false);
+  assert.ok(r['5031339'].flags.includes('suspended'));
+  assert.equal(r['5099999'].ownerKey, '');                       // hired before being referred → nobody's referral
+  const old = d.applicants.find((a) => a.name === 'متعين قبل كده');
+  assert.ok(old.flags.includes('known'));
+  assert.notEqual(old.status, 'اشتغل');
+  assert.ok(d.svs.includes('Raafat'));
+  // A new candidate whose phone is already a hire is refused; a Headcount-only phone is not
+  const zt = env.api('login', { type: 'internal', code: '4722422', password: 'ziad2026' });
+  assert.equal(zt.ok, true, zt.error);
+  const form = { fullName: 'محمود علي حسن', mobile: '01012345678', nationalId: '29805050100015', address: 'x', zone: 'Haram', idExpiry: '2030-01-01' };
+  assert.match(env.api('submitCandidate', { token: zt.data.token, form }).error, /مسجل عندنا/);
+  assert.equal(env.api('submitCandidate', { token: zt.data.token, form: { ...form, mobile: '01099988877', nationalId: '29606060100012' } }).error, undefined); // only in Headcount → allowed
+});
