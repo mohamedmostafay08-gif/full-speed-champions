@@ -27,7 +27,7 @@ var CONFIG_DEFAULTS = {
   LOCK_MINUTES: 15,
   PUBLIC_APPLY_PER_HOUR: 30,          // per referral link
   MIN_PASSWORD_LENGTH: 6,
-  SUPPORT_WHATSAPP: '201097865980',
+  SUPPORT_WHATSAPP: '201120339097',
   PUBLIC_APP_URL: 'https://mohamedmostafay08-gif.github.io/full-speed-champions/',  // the installable app (GitHub Pages)
   // Where the Google link reads its interface from. Empty = use the Index.html saved in Apps Script.
   UI_SOURCE_URL: 'https://raw.githubusercontent.com/mohamedmostafay08-gif/full-speed-champions/main/dist/single-file/Index.html'
