@@ -35,6 +35,7 @@ function loadConfig_() {
 function loadWorld_() {
   if (WORLD_) return WORLD_;
   var raw = {
+    hiring: rowsToRecords(values_(TABS.HIRING), COLUMNS.HIRING),
     riders: rowsToRecords(values_(TABS.RIDERS), COLUMNS.RIDERS),
     headcount: rowsToRecords(values_(TABS.HEADCOUNT), COLUMNS.HEADCOUNT),
     applicants: rowsToRecords(values_(TABS.APPLICANTS), COLUMNS.APPLICANTS),

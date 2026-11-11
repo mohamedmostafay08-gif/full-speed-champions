@@ -113,6 +113,7 @@ button { cursor: pointer; }
 .kpi .lbl { font-size: 12px; color: var(--muted); }
 .kpi .num { font-size: 32px; }
 .kpi .num.gold { color: var(--gold); }
+.kpi .num.txt { font: 700 17px/1.35 var(--f-display); }
 .kpi .delta { font-size: 12px; color: var(--muted); }
 .kpi .delta b.up { color: var(--green-hi); } .kpi .delta b.down { color: var(--danger); }
 .charts { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
@@ -179,6 +180,10 @@ td .gold { color: var(--gold); font-weight: 700; }
 .login .brand .wm b { color: var(--green); }
 .sk { border-radius: 14px; background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%); background-size: 200% 100%; animation: sk 1.2s linear infinite; }
 @keyframes sk { to { background-position: -200% 0; } }
+.heat td.hm { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; min-width: 44px; border: 2px solid var(--surface); }
+.heat th, .heat td { white-space: nowrap; }
+.insight-line { color: var(--ink); background: var(--info-soft); border-radius: 10px; padding: 8px 10px; margin: 2px 0 10px; }
+.insight-line b { color: var(--info); }
 .insight { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .insight:last-child { border-bottom: 0; }
 .insight b.tag { flex: none; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--info-soft); color: var(--info); }
@@ -262,7 +267,8 @@ var CONFIG_DEFAULTS = {
 
 /** Tab names. Existing tabs keep their current names. */
 var TABS = {
-  RIDERS: 'Normal Riders Handle',     // hires exported from Talabat (source of truth)
+  HIRING: 'Hiring tracker',           // daily raw export of hires: official hire date, SV, SP status
+  RIDERS: 'Normal Riders Handle',     // Talabat export: the referral code of each hire
   HEADCOUNT: 'Headcount',             // IMPORTRANGE — read only, never written
   APPLICANTS: 'New Applicants',       // candidates submitted through the program
   DAILY_ORDERS: 'Daily Orders',       // date | rider code | completed orders
@@ -287,6 +293,17 @@ var TABS = {
  * anything. The first name is the one the setup writes.
  */
 var COLUMNS = {
+  HIRING: {
+    hireDate: ['Dates', 'Date', 'Hire Date', 'تاريخ التعيين'],
+    code: ['Rider ID', 'Code', 'Rider Code', 'كود المندوب'],
+    zone: ['Zones', 'Zone', 'المنطقة'],
+    name: ['Rider Name', 'Name', 'الاسم'],
+    phone: ['Phone Number', 'Phone', 'الموبايل'],
+    status: ['Status', 'الحالة'],
+    sv: ['SV', 'SPV', 'Supervisor'],
+    sp: ['Has SP', 'SP Status', 'SP'],
+    vehicle: ['Vehicle', 'المركبة']
+  },
   RIDERS: {
     hireDate: ['تاريخ التعيين', 'Hire Date'],
     code: ['كود المندوب', 'Code', 'Rider Code'],
@@ -887,19 +904,42 @@ function resolveConfig(rows, tierRows) {
 function buildWorld(raw, cfg, today) {
   var opts = { today: today };
 
-  var riders = (raw.riders || []).map(function (r) {
-    return {
-      row: r._row,
-      code: cleanCode(r.code),
-      name: cleanText(r.name),
-      zone: cleanText(r.zone),
-      phone: canonicalPhone(r.phone),
-      vehicle: cleanText(r.vehicle),
-      hireDate: parseSheetDate(r.hireDate, opts),
-      orders: cleanText(r.orders) === '' ? null : Number(r.orders) || 0,
-      referralCode: cleanCode(r.referralCode)
-    };
-  }).filter(function (r) { return r.code; });
+  // Hires come from two tabs:
+  //  - Hiring tracker: the official hire date, SV and SP status (daily raw export)
+  //  - Normal Riders Handle: Talabat's referral code (and a hand-typed order total)
+  // A rider in either tab is a hire. When both have a date, Hiring tracker wins.
+  var byCode = {}, order = [];
+  function rider(code) {
+    if (!byCode[code]) { byCode[code] = { code: code, name: '', zone: '', phone: null, vehicle: '', hireDate: null, orders: null, referralCode: '', sv: '', sp: null, status: '', inTracker: false }; order.push(code); }
+    return byCode[code];
+  }
+  (raw.hiring || []).forEach(function (h) {
+    var code = cleanCode(h.code); if (!code) return;
+    var r = rider(code);
+    r.inTracker = true;
+    r.row = h._row;
+    r.hireDate = parseSheetDate(h.hireDate, opts) || r.hireDate;
+    r.name = cleanText(h.name) || r.name;
+    r.zone = cleanText(h.zone) || r.zone;
+    r.phone = canonicalPhone(h.phone) || r.phone;
+    r.vehicle = cleanText(h.vehicle) || r.vehicle;
+    r.sv = cleanText(h.sv) || r.sv;
+    r.status = cleanText(h.status);
+    var sp = headerKey(h.sp);
+    r.sp = sp ? (/^with/.test(sp) || sp === 'yes' ? true : /^no/.test(sp) ? false : null) : null;
+  });
+  (raw.riders || []).forEach(function (n) {
+    var code = cleanCode(n.code); if (!code) return;
+    var r = rider(code);
+    if (!r.inTracker) { r.row = n._row; r.hireDate = parseSheetDate(n.hireDate, opts); }
+    r.name = r.name || cleanText(n.name);
+    r.zone = r.zone || cleanText(n.zone);
+    r.phone = r.phone || canonicalPhone(n.phone);
+    r.vehicle = r.vehicle || cleanText(n.vehicle);
+    r.orders = cleanText(n.orders) === '' ? null : Number(n.orders) || 0;
+    r.referralCode = cleanCode(n.referralCode);
+  });
+  var riders = order.map(function (c) { return byCode[c]; });
 
   var headcount = (raw.headcount || []).map(function (h) {
     return {
@@ -940,6 +980,7 @@ function buildWorld(raw, cfg, today) {
     if (r.phone && !ridersByPhone[r.phone]) ridersByPhone[r.phone] = r;
   });
   headcount.forEach(function (h) { headcountByCode[h.code] = h; });
+  riders.forEach(function (r) { if (!r.sv && headcountByCode[r.code]) r.sv = headcountByCode[r.code].supervisor; });
 
   // Earliest application per phone decides who referred that person.
   var appsByPhone = {};
@@ -972,6 +1013,13 @@ function buildWorld(raw, cfg, today) {
     ridersByPhone: ridersByPhone, ridersByCode: ridersByCode, headcountByCode: headcountByCode,
     appsByPhone: appsByPhone, campaigns: campaigns, payoutsByCode: payoutsByCode
   };
+}
+
+/** The supervisor of an internal referrer (Headcount SPV, else the Hiring tracker SV). External partners have none. */
+function svOf(key, world) {
+  if (!key || canonicalPhone(key)) return '';
+  var h = world.headcountByCode[key], r = world.ridersByCode[key];
+  return (h && h.supervisor) || (r && r.sv) || '';
 }
 
 /** Extra bonus from active campaigns: hire date inside the campaign, zone matches (or campaign is for all zones). */
@@ -1043,7 +1091,22 @@ function appOwnerKey(refCode) {
 function riderOwner(rider, world) {
   if (rider.referralCode && rider.referralCode !== world.cfg.COMPANY_REF_CODE) return rider.referralCode;
   var app = rider.phone && world.appsByPhone[rider.phone];
-  return app ? appOwnerKey(app.refCode) : '';
+  return app && appliedBeforeHire(app, rider) ? appOwnerKey(app.refCode) : '';
+}
+
+/**
+ * An application only counts for a hire that came after it (a day of slack
+ * for same-day paperwork). Someone hired before they were "referred" was
+ * already ours — no referral, no bonus.
+ */
+function appliedBeforeHire(app, rider) {
+  return !app.timestamp || !rider.hireDate || app.timestamp <= addDays(rider.hireDate, 1);
+}
+
+/** The rider a candidate became, if their phone was hired after the application. */
+function hiredFrom(app, world) {
+  var r = app.phone && world.ridersByPhone[app.phone];
+  return r && appliedBeforeHire(app, r) ? r : null;
 }
 
 /* ──────────────────────────── Dashboard ───────────────────────────── */
@@ -1075,7 +1138,7 @@ function buildDashboard(world, user) {
   var pipeline = world.applicants
     .filter(function (a) { return appOwnerKey(a.refCode) === key && a.timestamp && a.timestamp >= start; })
     .map(function (a) {
-      var hired = a.phone && world.ridersByPhone[a.phone];
+      var hired = hiredFrom(a, world);
       var status = hired ? STATUS_HIRED : (a.status || STATUSES[0]);
       var since = a.statusUpdated || a.timestamp;
       var waiting = diffDays(since, today);
@@ -1142,7 +1205,7 @@ function buildProfile(world, user) {
     name: r.name || h.name || user.name || '',
     phone: r.phone || h.phone || '',
     zone: r.zone || h.zone || '',
-    supervisor: h.supervisor || '',
+    supervisor: h.supervisor || r.sv || '',
     vehicle: r.vehicle || h.vehicle || '',
     talabatLink: cfg.TALABAT_REF_BASE + code,
     refParam: code
@@ -1155,7 +1218,8 @@ var FLAG_LABELS = {
   self: 'رشّح نفسه',
   burst: 'ترشيحات كتير في يوم واحد',
   dupe: 'نفس الرقم أو الرقم القومي متكرر',
-  known: 'كان شغال عندنا قبل كده',
+  known: 'كان متعيّن عندنا قبل ما يترشح',
+  suspended: 'موقوف (No SP)',
   quiet: 'اتعين ومش بيشتغل'
 };
 
@@ -1205,6 +1269,11 @@ function buildAdminData(world, users) {
     var app = r.phone && world.appsByPhone[r.phone];
     e.ownerKey = owner;
     e.ownerName = p ? p.name : '';
+    e.sv = r.sv || '';
+    e.sp = r.sp;
+    e.trackerStatus = r.status || '';
+    e.inTracker = !!r.inTracker;
+    e.ownerSv = svOf(owner, world);
     e.ownerType = p ? p.type : '';
     e.source = !owner ? 'none' : (r.referralCode && r.referralCode !== cfg.COMPANY_REF_CODE ? 'talabat' : 'app');
     e.appliedOn = app ? app.timestamp : null;
@@ -1212,6 +1281,7 @@ function buildAdminData(world, users) {
     if (!owner) { e.bonus = 0; e.payStatus = 'none'; }
     e.flags = [];
     if (e.state === 'active' && diffDays(r.hireDate, today) >= 14 && e.orders === 0) e.flags.push('quiet');
+    if (owner && r.sp === false) e.flags.push('suspended');
     if (p) {
       p.hires++; p.orders += e.orders; p.bonus += e.bonus; p.paid += e.paid;
       if (e.state === 'active' || e.state === 'upcoming') p.active++;
@@ -1228,13 +1298,11 @@ function buildAdminData(world, users) {
     var k = appOwnerKey(a.refCode) + '|' + (a.timestamp ? a.timestamp.getTime() : '');
     perRefDay[k] = (perRefDay[k] || 0) + 1;
   });
-  var headPhones = {};
-  world.headcount.forEach(function (h) { if (h.phone) headPhones[h.phone] = true; });
 
   var applicants = world.applicants.map(function (a) {
     var key = appOwnerKey(a.refCode);
     var p = person(key);
-    var hired = a.phone && world.ridersByPhone[a.phone];
+    var hired = hiredFrom(a, world);
     var status = hired ? STATUS_HIRED : (a.status || STATUSES[0]);
     var since = a.statusUpdated || a.timestamp;
     var waiting = since ? diffDays(since, today) : 0;
@@ -1242,10 +1310,11 @@ function buildAdminData(world, users) {
     if (p && a.phone && p.phone === a.phone) flags.push('self');
     if ((perRefDay[key + '|' + (a.timestamp ? a.timestamp.getTime() : '')] || 0) >= 5) flags.push('burst');
     if ((a.nationalId && byNid[a.nationalId] > 1) || (a.phone && byPhone[a.phone] > 1)) flags.push('dupe');
-    if (a.phone && headPhones[a.phone] && !hired) flags.push('known');
+    var before = a.phone && world.ridersByPhone[a.phone];
+    if (before && !hired) flags.push('known');
     if (p) p.applicants++;
     return {
-      row: a.row, submitted: a.timestamp, refKey: key, refName: p ? p.name : '', refType: p ? p.type : '',
+      row: a.row, submitted: a.timestamp, refKey: key, refName: p ? p.name : '', refType: p ? p.type : '', refSv: svOf(key, world),
       name: a.name, phone: a.phone, nationalId: a.nationalId, zone: a.zone,
       status: status, sheetStatus: a.rawStatus, note: a.note, statusUpdated: a.statusUpdated,
       daysWaiting: waiting, stage: stageIndex(status),
@@ -1275,6 +1344,7 @@ function buildAdminData(world, users) {
     users: Object.keys(people).map(function (k) { return people[k]; }),
     payouts: payouts,
     campaigns: world.campaigns || [],
+    svs: Object.keys(world.riders.reduce(function (m, r) { if (r.sv) m[r.sv] = 1; return m; }, world.headcount.reduce(function (m, h) { if (h.supervisor) m[h.supervisor] = 1; return m; }, {}))).sort(),
     zones: Object.keys(world.riders.concat(world.headcount).reduce(function (m, r) { if (r.zone) m[r.zone] = 1; return m; }, {})).sort()
   };
 }
@@ -1288,7 +1358,7 @@ function buildAdminData(world, users) {
 function findNewlyHired(world) {
   var out = [];
   world.applicants.forEach(function (a) {
-    var r = a.phone && world.ridersByPhone[a.phone];
+    var r = hiredFrom(a, world);
     if (!r) return;
     if (a.status === STATUS_HIRED && a.hiredCode === r.code) return;
     out.push({ row: a.row, code: r.code, hireDate: r.hireDate });
@@ -1347,7 +1417,6 @@ function validateCandidate(form, world) {
 function identityIndexFor(world) {
   if (world._identity) return world._identity;
   var records = [];
-  world.headcount.forEach(function (h) { records.push({ source: TABS.HEADCOUNT, phone: h.phone, label: h.code }); });
   world.riders.forEach(function (r) { records.push({ source: TABS.RIDERS, phone: r.phone, label: r.code }); });
   world.applicants.forEach(function (a) { records.push({ source: TABS.APPLICANTS, phone: a.phone, nationalId: a.nationalId, label: a.name }); });
   world._identity = buildIdentityIndex(records);
@@ -1389,6 +1458,11 @@ if (typeof module !== 'undefined' && module.exports) {
   function nid() { var y = int(85, 104), cent = y >= 100 ? '3' : '2'; return cent + pad(y % 100, 2) + pad(int(1, 12), 2) + pad(int(1, 28), 2) + pick(['01', '02', '12', '13', '14', '21']) + pad(int(0, 9999), 4) + int(0, 9); }
 
   var COMPANY = '3901026';
+  // Fictional supervisors, one or two per zone, each with their own "quality".
+  var SVS = {};
+  ZONES.forEach(function (z, i) { SVS[z] = [{ name: 'SV ' + pick(FIRST) + ' — ' + z, q: .55 + rnd() * .6 }].concat(i < 4 ? [{ name: 'SV ' + pick(FIRST) + ' ' + pick(LAST) + ' — ' + z, q: .5 + rnd() * .6 }] : []); });
+  function svFor(z) { return pick(SVS[z] || SVS.Maadi); }
+  var hiring = [];
   var cfg = resolveConfig([['PROGRAM_START_DATE', iso(ago(90))], ['ANNOUNCEMENT', 'الأسبوع ده كل تعيين في المعادي عليه 500 ج زيادة 🔥']], []);
 
   // ── Referrers: 24 riders and 6 outside partners ──
@@ -1397,7 +1471,8 @@ if (typeof module !== 'undefined' && module.exports) {
     var code = String(4700000 + int(1000, 99999)), ph = phone(), nm = name(3) + ' _FULL SPEED';
     var skill = rnd();
     refs.push({ key: code, type: 'internal', weight: skill < .25 ? 6 : skill < .6 ? 2.5 : 1, quality: .2 + rnd() * .5, phone: ph });
-    headcount.push({ code: code, name: nm, zone: zone(), supervisor: 'Kabo ' + pick(ZONES), manager: 'Full Speed', phone: ph, vehicle: pick(['Bike', 'Bike', 'Bicycle']), active: 'Active' });
+    var hz = zone();
+    headcount.push({ code: code, name: nm, zone: hz, supervisor: svFor(hz).name, manager: 'Full Speed', phone: ph, vehicle: pick(['Bike', 'Bike', 'Bicycle']), active: 'Active' });
     if (rnd() < .85) users.push({ type: 'internal', code: code, name: nm, phone: ph, refId: '', status: 'active', created: ago(int(60, 120)), lastLogin: ago(int(0, 14)) });
   }
   for (var j = 0; j < 6; j++) {
@@ -1426,8 +1501,11 @@ if (typeof module !== 'undefined' && module.exports) {
         var hire = addDays(sub, int(2, 16));
         if (hire > today) hire = today;
         var code2 = String(riderCode += int(3, 40));
-        riders.push({ _row: riders.length + 2, hireDate: hire, code: code2, name: name(3) + ' _FULL SPEED', zone: z, phone: p, vehicle: pick(['Bike', 'Bike', 'Bicycle']), orders: '', referralCode: ref.type === 'internal' ? ref.key : COMPANY });
-        var perDay = rnd() < .08 ? 0 : 6 + rnd() * 18;
+        var sv = svFor(z), veh = pick(['Bike', 'Bike', 'Bike', 'Bicycle', 'Walker']);
+        var perDay = rnd() < .08 ? 0 : (4 + rnd() * 16) * sv.q * (veh === 'Bike' ? 1.15 : veh === 'Walker' ? .6 : .85);
+        var tenure = diffDays(hire, today), spOn = perDay > 0 && rnd() > Math.min(.6, tenure / 160 + (1.2 - sv.q) * .25);
+        hiring.push({ _row: hiring.length + 2, hireDate: hire, code: code2, zone: z, name: name(3) + ' _FULL SPEED', phone: p, status: 'Inactive', sv: sv.name, sp: spOn ? 'With SP' : 'No SP', vehicle: veh });
+        riders.push({ _row: riders.length + 2, code: code2, referralCode: ref.type === 'internal' ? ref.key : COMPANY });
         for (var x = hire; x < today; x = addDays(x, 1)) if (perDay) daily.push({ date: x, code: code2, orders: Math.max(0, Math.round(perDay + (rnd() - .5) * 8)) });
       }
     }
@@ -1435,7 +1513,8 @@ if (typeof module !== 'undefined' && module.exports) {
   // Hires that came without any referral (for the "share of hires" number)
   for (var u2 = 0; u2 < 70; u2++) {
     var c3 = String(riderCode += int(3, 40)), h3 = ago(int(0, 90));
-    riders.push({ _row: riders.length + 2, hireDate: h3, code: c3, name: name(3) + ' _FULL SPEED', zone: zone(), phone: phone(), vehicle: 'Bike', orders: int(50, 900), referralCode: '' });
+    var z3 = zone();
+    hiring.push({ _row: hiring.length + 2, hireDate: h3, code: c3, zone: z3, name: name(3) + ' _FULL SPEED', phone: phone(), status: 'Inactive', sv: svFor(z3).name, sp: rnd() < .8 ? 'With SP' : 'No SP', vehicle: 'Bike' });
   }
   // A few things the alerts page should catch
   var cheater = refs[3];
@@ -1444,7 +1523,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
   var campaigns = [{ id: 'C-MAADI', name: 'أسبوع المعادي', start: ago(10), end: addDays(today, 4), zone: 'Maadi', extra: 500, active: 'نعم' }];
   var payouts = [];
-  var world = function () { return buildWorld({ riders: riders, headcount: headcount, applicants: applicants, dailyOrders: daily, campaigns: campaigns, payouts: payouts }, cfg, today); };
+  var world = function () { return buildWorld({ hiring: hiring, riders: riders, headcount: headcount, applicants: applicants, dailyOrders: daily, campaigns: campaigns, payouts: payouts }, cfg, today); };
 
   // Pay most of what was due more than a week ago, so the payouts log has history.
   (function () {
@@ -1555,7 +1634,7 @@ if (typeof module !== 'undefined' && module.exports) {
     }
   } : window.FS_ADMIN_DEMO;
 
-  var S = { token: null, me: null, data: null, view: 'overview', range: 'season', source: 'all', zone: '', drafts: {} };
+  var S = { token: null, me: null, data: null, view: 'overview', range: 'season', source: 'all', zone: '', sv: '', svView: 'rider', drafts: {} };
   var root = document.getElementById('root');
   var charts = [];
 
@@ -1664,7 +1743,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
   /* ─────────────── Shell ─────────────── */
   var NAV = [
-    ['', [['overview', 'لوحة القيادة', 'dash'], ['analytics', 'التحليلات', 'chart']]],
+    ['', [['overview', 'لوحة القيادة', 'dash'], ['analytics', 'التحليلات', 'chart'], ['sv', 'السوبرفايزرز', 'team']]],
     ['التشغيل', [['applicants', 'المرشحين', 'people'], ['riders', 'الطيارين والبونص', 'bike'], ['payouts', 'سجل الصرف', 'money'], ['users', 'المرشِّحين', 'user']]],
     ['التحكم', [['alerts', 'التنبيهات', 'flag'], ['campaigns', 'الحملات والإعلانات', 'mega'], ['settings', 'الإعدادات', 'gear'], ['team', 'الفريق', 'team'], ['audit', 'سجل التعديلات', 'log']]]
   ];
@@ -1720,11 +1799,13 @@ if (typeof module !== 'undefined' && module.exports) {
   function inRange(d) { return d && d >= rangeStart() && d <= S.data.today; }
   function srcOk(t) { return S.source === 'all' || t === S.source; }
   function zoneOk(z) { return !S.zone || z === S.zone; }
+  function svOk(v) { return !S.sv || v === S.sv; }
   function filterBar() {
     return '<div class="filters"><div class="seg" role="group" aria-label="الفترة">' + RANGES.map(function (r) {
       return '<button data-range="' + r[0] + '" aria-pressed="' + (S.range === r[0]) + '">' + r[1] + '</button>';
     }).join('') + '</div>' +
     '<label>المصدر <select id="fSource"><option value="all">الكل</option><option value="internal"' + (S.source === 'internal' ? ' selected' : '') + '>طيارين داخليين</option><option value="external"' + (S.source === 'external' ? ' selected' : '') + '>شركاء خارجيين</option></select></label>' +
+    '<label title="الترشيحات: فريق المرشِّح · التعيينات: فريق الطيار الجديد">SV <select id="fSv"><option value="">كل السوبرفايزرز</option>' + (S.data.svs || []).map(function (v) { return '<option' + (S.sv === v ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('') + '</select></label>' +
     '<label>المنطقة <select id="fZone"><option value="">كل المناطق</option>' + S.data.zones.map(function (z) { return '<option' + (S.zone === z ? ' selected' : '') + '>' + esc(z) + '</option>'; }).join('') + '</select></label>' +
     '<span class="muted" style="margin-inline-start:auto;font-size:12px">' + fmt(rangeStart(), true) + ' ← ' + fmt(S.data.today, true) + '</span></div>';
   }
@@ -1732,20 +1813,21 @@ if (typeof module !== 'undefined' && module.exports) {
     root.querySelectorAll('[data-range]').forEach(function (b) { b.onclick = function () { S.range = b.dataset.range; render(); }; });
     var s = document.getElementById('fSource'); if (s) s.onchange = function () { S.source = s.value; render(); };
     var z = document.getElementById('fZone'); if (z) z.onchange = function () { S.zone = z.value; render(); };
+    var v = document.getElementById('fSv'); if (v) v.onchange = function () { S.sv = v.value; render(); };
   }
   function scoped() {
     var d = S.data;
-    var apps = d.applicants.filter(function (a) { return inRange(a.submitted) && srcOk(a.refType) && zoneOk(a.zone); });
-    var hires = d.riders.filter(function (r) { return r.ownerKey && inRange(r.hireDate) && srcOk(r.ownerType) && zoneOk(r.zone); });
-    var allHires = d.riders.filter(function (r) { return inRange(r.hireDate) && zoneOk(r.zone); });
+    var apps = d.applicants.filter(function (a) { return inRange(a.submitted) && srcOk(a.refType) && zoneOk(a.zone) && svOk(a.refSv); });
+    var hires = d.riders.filter(function (r) { return r.ownerKey && inRange(r.hireDate) && srcOk(r.ownerType) && zoneOk(r.zone) && svOk(r.sv); });
+    var allHires = d.riders.filter(function (r) { return inRange(r.hireDate) && zoneOk(r.zone) && svOk(r.sv); });
     return { apps: apps, hires: hires, allHires: allHires };
   }
   function prevScoped() {
     var start = rangeStart(), len = diff(start, S.data.today) + 1, pStart = addDays(start, -len), pEnd = addDays(start, -1);
     var inP = function (d) { return d && d >= pStart && d <= pEnd; };
     return {
-      apps: S.data.applicants.filter(function (a) { return inP(a.submitted) && srcOk(a.refType) && zoneOk(a.zone); }).length,
-      hires: S.data.riders.filter(function (r) { return r.ownerKey && inP(r.hireDate) && srcOk(r.ownerType) && zoneOk(r.zone); }).length
+      apps: S.data.applicants.filter(function (a) { return inP(a.submitted) && srcOk(a.refType) && zoneOk(a.zone) && svOk(a.refSv); }).length,
+      hires: S.data.riders.filter(function (r) { return r.ownerKey && inP(r.hireDate) && srcOk(r.ownerType) && zoneOk(r.zone) && svOk(r.sv); }).length
     };
   }
   function delta(now, before) {
@@ -1857,53 +1939,135 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 
   /* ─────────────── Analytics ─────────────── */
+  function median(a) { if (!a.length) return 0; var b = a.slice().sort(function (x, y) { return x - y; }), m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; }
+  function avg(a) { return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : 0; }
+  function reached1(r) { return r.orders >= S.data.season.tiers[0].orders; }
+  function insight(t) { return '<p class="sub insight-line">' + t + '</p>'; }
+
+  function forecast() {
+    var d = S.data, t = d.today, last28 = d.riders.filter(function (r) { return r.ownerKey && r.hireDate && diff(r.hireDate, t) < 28 && diff(r.hireDate, t) >= 0 && srcOk(r.ownerType) && zoneOk(r.zone) && svOk(r.sv); }).length;
+    var in30 = addDays(t, 30);
+    var due30 = d.riders.filter(function (r) { return r.ownerKey && r.bonus > 0 && r.payStatus !== 'paid' && (r.payStatus === 'due' || (r.payoutDate && r.payoutDate <= in30)) && srcOk(r.ownerType) && zoneOk(r.zone) && svOk(r.sv); });
+    var upside = d.riders.filter(function (r) { return r.state === 'active' && r.ownerKey && r.nextBonus && srcOk(r.ownerType) && zoneOk(r.zone) && svOk(r.sv); }).reduce(function (s, r) { return s + (r.nextBonus - r.bonus); }, 0);
+    return { hires30: Math.round(last28 / 28 * 30), due30: due30.reduce(function (s, r) { return s + r.bonus - r.paid; }, 0), dueCount: due30.length, upside: upside };
+  }
+
   function viewAnalytics() {
-    var d = S.data, sc = scoped(), tiers = d.season.tiers;
+    var d = S.data, sc = scoped();
+    var paidHires = sc.hires.filter(function (r) { return r.bonus > 0; });
+    var cost = sc.hires.length ? Math.round(sc.hires.reduce(function (s, r) { return s + r.bonus; }, 0) / sc.hires.length) : 0;
+    var orders = sc.hires.reduce(function (s, r) { return s + r.orders; }, 0), bonus = sc.hires.reduce(function (s, r) { return s + r.bonus; }, 0);
+    var fc = forecast();
+
     // Zone conversion
     var z = {};
     sc.apps.forEach(function (a) { var k = a.zone || 'غير محدد'; z[k] = z[k] || { apps: 0, hired: 0, rejected: 0 }; z[k].apps++; if (a.status === 'اشتغل') z[k].hired++; if (a.status === 'مرفوض') z[k].rejected++; });
-    var zoneRows = Object.keys(z).sort(function (p, q) { return z[q].apps - z[p].apps; }).map(function (k) { return [esc(k), z[k].apps, z[k].hired, pct(z[k].hired, z[k].apps) + '%', z[k].rejected]; });
-    // Rejection reasons (admin notes on rejected)
+    var zk = Object.keys(z).sort(function (p, q) { return z[q].apps - z[p].apps; });
+    var zoneRows = zk.map(function (k) { return [esc(k), z[k].apps, z[k].hired, pct(z[k].hired, z[k].apps) + '%', z[k].rejected]; });
+    var bestZone = zk.filter(function (k) { return z[k].apps >= 10; }).sort(function (p, q) { return pct(z[q].hired, z[q].apps) - pct(z[p].hired, z[p].apps); })[0];
+    // Rejections
     var reasons = {};
     sc.apps.filter(function (a) { return a.status === 'مرفوض'; }).forEach(function (a) { var r = (a.note || 'من غير سبب').split(/[—\-|،,]/)[0].trim() || 'من غير سبب'; reasons[r] = (reasons[r] || 0) + 1; });
-    var reasonRows = Object.keys(reasons).sort(function (p, q) { return reasons[q] - reasons[p]; }).slice(0, 10).map(function (k) { return [esc(k), reasons[k]]; });
-    // Bonus at risk: active riders closest to the next tier
-    var close = d.riders.filter(function (r) { return r.state === 'active' && r.ownerKey && r.nextOrders && zoneOk(r.zone) && srcOk(r.ownerType); })
-      .sort(function (a, b) { return a.daysLeft - b.daysLeft || a.ordersToNext - b.ordersToNext; }).slice(0, 10);
-    // Referrer leaderboard (all time in scope)
+    var rk = Object.keys(reasons).sort(function (p, q) { return reasons[q] - reasons[p]; });
+    var rejTotal = rk.reduce(function (s, k) { return s + reasons[k]; }, 0);
+    // Leaders
     var by = {};
     sc.apps.forEach(function (a) { if (a.refKey) { by[a.refKey] = by[a.refKey] || { apps: 0, hired: 0 }; by[a.refKey].apps++; if (a.status === 'اشتغل') by[a.refKey].hired++; } });
-    var lead = Object.keys(by).filter(function (k) { return by[k].apps >= 2; }).sort(function (p, q) { return pct(by[q].hired, by[q].apps) - pct(by[p].hired, by[p].apps) || by[q].apps - by[p].apps; }).slice(0, 10)
+    var lead = Object.keys(by).filter(function (k) { return by[k].apps >= 3; }).sort(function (p, q) { return pct(by[q].hired, by[q].apps) - pct(by[p].hired, by[p].apps) || by[q].apps - by[p].apps; }).slice(0, 10)
       .map(function (k) { var u = d.usersByKey[k] || {}; return [esc(cleanName(u.name) || k), by[k].apps, by[k].hired, pct(by[k].hired, by[k].apps) + '%']; });
-    var sourceRows = ['talabat', 'app', 'none'].map(function (s) { return [{ talabat: 'كود طلبات (طيار داخلي)', app: 'استمارة البرنامج (شريك / كود الشركة)', none: 'من غير ترشيح' }[s], sc.allHires.filter(function (r) { return r.source === s; }).length]; });
+    // Vehicles
+    var veh = {};
+    sc.hires.forEach(function (r) { var k = r.vehicle || 'غير محدد'; veh[k] = veh[k] || []; veh[k].push(r); });
+    var vk = Object.keys(veh).sort(function (p, q) { return veh[q].length - veh[p].length; });
+    var vehRows = vk.map(function (k) { var a = veh[k]; return [esc(k), a.length, Math.round(avg(a.map(function (r) { return r.orders; }))), pct(a.filter(reached1).length, a.length) + '%', a.some(function (r) { return r.sp !== null && r.sp !== undefined; }) ? pct(a.filter(function (r) { return r.sp === true; }).length, a.filter(function (r) { return r.sp !== null && r.sp !== undefined; }).length) + '%' : '—']; });
+    // Close to next tier
+    var close = d.riders.filter(function (r) { return r.state === 'active' && r.ownerKey && r.nextOrders && zoneOk(r.zone) && srcOk(r.ownerType) && svOk(r.sv); })
+      .sort(function (a, b) { return a.daysLeft - b.daysLeft || a.ordersToNext - b.ordersToNext; }).slice(0, 12);
+    var sourceRows = ['talabat', 'app', 'none'].map(function (s) { var n = sc.allHires.filter(function (r) { return r.source === s; }).length; return [{ talabat: 'كود طلبات (طيار داخلي)', app: 'استمارة البرنامج (شريك / كود الشركة)', none: 'من غير ترشيح' }[s], n, pct(n, sc.allHires.length) + '%']; });
 
-    return head('التحليلات', 'إيه اللي شغال، وفين المرشحين بيقعوا، والفلوس رايحة على فين') + filterBar() +
+    return head('التحليلات', 'إيه اللي شغال، فين المرشحين بيقعوا، والفلوس رايحة على فين') + filterBar() +
+      '<div class="kpis">' +
+        kpi('تكلفة البونص لكل تعيين', money(cost), 'gold', '<span class="delta">جنيه في المتوسط (' + paidHires.length + ' من ' + sc.hires.length + ' فتحوا بونص)</span>') +
+        kpi('تكلفة البونص لكل أوردر', orders ? (bonus / orders).toFixed(2) : '—', '', '<span class="delta">جنيه لكل أوردر عمله طيار من ترشيح — كل ما يقل، البونص أكفأ</span>') +
+        kpi('تعيينات متوقعة الـ30 يوم الجاية', fc.hires30, '', '<span class="delta">على معدل آخر 4 أسابيع</span>') +
+        kpi('بونص هيستحق خلال 30 يوم', money(fc.due30), 'gold', '<span class="delta">' + fc.dueCount + ' طيار · وممكن يزيد ' + money(fc.upside) + ' ج لو وصلوا الشريحة الجاية</span>') +
+      '</div>' +
       '<div class="charts">' +
-        '<section class="card"><h2>الطيارين حسب شريحة البونص<small>اللي اتعيّنوا في الفترة</small></h2><p class="sub">كام طيار وصل لكل شريحة — الأعمدة الشمال هي اللي لسه ما فتحتش بونص</p><div class="chart-box"><canvas id="cTiers" role="img" aria-label="توزيع الطيارين على الشرايح"></canvas></div></section>' +
-        '<section class="card"><h2>البونص اللي هيستحق الصرف<small>حسب أسبوع الاستحقاق</small></h2><p class="sub">المستحق الحالي + المتوقع لو كل طيار فضل على شريحته</p><div class="chart-box"><canvas id="cLiab" role="img" aria-label="البونص المتوقع حسب الأسبوع"></canvas></div></section>' +
-        '<section class="card"><h2>كام يوم من التقديم للتعيين</h2><div class="chart-box"><canvas id="cTTH" role="img" aria-label="توزيع أيام التعيين"></canvas></div></section>' +
-        '<section class="card"><h2>متوسط الأوردرات حسب أسبوع التعيين<small>الأوردرات المكتملة لحد النهارده</small></h2><div class="chart-box"><canvas id="cCohort" role="img" aria-label="متوسط أوردرات كل دفعة"></canvas></div></section>' +
-        '<section class="card"><h2>المناطق: ترشيحات وتحويل</h2>' + table([['المنطقة'], ['ترشيحات', 'n'], ['اشتغلوا', 'n'], ['تحويل', 'n'], ['مرفوض', 'n']], zoneRows, { empty: 'مفيش بيانات.', page: 10 }) + '</section>' +
-        '<section class="card"><h2>أسباب الرفض</h2><p class="sub">من ملاحظة الإدارة على المرفوضين</p>' + table([['السبب'], ['العدد', 'n']], reasonRows, { empty: 'مفيش مرفوضين في الفترة دي.' }) + '</section>' +
-        '<section class="card"><h2>أعلى نسبة تحويل<small>اللي رشّحوا 2 أو أكتر</small></h2>' + table([['المرشِّح'], ['ترشيحات', 'n'], ['اشتغلوا', 'n'], ['تحويل', 'n']], lead, { empty: 'مفيش بيانات كفاية.' }) + '</section>' +
-        '<section class="card"><h2>التعيينات جت منين</h2>' + table([['المصدر'], ['تعيينات', 'n']], sourceRows) + '</section>' +
+        '<section class="card wide"><h2>خريطة الترشيحات: المنطقة × الأسبوع<small>كل ما المربع يغمق، الترشيحات أكتر</small></h2>' + heatmap(sc.apps) + '</section>' +
+        '<section class="card"><h2>تركيز المرشِّحين<small>منحنى باريتو</small></h2>' + pareto(sc).text + '<div class="chart-box"><canvas id="cPareto" role="img" aria-label="نسبة التعيينات التراكمية حسب المرشِّحين"></canvas></div></section>' +
+        '<section class="card"><h2>الطيارين الشغالين (With SP) حسب مدة التعيين</h2>' + spText(sc) + '<div class="chart-box"><canvas id="cSP" role="img" aria-label="نسبة الطيارين اللي ليهم نقطة فتح حسب مدة التعيين"></canvas></div></section>' +
+        '<section class="card"><h2>الطيارين حسب شريحة البونص<small>اللي اتعيّنوا في الفترة</small></h2>' + insight(pct(sc.hires.filter(reached1).length, sc.hires.length) + '% بس من التعيينات وصلوا أول شريحة (' + d.season.tiers[0].orders + ' أوردر).') + '<div class="chart-box"><canvas id="cTiers" role="img" aria-label="توزيع الطيارين على الشرايح"></canvas></div></section>' +
+        '<section class="card"><h2>البونص اللي هيستحق الصرف<small>حسب أسبوع الاستحقاق</small></h2>' + insight('جهّز ' + money(fc.due30) + ' ج للـ30 يوم الجاية.') + '<div class="chart-box"><canvas id="cLiab" role="img" aria-label="البونص المتوقع حسب الأسبوع"></canvas></div></section>' +
+        '<section class="card"><h2>كام يوم من التقديم للتعيين</h2>' + tthText(sc) + '<div class="chart-box"><canvas id="cTTH" role="img" aria-label="توزيع أيام التعيين"></canvas></div></section>' +
+        '<section class="card"><h2>متوسط الأوردرات حسب أسبوع التعيين<small>الأوردرات المكتملة لحد النهارده</small></h2>' + insight('الدفعات الأقدم عندها وقت أطول، فطبيعي أوردراتها أعلى — قارن الدفعات اللي في نفس العمر.') + '<div class="chart-box"><canvas id="cCohort" role="img" aria-label="متوسط أوردرات كل دفعة"></canvas></div></section>' +
+        '<section class="card"><h2>المركبة: الأداء والاستمرار</h2>' + (vk.length > 1 ? insight('أعلى متوسط أوردرات: <b>' + esc(vk.slice().sort(function (p, q) { return avg(veh[q].map(function (r) { return r.orders; })) - avg(veh[p].map(function (r) { return r.orders; })); })[0]) + '</b>.') : '') +
+          table([['المركبة'], ['تعيينات', 'n'], ['متوسط أوردرات', 'n'], ['وصلوا أول شريحة', 'n'], ['With SP', 'n']], vehRows, { empty: 'مفيش بيانات.' }) + '</section>' +
+        '<section class="card"><h2>التعيينات جت منين</h2>' + table([['المصدر'], ['تعيينات', 'n'], ['النسبة', 'n']], sourceRows) + '</section>' +
+        '<section class="card"><h2>المناطق: ترشيحات وتحويل</h2>' + (bestZone ? insight('أعلى تحويل (10 ترشيحات أو أكتر): <b>' + esc(bestZone) + '</b> بـ ' + pct(z[bestZone].hired, z[bestZone].apps) + '%.') : '') + table([['المنطقة'], ['ترشيحات', 'n'], ['اشتغلوا', 'n'], ['تحويل', 'n'], ['مرفوض', 'n']], zoneRows, { empty: 'مفيش بيانات.', page: 10 }) + '</section>' +
+        '<section class="card"><h2>أسباب الرفض</h2>' + (rk.length ? insight('<b>' + esc(rk[0]) + '</b> لوحده ' + pct(reasons[rk[0]], rejTotal) + '% من الرفض — لو اتحل قبل الترشيح هيرفع التحويل.') : '') + table([['السبب'], ['العدد', 'n'], ['النسبة', 'n']], rk.slice(0, 10).map(function (k) { return [esc(k), reasons[k], pct(reasons[k], rejTotal) + '%']; }), { empty: 'مفيش مرفوضين في الفترة دي.' }) + '</section>' +
+        '<section class="card"><h2>أعلى نسبة تحويل<small>اللي رشّحوا 3 أو أكتر</small></h2>' + table([['المرشِّح'], ['ترشيحات', 'n'], ['اشتغلوا', 'n'], ['تحويل', 'n']], lead, { empty: 'مفيش بيانات كفاية.' }) + '</section>' +
         '<section class="card wide"><h2>قريبين من الشريحة الجاية<small>أكتر ناس تشجيعهم يفرق دلوقتي</small></h2>' + table(
-          [['الطيار'], ['المرشِّح'], ['أوردرات', 'n'], ['باقي للشريحة', 'n'], ['هيفتح (ج)', 'n'], ['أيام باقية', 'n'], ['']],
-          close.map(function (r) { return [esc(cleanName(r.name)), esc(cleanName(r.ownerName) || r.ownerKey), r.orders, r.ordersToNext, '<span class="gold">' + money(r.nextBonus) + '</span>', r.daysLeft,
+          [['الطيار'], ['SV'], ['المرشِّح'], ['أوردرات', 'n'], ['باقي للشريحة', 'n'], ['هيفتح (ج)', 'n'], ['أيام باقية', 'n'], ['']],
+          close.map(function (r) { return [esc(cleanName(r.name)), esc(r.sv || '—'), esc(cleanName(r.ownerName) || r.ownerKey), r.orders, r.ordersToNext, '<span class="gold">' + money(r.nextBonus) + '</span>', r.daysLeft,
             r.phone ? '<a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="' + wa(r.phone, 'يا ' + cleanName(r.name).split(' ')[0] + ' فاضلك ' + r.ordersToNext + ' أوردر بس على الشريحة الجاية وقدامك ' + r.daysLeft + ' يوم 💪 — Full Speed') + '">' + icon('wa') + 'شجّعه</a>' : '']; }),
           { empty: 'مفيش طيارين قريبين من شريحة دلوقتي.' }) + '</section>' +
       '</div>';
   }
+
+  /* Zone × week grid: one hue, darker = more applications. */
+  function heatmap(apps) {
+    var t = S.data.today, weeks = [], w = weekStart(addDays(t, -7 * 11));
+    if (w < weekStart(rangeStart())) w = weekStart(rangeStart());
+    while (w <= t) { weeks.push(iso(w)); w = addDays(w, 7); }
+    var grid = {}, zones = {};
+    apps.forEach(function (a) { var k = iso(weekStart(a.submitted)); if (weeks.indexOf(k) === -1) return; var z = a.zone || 'غير محدد'; zones[z] = (zones[z] || 0) + 1; grid[z + '|' + k] = (grid[z + '|' + k] || 0) + 1; });
+    var zs = Object.keys(zones).sort(function (p, q) { return zones[q] - zones[p]; }).slice(0, 10);
+    if (!zs.length) return '<div class="empty">مفيش ترشيحات في الفترة.</div>';
+    var max = Math.max.apply(null, Object.keys(grid).map(function (k) { return grid[k]; }));
+    var cell = function (n) { var p = n ? Math.round(18 + 82 * n / max) : 0; return '<td class="hm" style="background:' + (n ? 'color-mix(in srgb, var(--s2) ' + p + '%, var(--surface))' : 'var(--surface-2)') + ';color:' + (p > 55 ? '#fff' : 'var(--ink)') + '" title="' + n + ' ترشيح">' + (n || '') + '</td>'; };
+    var hot = zs.map(function (z) { var last = grid[z + '|' + weeks[weeks.length - 1]] || 0, prev = grid[z + '|' + weeks[weeks.length - 2]] || 0; return { z: z, d: last - prev }; }).sort(function (a, b) { return b.d - a.d; });
+    return (hot[0] && hot[0].d > 0 ? insight('أكتر منطقة طلعت الأسبوع ده: <b>' + esc(hot[0].z) + '</b> (+' + hot[0].d + ' عن الأسبوع اللي فات).' + (hot[hot.length - 1].d < 0 ? ' وأكتر واحدة نزلت: <b>' + esc(hot[hot.length - 1].z) + '</b> (' + hot[hot.length - 1].d + ').' : '')) : '') +
+      '<div class="tbl-wrap"><table class="heat"><thead><tr><th>المنطقة</th>' + weeks.map(function (k) { return '<th class="n">' + fmt(k) + '</th>'; }).join('') + '<th class="n">الإجمالي</th></tr></thead><tbody>' +
+      zs.map(function (z) { return '<tr><td>' + esc(z) + '</td>' + weeks.map(function (k) { return cell(grid[z + '|' + k] || 0); }).join('') + '<td class="n"><b>' + zones[z] + '</b></td></tr>'; }).join('') + '</tbody></table></div>';
+  }
+
+  function pareto(sc) {
+    var by = {}; sc.hires.forEach(function (r) { by[r.ownerKey] = (by[r.ownerKey] || 0) + 1; });
+    var counts = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return b - a; });
+    var total = counts.reduce(function (s, x) { return s + x; }, 0), n = counts.length;
+    var pts = [], acc = 0;
+    counts.forEach(function (c, i) { acc += c; pts.push({ x: Math.round((i + 1) / n * 100), y: Math.round(acc / total * 100) }); });
+    var top20 = n ? pts[Math.max(0, Math.ceil(n * .2) - 1)].y : 0;
+    return { pts: pts, text: n ? insight('أعلى 20% من المرشِّحين (' + Math.ceil(n * .2) + ' شخص) جابوا <b>' + top20 + '%</b> من التعيينات — دول اللي يستاهلوا اهتمام ومكافأة.') : insight('مفيش تعيينات في الفترة.') };
+  }
+  function spBuckets(sc) {
+    var b = [[0, 7, '0–7'], [8, 14, '8–14'], [15, 30, '15–30'], [31, 60, '31–60'], [61, 9999, '+60']];
+    return b.map(function (x) {
+      var rs = sc.hires.filter(function (r) { var t = diff(r.hireDate, S.data.today); return t >= x[0] && t <= x[1] && r.sp !== null && r.sp !== undefined; });
+      return { label: x[2] + ' يوم', n: rs.length, p: rs.length ? pct(rs.filter(function (r) { return r.sp === true; }).length, rs.length) : null };
+    });
+  }
+  function spText(sc) {
+    var b = spBuckets(sc).filter(function (x) { return x.p !== null; });
+    if (!b.length) return insight('محتاج عمود "Has SP" في Hiring tracker عشان الرسم ده يشتغل.');
+    var lo = b.slice().sort(function (p, q) { return p.p - q.p; })[0];
+    return insight('أقل نسبة استمرار عند <b>' + lo.label + '</b> (' + lo.p + '% With SP) — ده الوقت اللي الطيارين بيتوقفوا فيه، والمتابعة فيه أهم.');
+  }
+  function tthText(sc) {
+    var xs = sc.hires.map(function (r) { return r.daysToHire; }).filter(function (x) { return x !== null && x !== undefined; });
+    return xs.length ? insight('النص من التعيينات بيخلص في <b>' + Math.round(median(xs)) + ' يوم</b> أو أقل؛ وأبطأ 10% بياخدوا ' + xs.slice().sort(function (a, b) { return a - b; })[Math.floor(xs.length * .9)] + ' يوم أو أكتر.') : '';
+  }
+
   function bindAnalytics() {
     bindFilters();
     var d = S.data, sc = scoped(), tiers = d.season.tiers;
     var labels = ['أقل من ' + tiers[0].orders].concat(tiers.map(function (t) { return t.orders + '+'; }));
     var counts = labels.map(function () { return 0; });
     sc.hires.forEach(function (r) { var i = 0; tiers.forEach(function (t, j) { if (r.orders >= t.orders) i = j + 1; }); counts[i]++; });
-    chart('cTiers', { type: 'bar', data: { labels: labels, datasets: [{ label: 'طيارين', data: counts, backgroundColor: css('--gold'), borderRadius: 4, maxBarThickness: 26 }] } });
+    chart('cTiers', { type: 'bar', data: { labels: labels, datasets: [{ label: 'طيارين', data: counts, backgroundColor: counts.map(function (c, i) { return i ? css('--gold') : css('--line-2'); }), borderRadius: 4, maxBarThickness: 26 }] } });
 
     var weeks = {}, t0 = weekStart(d.today);
-    d.riders.filter(function (r) { return (r.payStatus === 'due' || r.payStatus === 'pending') && r.ownerKey && r.bonus > 0 && srcOk(r.ownerType) && zoneOk(r.zone); }).forEach(function (r) {
+    d.riders.filter(function (r) { return (r.payStatus === 'due' || r.payStatus === 'pending') && r.ownerKey && r.bonus > 0 && srcOk(r.ownerType) && zoneOk(r.zone) && svOk(r.sv); }).forEach(function (r) {
       var w = r.payStatus === 'due' ? t0 : weekStart(r.payoutDate); var k = iso(w < t0 ? t0 : w);
       weeks[k] = (weeks[k] || 0) + (r.bonus - r.paid);
     });
@@ -1918,6 +2082,92 @@ if (typeof module !== 'undefined' && module.exports) {
     sc.hires.forEach(function (r) { var k = iso(weekStart(r.hireDate)); co[k] = co[k] || { n: 0, o: 0 }; co[k].n++; co[k].o += r.orders; });
     var ck = Object.keys(co).sort();
     chart('cCohort', { type: 'bar', data: { labels: ck.map(function (k) { return fmt(k); }), datasets: [{ label: 'متوسط أوردرات', data: ck.map(function (k) { return Math.round(co[k].o / co[k].n); }), backgroundColor: css('--s2'), borderRadius: 4, maxBarThickness: 28 }] } });
+
+    var pr = pareto(sc).pts;
+    chart('cPareto', { type: 'line', data: { labels: pr.map(function (p) { return p.x + '%'; }), datasets: [{ label: '% من التعيينات', data: pr.map(function (p) { return p.y; }), borderColor: css('--s1'), backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: .2, fill: false }] },
+      options: { scales: { x: { title: { display: true, text: 'أعلى % من المرشِّحين ←', color: css('--muted') }, grid: { display: false }, ticks: { maxTicksLimit: 6, color: css('--muted') } }, y: { min: 0, max: 100, title: { display: true, text: '% من التعيينات', color: css('--muted') }, ticks: { callback: function (v) { return v + '%'; }, color: css('--muted') }, grid: { color: css('--line') }, position: 'left' } } } });
+
+    var sp = spBuckets(sc);
+    chart('cSP', { type: 'bar', data: { labels: sp.map(function (b) { return b.label; }), datasets: [{ label: '% With SP', data: sp.map(function (b) { return b.p; }), backgroundColor: css('--s2'), borderRadius: 4, maxBarThickness: 40 }] },
+      options: { plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return c.parsed.y + '% With SP — ' + sp[c.dataIndex].n + ' طيار'; } } } }, scales: { x: { grid: { display: false }, reverse: true, ticks: { color: css('--muted') } }, y: { min: 0, max: 100, ticks: { callback: function (v) { return v + '%'; }, color: css('--muted') }, grid: { color: css('--line') }, position: 'right' } } } });
+  }
+
+  /* ─────────────── Supervisors ─────────────── */
+  function svStats(sc) {
+    var d = S.data, out = {};
+    var get = function (k) { return out[k] = out[k] || { sv: k, hires: 0, refHires: 0, orders: [], reached: 0, bonus: 0, spKnown: 0, spOn: 0, refs: {}, apps: 0, appHired: 0 }; };
+    if (S.svView === 'rider') {
+      sc.allHires.forEach(function (r) {
+        var s = get(r.sv || 'غير محدد'); s.hires++;
+        if (r.ownerKey) { s.refHires++; s.orders.push(r.orders); if (reached1(r)) s.reached++; s.bonus += r.bonus; }
+        if (r.sp !== null && r.sp !== undefined) { s.spKnown++; if (r.sp) s.spOn++; }
+      });
+    } else {
+      sc.apps.forEach(function (a) { if (a.refType !== 'internal') return; var s = get(a.refSv || 'غير محدد'); s.apps++; s.refs[a.refKey] = 1; if (a.status === 'اشتغل') s.appHired++; });
+      sc.hires.forEach(function (r) { if (r.ownerType !== 'internal') return; var s = get(r.ownerSv || 'غير محدد'); s.refHires++; s.refs[r.ownerKey] = 1; s.orders.push(r.orders); if (reached1(r)) s.reached++; s.bonus += r.bonus; });
+    }
+    return Object.keys(out).map(function (k) { var s = out[k]; s.avgOrders = Math.round(avg(s.orders)); s.referrers = Object.keys(s.refs).length; return s; });
+  }
+
+  function viewSV() {
+    var sc = scoped(), rows = svStats(sc), rider = S.svView === 'rider';
+    rows.sort(function (a, b) { return b.refHires - a.refHires || b.hires - a.hires || b.apps - a.apps; });
+    var named = rows.filter(function (r) { return r.sv !== 'غير محدد'; });
+    var best = named.filter(function (r) { return r.refHires >= 3; }).sort(function (a, b) { return b.avgOrders - a.avgOrders; })[0];
+    var top = named[0];
+    var totalRef = rows.reduce(function (s, r) { return s + r.refHires; }, 0);
+    var tbl = rider ? table(
+      [['SV'], ['كل التعيينات', 'n'], ['من ترشيحات', 'n'], ['نسبة الترشيحات', 'n'], ['متوسط أوردرات', 'n'], ['وصلوا أول شريحة', 'n'], ['With SP', 'n'], ['البونص (ج)', 'n'], ['تكلفة / تعيين', 'n']],
+      rows.map(function (r) { return ['<b>' + esc(r.sv) + '</b>', r.hires, r.refHires, pct(r.refHires, r.hires) + '%', r.refHires ? r.avgOrders : '—', r.refHires ? pct(r.reached, r.refHires) + '%' : '—', r.spKnown ? pct(r.spOn, r.spKnown) + '%' : '—', '<span class="gold">' + money(r.bonus) + '</span>', r.refHires ? money(Math.round(r.bonus / r.refHires)) : '—']; }),
+      { empty: 'مفيش تعيينات في الفترة.' }) : table(
+      [['SV المرشِّحين'], ['مرشِّحين نشطين', 'n'], ['ترشيحات', 'n'], ['اتعيّنوا', 'n'], ['تحويل', 'n'], ['متوسط أوردرات', 'n'], ['البونص (ج)', 'n']],
+      rows.map(function (r) { return ['<b>' + esc(r.sv) + '</b>', r.referrers, r.apps, r.refHires, r.apps ? pct(r.appHired, r.apps) + '%' : '—', r.refHires ? r.avgOrders : '—', '<span class="gold">' + money(r.bonus) + '</span>']; }),
+      { empty: 'مفيش ترشيحات من طيارين داخليين في الفترة.' });
+    return head('السوبرفايزرز', 'مين بيستلم تعيينات أكتر من الترشيحات، وطياريه بيشتغلوا قد إيه — ومين فريقه بيرشّح أكتر') + filterBar() +
+      '<div class="filters"><div class="seg" role="group" aria-label="زاوية العرض"><button data-svv="rider" aria-pressed="' + rider + '">فرق الطيارين الجداد</button><button data-svv="ref" aria-pressed="' + !rider + '">فرق المرشِّحين</button></div>' +
+      '<span class="muted" style="font-size:12px">' + (rider ? 'كل طيار اتعين بيتحسب على الـ SV بتاعه في Hiring tracker' : 'كل ترشيح بيتحسب على SV الطيار اللي رشّح (من Headcount)') + '</span></div>' +
+      '<div class="kpis">' +
+        kpi('عدد السوبرفايزرز', named.length, '', '<span class="delta">ليهم نشاط في الفترة</span>') +
+        kpi(rider ? 'الأكتر استلاماً من الترشيحات' : 'فريقه الأكتر ترشيحاً', top ? esc(top.sv) : '—', 'txt', '<span class="delta">' + (top ? top.refHires + ' تعيين — ' + pct(top.refHires, totalRef) + '% من الكل' : '') + '</span>') +
+        kpi('أعلى جودة (متوسط أوردرات)', best ? esc(best.sv) : '—', 'txt', '<span class="delta">' + (best ? best.avgOrders + ' أوردر لكل طيار (3 تعيينات أو أكتر)' : 'محتاج 3 تعيينات على الأقل') + '</span>') +
+        kpi('بونص الترشيحات', money(rows.reduce(function (s, r) { return s + r.bonus; }, 0)), 'gold', '<span class="delta">جنيه في الفترة</span>') +
+      '</div>' +
+      '<div class="charts">' +
+        '<section class="card wide"><h2>الكمية قصاد الجودة<small>كل دايرة SV — حجمها = البونص</small></h2>' +
+          insight('يمين فوق = تعيينات كتير وطيارين شغالين كويس. الخطوط المتقطعة هي المتوسط (الوسيط) — اللي تحت الخط الأفقي طياريه محتاجين متابعة.') +
+          '<div class="chart-box tall"><canvas id="cBubble" role="img" aria-label="السوبرفايزرز: عدد التعيينات قصاد متوسط الأوردرات"></canvas></div></section>' +
+        '<section class="card wide"><h2>' + (rider ? 'التعيينات من ترشيحات لكل SV' : 'الترشيحات والتعيينات لكل SV') + '<small>أعلى 15</small></h2>' +
+          (rider ? '' : legend([['ترشيحات', css('--s1')], ['اتعيّنوا', css('--s2')]])) + '<div class="chart-box tall"><canvas id="cSvBar" role="img" aria-label="ترتيب السوبرفايزرز"></canvas></div></section>' +
+        '<section class="card wide"><h2>التفاصيل</h2>' + tbl + '</section>' +
+      '</div>';
+  }
+  function bindSV() {
+    bindFilters();
+    root.querySelectorAll('[data-svv]').forEach(function (b) { b.onclick = function () { S.svView = b.dataset.svv; render(); }; });
+    var rows = svStats(scoped()).filter(function (r) { return r.sv !== 'غير محدد' && r.refHires > 0; });
+    var mx = median(rows.map(function (r) { return r.refHires; })), my = median(rows.map(function (r) { return r.avgOrders; }));
+    var maxB = Math.max.apply(null, rows.map(function (r) { return r.bonus; }).concat([1]));
+    var guide = { id: 'guide', afterDatasetsDraw: function (c) {
+      var x = c.scales.x, y = c.scales.y, g = c.ctx; g.save(); g.setLineDash([5, 5]); g.strokeStyle = css('--dim'); g.lineWidth = 1;
+      g.beginPath(); g.moveTo(x.getPixelForValue(mx), y.top); g.lineTo(x.getPixelForValue(mx), y.bottom); g.moveTo(x.left, y.getPixelForValue(my)); g.lineTo(x.right, y.getPixelForValue(my)); g.stroke();
+      g.setLineDash([]); g.fillStyle = css('--ink'); g.font = '12px ' + (css('--f-body').split(',')[0].replace(/"/g, '') || 'sans-serif'); g.textAlign = 'center';
+      rows.slice().sort(function (a, b) { return b.bonus - a.bonus; }).slice(0, 6).forEach(function (r) { g.fillText(r.sv, x.getPixelForValue(r.refHires), y.getPixelForValue(r.avgOrders) - 6 - Math.sqrt(r.bonus / maxB) * 22); });
+      g.restore();
+    } };
+    var ch = { type: 'bubble', data: { datasets: [{ label: 'SV', data: rows.map(function (r) { return { x: r.refHires, y: r.avgOrders, r: 5 + Math.sqrt(r.bonus / maxB) * 22, sv: r.sv, bonus: r.bonus }; }),
+      backgroundColor: 'color-mix(in srgb, ' + css('--s2') + ' 55%, transparent)', borderColor: css('--s2'), borderWidth: 2 }] },
+      options: { interaction: { mode: 'nearest', intersect: true }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (i) { return i[0].raw.sv; }, label: function (c) { return c.raw.x + ' تعيين · ' + c.raw.y + ' أوردر في المتوسط · ' + money(c.raw.bonus) + ' ج بونص'; } } } },
+        layout: { padding: { left: 40, right: 40, top: 26 } },
+        scales: { x: { title: { display: true, text: 'تعيينات من ترشيحات ←', color: css('--muted') }, beginAtZero: true, grid: { color: css('--line') }, ticks: { precision: 0, color: css('--muted') } }, y: { title: { display: true, text: 'متوسط الأوردرات ↑', color: css('--muted') }, beginAtZero: true, grid: { color: css('--line') }, ticks: { color: css('--muted') }, position: 'left' } } }, plugins: [guide] };
+    // Chart.js can't read color-mix(); give it a real rgba
+    var hex = css('--s2'); var n = parseInt(hex.slice(1), 16); ch.data.datasets[0].backgroundColor = 'rgba(' + (n >> 16) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',.45)';
+    chart('cBubble', ch);
+    var all = svStats(scoped()).filter(function (r) { return r.sv !== 'غير محدد'; }).sort(function (a, b) { return (S.svView === 'rider' ? b.refHires - a.refHires : b.apps - a.apps); }).slice(0, 15);
+    var ds = S.svView === 'rider'
+      ? [{ label: 'تعيينات من ترشيحات', data: all.map(function (r) { return r.refHires; }), backgroundColor: css('--s2'), borderRadius: 4, maxBarThickness: 18 }]
+      : [{ label: 'ترشيحات', data: all.map(function (r) { return r.apps; }), backgroundColor: css('--s1'), borderRadius: 4, maxBarThickness: 14 }, { label: 'اتعيّنوا', data: all.map(function (r) { return r.refHires; }), backgroundColor: css('--s2'), borderRadius: 4, maxBarThickness: 14 }];
+    chart('cSvBar', { type: 'bar', data: { labels: all.map(function (r) { return r.sv; }), datasets: ds },
+      options: { indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: css('--line') }, ticks: { precision: 0, color: css('--muted') }, reverse: true }, y: { grid: { display: false }, ticks: { color: css('--muted') }, position: 'right' } } } });
   }
 
   /* ─────────────── Generic table ─────────────── */
@@ -2099,6 +2349,7 @@ if (typeof module !== 'undefined' && module.exports) {
       '<input type="search" id="rq" placeholder="بحث بالاسم أو الكود أو المرشِّح" value="' + esc(f.q) + '"></div>' +
       list('riders', [
         { t: 'الطيار', k: 'name', v: function (r) { return '<b>' + esc(cleanName(r.name)) + '</b><div class="muted ltr" style="font-size:11px">#' + esc(r.code) + '</div>' + (r.flags.length ? '<div class="flag">⚠ ' + r.flags.map(function (x) { return d.flagLabels[x]; }).join('، ') + '</div>' : ''); } },
+        { t: 'SV', k: 'sv', v: function (r) { return esc(r.sv || '—') + (r.sp === false ? '<div class="flag">No SP</div>' : ''); } },
         { t: 'المرشِّح', k: 'ownerName', v: function (r) { return r.ownerKey ? esc(cleanName(r.ownerName) || r.ownerKey) + '<div class="muted" style="font-size:11px">' + (r.source === 'talabat' ? 'كود طلبات' : 'استمارة') + '</div>' : '<span class="muted">—</span>'; } },
         { t: 'اتعين', k: 'hireDate', c: 'n', v: function (r) { return fmt(r.hireDate); } },
         { t: 'أوردرات', k: 'orders', c: 'n', v: function (r) { return money(r.orders) + (r.ordersSource === 'manual' ? '<div class="muted" style="font-size:10px">يدوي</div>' : ''); } },
@@ -2236,7 +2487,7 @@ if (typeof module !== 'undefined' && module.exports) {
     d.applicants.forEach(function (a) { a.flags.forEach(function (f) { rows.push({ kind: f, who: a.name, ref: cleanName(a.refName) || a.refKey, date: a.submitted, open: ['app', a.row] }); }); });
     d.riders.forEach(function (r) { r.flags.forEach(function (f) { rows.push({ kind: f, who: cleanName(r.name), ref: cleanName(r.ownerName) || r.ownerKey, date: r.hireDate, open: ['rider', r.code] }); }); });
     var groups = {}; rows.forEach(function (r) { groups[r.kind] = (groups[r.kind] || 0) + 1; });
-    var help = { self: 'المرشِّح رشّح رقمه هو. غالباً عايز ياخد البونص على نفسه.', burst: '5 ترشيحات أو أكتر من نفس الشخص في يوم واحد. راجع إنهم ناس حقيقيين.', dupe: 'نفس الموبايل أو الرقم القومي اترشح أكتر من مرة.', known: 'الرقم ده في Headcount — كان شغال عندنا قبل كده، فمش "جديد".', quiet: 'اتعين من أسبوعين أو أكتر ومعملش ولا أوردر.' };
+    var help = { self: 'المرشِّح رشّح رقمه هو. غالباً عايز ياخد البونص على نفسه.', burst: '5 ترشيحات أو أكتر من نفس الشخص في يوم واحد. راجع إنهم ناس حقيقيين.', dupe: 'نفس الموبايل أو الرقم القومي اترشح أكتر من مرة.', known: 'الرقم ده متعيّن عندنا قبل تاريخ ترشيحه، فمش جديد ومالوش بونص.', suspended: 'طيار من ترشيح حالته No SP (موقوف) في Hiring tracker.', quiet: 'اتعين من أسبوعين أو أكتر ومعملش ولا أوردر.' };
     return head('التنبيهات', 'حالات محتاجة مراجعة: تلاعب محتمل، تكرار، أو طيارين اتعيّنوا ومش بيشتغلوا') +
       '<div class="kpis">' + Object.keys(d.flagLabels).map(function (k) { return kpi(d.flagLabels[k], groups[k] || 0, groups[k] ? 'gold' : '', '<span class="delta">' + help[k] + '</span>'); }).join('') + '</div>' +
       list('alerts', [
@@ -2390,8 +2641,8 @@ if (typeof module !== 'undefined' && module.exports) {
     };
   }
 
-  var VIEWS = { overview: viewOverview, analytics: viewAnalytics, applicants: viewApplicants, riders: viewRiders, payouts: viewPayouts, users: viewUsers, alerts: viewAlerts, campaigns: viewCampaigns, settings: viewSettings, team: viewTeam, audit: viewAudit };
-  var BINDERS = { overview: bindOverview, analytics: bindAnalytics, applicants: bindApplicants, riders: bindRiders, payouts: bindPayouts, users: bindUsers, alerts: bindAlerts, campaigns: bindCampaigns, settings: bindSettings, team: bindTeam, audit: bindAudit };
+  var VIEWS = { overview: viewOverview, analytics: viewAnalytics, sv: viewSV, applicants: viewApplicants, riders: viewRiders, payouts: viewPayouts, users: viewUsers, alerts: viewAlerts, campaigns: viewCampaigns, settings: viewSettings, team: viewTeam, audit: viewAudit };
+  var BINDERS = { overview: bindOverview, analytics: bindAnalytics, sv: bindSV, applicants: bindApplicants, riders: bindRiders, payouts: bindPayouts, users: bindUsers, alerts: bindAlerts, campaigns: bindCampaigns, settings: bindSettings, team: bindTeam, audit: bindAudit };
 
   /* ─────────────── Start ─────────────── */
   (async function () {

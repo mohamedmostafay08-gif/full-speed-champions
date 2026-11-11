@@ -24,6 +24,11 @@
   function nid() { var y = int(85, 104), cent = y >= 100 ? '3' : '2'; return cent + pad(y % 100, 2) + pad(int(1, 12), 2) + pad(int(1, 28), 2) + pick(['01', '02', '12', '13', '14', '21']) + pad(int(0, 9999), 4) + int(0, 9); }
 
   var COMPANY = '3901026';
+  // Fictional supervisors, one or two per zone, each with their own "quality".
+  var SVS = {};
+  ZONES.forEach(function (z, i) { SVS[z] = [{ name: 'SV ' + pick(FIRST) + ' — ' + z, q: .55 + rnd() * .6 }].concat(i < 4 ? [{ name: 'SV ' + pick(FIRST) + ' ' + pick(LAST) + ' — ' + z, q: .5 + rnd() * .6 }] : []); });
+  function svFor(z) { return pick(SVS[z] || SVS.Maadi); }
+  var hiring = [];
   var cfg = resolveConfig([['PROGRAM_START_DATE', iso(ago(90))], ['ANNOUNCEMENT', 'الأسبوع ده كل تعيين في المعادي عليه 500 ج زيادة 🔥']], []);
 
   // ── Referrers: 24 riders and 6 outside partners ──
@@ -32,7 +37,8 @@
     var code = String(4700000 + int(1000, 99999)), ph = phone(), nm = name(3) + ' _FULL SPEED';
     var skill = rnd();
     refs.push({ key: code, type: 'internal', weight: skill < .25 ? 6 : skill < .6 ? 2.5 : 1, quality: .2 + rnd() * .5, phone: ph });
-    headcount.push({ code: code, name: nm, zone: zone(), supervisor: 'Kabo ' + pick(ZONES), manager: 'Full Speed', phone: ph, vehicle: pick(['Bike', 'Bike', 'Bicycle']), active: 'Active' });
+    var hz = zone();
+    headcount.push({ code: code, name: nm, zone: hz, supervisor: svFor(hz).name, manager: 'Full Speed', phone: ph, vehicle: pick(['Bike', 'Bike', 'Bicycle']), active: 'Active' });
     if (rnd() < .85) users.push({ type: 'internal', code: code, name: nm, phone: ph, refId: '', status: 'active', created: ago(int(60, 120)), lastLogin: ago(int(0, 14)) });
   }
   for (var j = 0; j < 6; j++) {
@@ -61,8 +67,11 @@
         var hire = addDays(sub, int(2, 16));
         if (hire > today) hire = today;
         var code2 = String(riderCode += int(3, 40));
-        riders.push({ _row: riders.length + 2, hireDate: hire, code: code2, name: name(3) + ' _FULL SPEED', zone: z, phone: p, vehicle: pick(['Bike', 'Bike', 'Bicycle']), orders: '', referralCode: ref.type === 'internal' ? ref.key : COMPANY });
-        var perDay = rnd() < .08 ? 0 : 6 + rnd() * 18;
+        var sv = svFor(z), veh = pick(['Bike', 'Bike', 'Bike', 'Bicycle', 'Walker']);
+        var perDay = rnd() < .08 ? 0 : (4 + rnd() * 16) * sv.q * (veh === 'Bike' ? 1.15 : veh === 'Walker' ? .6 : .85);
+        var tenure = diffDays(hire, today), spOn = perDay > 0 && rnd() > Math.min(.6, tenure / 160 + (1.2 - sv.q) * .25);
+        hiring.push({ _row: hiring.length + 2, hireDate: hire, code: code2, zone: z, name: name(3) + ' _FULL SPEED', phone: p, status: 'Inactive', sv: sv.name, sp: spOn ? 'With SP' : 'No SP', vehicle: veh });
+        riders.push({ _row: riders.length + 2, code: code2, referralCode: ref.type === 'internal' ? ref.key : COMPANY });
         for (var x = hire; x < today; x = addDays(x, 1)) if (perDay) daily.push({ date: x, code: code2, orders: Math.max(0, Math.round(perDay + (rnd() - .5) * 8)) });
       }
     }
@@ -70,7 +79,8 @@
   // Hires that came without any referral (for the "share of hires" number)
   for (var u2 = 0; u2 < 70; u2++) {
     var c3 = String(riderCode += int(3, 40)), h3 = ago(int(0, 90));
-    riders.push({ _row: riders.length + 2, hireDate: h3, code: c3, name: name(3) + ' _FULL SPEED', zone: zone(), phone: phone(), vehicle: 'Bike', orders: int(50, 900), referralCode: '' });
+    var z3 = zone();
+    hiring.push({ _row: hiring.length + 2, hireDate: h3, code: c3, zone: z3, name: name(3) + ' _FULL SPEED', phone: phone(), status: 'Inactive', sv: svFor(z3).name, sp: rnd() < .8 ? 'With SP' : 'No SP', vehicle: 'Bike' });
   }
   // A few things the alerts page should catch
   var cheater = refs[3];
@@ -79,7 +89,7 @@
 
   var campaigns = [{ id: 'C-MAADI', name: 'أسبوع المعادي', start: ago(10), end: addDays(today, 4), zone: 'Maadi', extra: 500, active: 'نعم' }];
   var payouts = [];
-  var world = function () { return buildWorld({ riders: riders, headcount: headcount, applicants: applicants, dailyOrders: daily, campaigns: campaigns, payouts: payouts }, cfg, today); };
+  var world = function () { return buildWorld({ hiring: hiring, riders: riders, headcount: headcount, applicants: applicants, dailyOrders: daily, campaigns: campaigns, payouts: payouts }, cfg, today); };
 
   // Pay most of what was due more than a week ago, so the payouts log has history.
   (function () {

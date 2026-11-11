@@ -37,7 +37,8 @@ var CONFIG_DEFAULTS = {
 
 /** Tab names. Existing tabs keep their current names. */
 var TABS = {
-  RIDERS: 'Normal Riders Handle',     // hires exported from Talabat (source of truth)
+  HIRING: 'Hiring tracker',           // daily raw export of hires: official hire date, SV, SP status
+  RIDERS: 'Normal Riders Handle',     // Talabat export: the referral code of each hire
   HEADCOUNT: 'Headcount',             // IMPORTRANGE — read only, never written
   APPLICANTS: 'New Applicants',       // candidates submitted through the program
   DAILY_ORDERS: 'Daily Orders',       // date | rider code | completed orders
@@ -62,6 +63,17 @@ var TABS = {
  * anything. The first name is the one the setup writes.
  */
 var COLUMNS = {
+  HIRING: {
+    hireDate: ['Dates', 'Date', 'Hire Date', 'تاريخ التعيين'],
+    code: ['Rider ID', 'Code', 'Rider Code', 'كود المندوب'],
+    zone: ['Zones', 'Zone', 'المنطقة'],
+    name: ['Rider Name', 'Name', 'الاسم'],
+    phone: ['Phone Number', 'Phone', 'الموبايل'],
+    status: ['Status', 'الحالة'],
+    sv: ['SV', 'SPV', 'Supervisor'],
+    sp: ['Has SP', 'SP Status', 'SP'],
+    vehicle: ['Vehicle', 'المركبة']
+  },
   RIDERS: {
     hireDate: ['تاريخ التعيين', 'Hire Date'],
     code: ['كود المندوب', 'Code', 'Rider Code'],
