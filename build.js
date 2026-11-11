@@ -16,7 +16,8 @@ const out = (p, s) => { fs.mkdirSync(path.dirname(path.join(root, p)), { recursi
 const logo = fs.readFileSync(path.join(root, 'assets/logo-mark.webp')).toString('base64');
 const crypto = require('node:crypto');
 const raw = read('ui/Index.html').replace('__LOGO__', logo);
-const page = raw.replace('<!--WEB_HEAD-->', '');
+const stamp = crypto.createHash('sha256').update(raw).digest('hex').slice(0, 10);
+const page = raw.replace('<!--WEB_HEAD-->', '<!-- fs-build ' + stamp + ' -->');
 const viewport = '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">';
 
 if (page.includes('<?')) throw new Error('Index.html must not contain "<?" (HtmlService scriptlets)');
