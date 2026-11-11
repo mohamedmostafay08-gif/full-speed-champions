@@ -1,0 +1,817 @@
+<title>Full Speed Champions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#070A08">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Cairo:wght@600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<style>
+/* Layout: one phone-width "dispatch board" column; rider slips stacked like
+   order tickets, money always in gold, a dock at the bottom. Dark-first,
+   same palette and type as the Full Speed site. */
+:root {
+  --bg: #070A08; --bg-2: #0B120D; --surface: #0F1912; --surface-2: #13201A;
+  --line: #1D2C21; --line-2: #2A3E2F;
+  --ink: #DCF0E0; --muted: #94AC99; --dim: #5F7265;
+  --green: #34B24C; --green-hi: #5BD06F; --on-green: #04140A; --green-soft: rgba(52,178,76,.12);
+  --gold: #E2A838; --gold-soft: rgba(226,168,56,.12);
+  --danger: #FF7A6E; --danger-soft: rgba(255,122,110,.12);
+  --info: #7DB8FF; --info-soft: rgba(125,184,255,.12);
+  --shadow: 0 18px 40px -22px rgba(0,0,0,.8);
+  --f-display: "Cairo", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-num: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --bg: #F4F6F3; --bg-2: #EBF1EA; --surface: #FFFFFF; --surface-2: #F2F8F3;
+  --line: #DCE5DB; --line-2: #C4D2C4;
+  --ink: #0C150E; --muted: #46594B; --dim: #7A9180;
+  --green: #187A31; --green-hi: #136B2A; --on-green: #FFFFFF; --green-soft: rgba(24,122,49,.09);
+  --gold: #946609; --gold-soft: rgba(148,102,9,.1);
+  --danger: #C2362B; --danger-soft: rgba(194,54,43,.08);
+  --info: #1F5FAD; --info-soft: rgba(31,95,173,.08);
+  --shadow: 0 14px 32px -20px rgba(12,40,20,.25);
+  color-scheme: light;
+} }
+:root[data-theme="light"] {
+  --bg: #F4F6F3; --bg-2: #EBF1EA; --surface: #FFFFFF; --surface-2: #F2F8F3;
+  --line: #DCE5DB; --line-2: #C4D2C4;
+  --ink: #0C150E; --muted: #46594B; --dim: #7A9180;
+  --green: #187A31; --green-hi: #136B2A; --on-green: #FFFFFF; --green-soft: rgba(24,122,49,.09);
+  --gold: #946609; --gold-soft: rgba(148,102,9,.1);
+  --danger: #C2362B; --danger-soft: rgba(194,54,43,.08);
+  --info: #1F5FAD; --info-soft: rgba(31,95,173,.08);
+  --shadow: 0 14px 32px -20px rgba(12,40,20,.25);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+html { direction: rtl; }
+html, body { min-height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 400 15px/1.6 var(--f-body);
+  -webkit-font-smoothing: antialiased;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--green-hi); outline-offset: 2px; }
+.num { font-family: var(--f-num); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .01em; line-height: 1; }
+.ltr { direction: ltr; unicode-bidi: isolate; }
+.muted { color: var(--muted); }
+.shell { max-width: 460px; margin: 0 auto; padding-block: 12px 112px; display: grid; gap: 16px; }
+
+/* ── Brand ── */
+.brand { display: flex; align-items: center; gap: 10px; }
+.mk { width: 40px; height: 40px; flex: none; background: url("data:image/webp;base64,__LOGO__") center/contain no-repeat; }
+.wm { font-family: var(--f-num); font-weight: 800; font-size: 22px; letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
+.wm b { color: var(--green); font-weight: 800; }
+.wm small { display: block; font: 600 10px/1.4 var(--f-body); letter-spacing: .22em; color: var(--muted); margin-top: 3px; }
+
+/* ── Top bar ── */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); padding-block: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
+.hello { font: 700 17px/1.3 var(--f-display); margin: 0; }
+.hello small { display: block; font: 500 12px var(--f-body); color: var(--muted); }
+.icons { display: flex; gap: 6px; }
+.icon-btn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line-2); background: var(--surface); display: grid; place-items: center; }
+.icon-btn svg { width: 18px; height: 18px; }
+.icon-btn[aria-busy="true"] svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Cards & bits ── */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px; }
+.eyebrow { font: 600 11px/1.4 var(--f-body); letter-spacing: .14em; text-transform: uppercase; color: var(--green); }
+h2.section { font: 700 16px/1.4 var(--f-display); margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+h2.section .count { font: 600 12px var(--f-body); color: var(--muted); }
+.pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 10px; font: 600 12px/1.5 var(--f-body); white-space: nowrap; border: 1px solid transparent; }
+.pill.green { background: var(--green-soft); color: var(--green-hi); border-color: color-mix(in srgb, var(--green) 35%, transparent); }
+.pill.gold { background: var(--gold-soft); color: var(--gold); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
+.pill.red { background: var(--danger-soft); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+.pill.blue { background: var(--info-soft); color: var(--info); border-color: color-mix(in srgb, var(--info) 35%, transparent); }
+.pill.dim { background: var(--surface-2); color: var(--muted); border-color: var(--line-2); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; padding: 13px 22px; border: 0; font: 700 15px var(--f-display); text-decoration: none; transition: transform .3s var(--ease), background .2s; }
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--green); color: var(--on-green); }
+.btn-primary:hover { background: var(--green-hi); }
+.btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+.btn-block { width: 100%; }
+.btn[disabled] { opacity: .55; pointer-events: none; }
+.btn svg { width: 18px; height: 18px; flex: none; }
+.link-btn { background: none; border: 0; color: var(--green-hi); font: 600 14px var(--f-body); padding: 6px; text-decoration: underline; text-underline-offset: 4px; }
+
+/* ── Forms ── */
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; }
+.seg button { border: 0; background: transparent; border-radius: 999px; padding: 9px 6px; font: 600 14px var(--f-display); color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--green); color: var(--on-green); }
+.form { display: grid; gap: 12px; }
+.field { display: grid; gap: 5px; align-content: start; }
+.field label { font: 600 13px var(--f-body); color: var(--muted); }
+.field input, .field select { width: 100%; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); font-size: 16px; }
+.field input:focus, .field select:focus { border-color: var(--green); outline: none; box-shadow: 0 0 0 3px var(--green-soft); }
+.field input.ltr { text-align: right; }
+.field .hint { font-size: 12px; color: var(--dim); }
+.field .err { font-size: 12px; color: var(--danger); }
+.field.bad input, .field.bad select { border-color: var(--danger); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row2 > * { min-width: 0; }
+.derived { font-size: 13px; color: var(--green-hi); min-height: 1em; }
+
+/* ── Auth ── */
+.auth { min-height: 100vh; display: grid; align-content: center; gap: 22px; padding-block: 28px; }
+.auth .brand { justify-content: center; }
+.auth .mk { width: 56px; height: 56px; }
+.auth .wm { font-size: 30px; }
+.teaser { text-align: center; display: grid; gap: 4px; }
+.teaser .num { font-size: 52px; color: var(--gold); }
+.teaser p { margin: 0; color: var(--muted); font-size: 14px; }
+.teaser strong { font: 700 18px var(--f-display); color: var(--ink); }
+
+/* ── Home ── */
+.hero { position: relative; overflow: hidden; border-color: color-mix(in srgb, var(--gold) 30%, var(--line)); background:
+  radial-gradient(120% 90% at 100% 0%, var(--gold-soft), transparent 60%), var(--surface); }
+.hero .num.total { font-size: 64px; color: var(--gold); display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
+.hero .num.total small { font: 700 18px var(--f-display); color: var(--muted); }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border-radius: 12px; overflow: hidden; margin-top: 14px; }
+.split > div { background: var(--surface-2); padding: 10px 12px; }
+.split .num { font-size: 26px; display: block; }
+.split .lbl { font-size: 12px; color: var(--muted); }
+.payout { margin-top: 12px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.payout b { color: var(--ink); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.stat .num { font-size: 30px; display: block; }
+.stat span:last-child { font-size: 12px; color: var(--muted); }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.nudge-bar { display: flex; align-items: center; gap: 10px; border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); background: var(--gold-soft); border-radius: 14px; padding: 12px 14px; text-align: start; width: 100%; }
+.nudge-bar b { font-family: var(--f-display); }
+.nudge-bar svg { width: 20px; height: 20px; color: var(--gold); flex: none; }
+
+/* ── Rider slip ── */
+.list { display: grid; gap: 10px; }
+.slip { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: grid; gap: 12px; }
+.slip.maxed { border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.slip.closed { opacity: .82; }
+.slip-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.slip-head > div:first-child { min-width: 0; }
+.slip-name { font: 700 15px/1.35 var(--f-display); margin: 0; overflow-wrap: anywhere; }
+.slip-meta { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; }
+.contact { display: flex; gap: 6px; flex: none; }
+.contact a { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line-2); color: var(--ink); }
+.contact a.wa { color: var(--green-hi); border-color: color-mix(in srgb, var(--green) 40%, transparent); background: var(--green-soft); }
+.contact svg { width: 16px; height: 16px; }
+.figures { display: grid; grid-template-columns: 1fr 1fr 1fr; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; }
+.figures > div { padding: 8px 10px; }
+.figures > div + div { border-inline-start: 1px solid var(--line); }
+.figures .num { font-size: 24px; display: block; }
+.figures .gold { color: var(--gold); }
+.figures span:last-child { font-size: 11px; color: var(--muted); }
+/* Order track: 0 → 850 orders, a tick at every bonus tier */
+.track { position: relative; height: 10px; border-radius: 6px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; }
+.track i { position: absolute; inset-block: 0; inset-inline-start: 0; background: linear-gradient(90deg, var(--green), var(--green-hi)); border-radius: 6px; transition: width .8s var(--ease); }
+.slip.maxed .track i { background: linear-gradient(90deg, var(--gold), #F4C86A); }
+.slip.closed .track i { background: var(--dim); }
+.track b { position: absolute; inset-block: 0; width: 1px; background: color-mix(in srgb, var(--bg) 70%, transparent); }
+.track-legend { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); gap: 8px; }
+.track-legend strong { color: var(--ink); font-weight: 600; }
+
+/* ── Pipeline ── */
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 7px 12px; font: 600 13px var(--f-body); color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip .n { font-family: var(--f-num); font-weight: 800; margin-inline-start: 4px; }
+.steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.steps div { display: grid; gap: 5px; text-align: center; font-size: 11px; color: var(--dim); }
+.steps div::before { content: ""; height: 5px; border-radius: 3px; background: var(--line-2); }
+.steps .done { color: var(--green-hi); }
+.steps .done::before { background: var(--green); }
+.steps .now { color: var(--ink); font-weight: 600; }
+.steps .now::before { background: var(--green-hi); box-shadow: 0 0 0 3px var(--green-soft); }
+.steps.rejected .now::before { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+.note { border-radius: 12px; padding: 10px 12px; font-size: 13px; background: var(--info-soft); border: 1px solid color-mix(in srgb, var(--info) 30%, transparent); }
+.note b { color: var(--info); }
+.note.warn { background: var(--gold-soft); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
+.note.warn b { color: var(--gold); }
+.note a { color: inherit; font-weight: 600; }
+
+/* ── Bonus guide ── */
+.rules { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.rules li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.rules svg { width: 20px; height: 20px; color: var(--green-hi); flex: none; margin-top: 2px; }
+.example { font-size: 13px; color: var(--muted); border-top: 1px dashed var(--line-2); padding-top: 10px; margin-top: 12px; }
+.example b { color: var(--ink); }
+.ladder { display: grid; gap: 4px; }
+.rung { display: grid; grid-template-columns: 70px 1fr 74px; align-items: center; gap: 10px; font-size: 13px; }
+.rung .bar { height: 14px; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 55%, transparent), var(--gold)); }
+.rung .num { font-size: 17px; }
+.rung .money { color: var(--gold); text-align: end; }
+.rung.hit .orders { color: var(--green-hi); }
+.sim { display: grid; gap: 14px; }
+.stepper { display: flex; align-items: center; gap: 10px; }
+.stepper button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line-2); background: var(--bg-2); font: 700 20px var(--f-num); }
+.stepper output { min-width: 48px; text-align: center; font-size: 30px; }
+input[type="range"] { width: 100%; accent-color: var(--green); }
+.sim-out { display: flex; justify-content: space-between; align-items: end; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.sim-out .num { font-size: 44px; color: var(--gold); }
+
+/* ── Profile ── */
+.pass { display: grid; gap: 0; }
+.pass-top { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px dashed var(--line-2); }
+.pass-top .mk { width: 46px; height: 46px; }
+.pass-top h3 { margin: 0; font: 800 18px/1.3 var(--f-display); }
+.kv { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.kv:last-child { border-bottom: 0; }
+.kv span:first-child { color: var(--muted); }
+.kv span:last-child { font-weight: 600; text-align: end; overflow-wrap: anywhere; }
+.code-big { font-size: 26px; color: var(--green-hi); }
+.linkbox { display: grid; gap: 8px; }
+.linkbox code { display: block; direction: ltr; text-align: left; font: 500 12px/1.5 ui-monospace, Menlo, monospace; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; overflow-wrap: anywhere; user-select: all; }
+.linkbox .actions .btn { padding: 10px 14px; font-size: 14px; }
+
+/* ── Dock ── */
+.dock { position: fixed; inset: auto 0 0; z-index: 25; padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); pointer-events: none; }
+.dock nav { pointer-events: auto; max-width: 460px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 6px; border-radius: 22px; background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line-2); box-shadow: var(--shadow); }
+@supports (backdrop-filter: blur(1px)) { .dock nav { backdrop-filter: blur(14px); } }
+.dock button { border: 0; background: none; border-radius: 16px; padding: 7px 0 6px; display: grid; justify-items: center; gap: 2px; font: 600 11px var(--f-body); color: var(--muted); position: relative; }
+.dock button svg { width: 22px; height: 22px; }
+.dock button[aria-current="page"] { color: var(--green-hi); background: var(--green-soft); }
+.dock .badge { position: absolute; top: 3px; inset-inline-end: calc(50% - 20px); min-width: 17px; height: 17px; border-radius: 9px; background: var(--gold); color: var(--on-green); font: 800 11px/17px var(--f-num); padding: 0 4px; }
+
+/* ── Sheet & toast ── */
+.sheet { position: fixed; inset: 0; z-index: 40; display: grid; align-items: end; background: rgba(0,0,0,.55); }
+.sheet > div { background: var(--bg); border-top: 1px solid var(--line-2); border-radius: 24px 24px 0 0; max-height: 92vh; overflow-y: auto; padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.sheet .inner { max-width: 460px; margin: 0 auto; display: grid; gap: 14px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; }
+.sheet-head h3 { margin: 0; font: 800 19px var(--f-display); }
+.toast { position: fixed; z-index: 50; top: calc(14px + env(safe-area-inset-top, 0px)); left: 50%; transform: translate(-50%, calc(-100% - 40px)); transition: transform .4s var(--ease); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px; font: 600 14px var(--f-body); max-width: calc(100% - 32px); text-align: center; box-shadow: var(--shadow); }
+.toast.show { transform: translate(-50%, 0); }
+.toast.bad { background: var(--danger); color: #fff; }
+.empty { text-align: center; padding: 26px 16px; color: var(--muted); font-size: 14px; border: 1px dashed var(--line-2); border-radius: 16px; }
+.demo-flag { font: 600 12px var(--f-body); color: var(--gold); text-align: center; border: 1px dashed color-mix(in srgb, var(--gold) 50%, transparent); border-radius: 999px; padding: 4px 10px; }
+.done-screen { text-align: center; display: grid; gap: 12px; justify-items: center; padding-block: 30px; }
+.done-screen .tick { width: 72px; height: 72px; border-radius: 50%; background: var(--green-soft); display: grid; place-items: center; color: var(--green-hi); }
+.done-screen .tick svg { width: 36px; height: 36px; }
+.view { display: grid; gap: 16px; animation: rise .35s var(--ease) both; }
+@keyframes rise { from { transform: translateY(8px); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7v9H3z"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.3 5 2.6 5 5.8"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 14v4M8 21h8M9 18h6"/></symbol>
+  <symbol id="i-id" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="11" r="2.2"/><path d="M5.8 16c.6-1.5 1.8-2.3 3.2-2.3s2.6.8 3.2 2.3M15 10h3M15 13h3"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></symbol>
+  <symbol id="i-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></symbol>
+  <symbol id="i-wa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9.5c.5 2 2.5 4 4.5 4.5l1-1.2 2 .9c-.3 1.3-1.4 2-2.7 1.8A7 7 0 0 1 8 9.7C7.8 8.4 8.6 7.3 9.8 7l.9 2z"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+</svg>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<main class="shell" id="app"></main>
+<div class="dock" id="dock" hidden>
+  <nav aria-label="التنقل">
+    <button type="button" data-go="home"><svg><use href="#i-home"/></svg>الرئيسية</button>
+    <button type="button" data-go="pipeline"><svg><use href="#i-people"/></svg>المرشحين<span class="badge" id="nudgeBadge" hidden></span></button>
+    <button type="button" data-go="bonus"><svg><use href="#i-trophy"/></svg>البونص</button>
+    <button type="button" data-go="profile"><svg><use href="#i-id"/></svg>حسابي</button>
+  </nav>
+</div>
+<div class="sheet" id="sheet" hidden></div>
+
+<!--DEMO-->
+
+<script>
+(function () {
+  'use strict';
+  document.documentElement.setAttribute('dir', 'rtl');
+  document.documentElement.setAttribute('lang', 'ar');
+
+  /* ───────────── Backend: Apps Script, or the demo when previewed ───────────── */
+  var live = typeof google !== 'undefined' && google.script && google.script.run;
+  var Backend = live ? {
+    call: function (action, payload) {
+      return new Promise(function (resolve) {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(function () { resolve({ ok: false, error: 'مافيش اتصال بالسيرفر. اتأكد من النت وجرّب تاني.' }); })
+          .api(action, payload);
+      });
+    },
+    ref: function () {
+      return new Promise(function (resolve) {
+        google.script.url.getLocation(function (loc) { resolve((loc && loc.parameter && loc.parameter.ref) || ''); });
+      });
+    }
+  } : window.FS_DEMO;
+
+  var S = { token: null, dash: null, boot: null, view: 'home', filter: 'all', ref: '', mode: 'login', type: 'internal' };
+  var app = document.getElementById('app');
+
+  /* ───────────── Small helpers ───────────── */
+  function esc(v) {
+    return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
+  function money(n) { return Number(n || 0).toLocaleString('en-US'); }
+  function day(s) { if (!s) return null; var p = String(s).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  var DF = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { day: 'numeric', month: 'long' });
+  var DFY = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' });
+  function fmtDay(s, withYear) { var d = day(s); return d ? (withYear ? DFY : DF).format(d) : '—'; }
+  function intl(phone) { return phone ? '20' + String(phone).slice(1) : ''; }
+  function first(name) { return String(name || '').trim().split(/\s+/)[0].replace(/_.*$/, ''); }
+  function cleanName(name) { return String(name || '').replace(/\s*_?FULL\s*SPEED(_BC)?\s*$/i, '').trim(); }
+  function icon(id) { return '<svg aria-hidden="true"><use href="#i-' + id + '"/></svg>'; }
+
+  var toastTimer;
+  function toast(msg, bad) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.className = 'toast show' + (bad ? ' bad' : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = 'toast' + (bad ? ' bad' : ''); }, 3400);
+  }
+
+  function copy(text, btn) {
+    function done() { toast('اتنسخ ✓'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { selectNear(btn); });
+    } else selectNear(btn);
+  }
+  function selectNear(btn) {
+    var code = btn && btn.closest('.linkbox') && btn.closest('.linkbox').querySelector('code');
+    if (!code) return;
+    var r = document.createRange(); r.selectNodeContents(code);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    toast('اضغط نسخ من القايمة');
+  }
+
+  /* Egyptian national ID → birth date (mirrors parseNationalId on the server) */
+  function nidBirth(v) {
+    var s = String(v || '').replace(/\D/g, '');
+    if (!/^[23]\d{13}$/.test(s)) return null;
+    var y = (s[0] === '2' ? 1900 : 2000) + +s.slice(1, 3), m = +s.slice(3, 5) - 1, d = +s.slice(5, 7);
+    var dt = new Date(y, m, d);
+    return dt.getMonth() === m && dt.getDate() === d ? dt : null;
+  }
+
+  async function call(action, payload, opts) {
+    var res = await Backend.call(action, payload);
+    if (!res.ok && res.error === 'SESSION_EXPIRED') { signOut(); toast('انتهت الجلسة، ادخل تاني.', true); return res; }
+    if (!res.ok && !(opts && opts.quiet)) toast(res.error, true);
+    return res;
+  }
+
+  function busy(btn, on, label) {
+    if (!btn) return;
+    if (on) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.textContent = label || 'لحظة…'; }
+    else { btn.disabled = false; if (btn.dataset.label) btn.innerHTML = btn.dataset.label; }
+  }
+
+  function showErrors(form, fields) {
+    form.querySelectorAll('.field').forEach(function (f) { f.classList.remove('bad'); var e = f.querySelector('.err'); if (e) e.remove(); });
+    Object.keys(fields || {}).forEach(function (k) {
+      var input = form.querySelector('[name="' + k + '"]');
+      if (!input) return;
+      var f = input.closest('.field'); f.classList.add('bad');
+      var e = document.createElement('div'); e.className = 'err'; e.textContent = fields[k]; f.appendChild(e);
+    });
+  }
+  function formData(form) { var o = {}; new FormData(form).forEach(function (v, k) { o[k] = String(v).trim(); }); return o; }
+
+  /* ───────────── Theme ───────────── */
+  function applyTheme(t) { if (t) document.documentElement.setAttribute('data-theme', t); }
+  applyTheme(store('fs_theme'));
+  function toggleTheme() {
+    var cur = document.documentElement.getAttribute('data-theme') ||
+      (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    var next = cur === 'light' ? 'dark' : 'light';
+    applyTheme(next); store('fs_theme', next);
+  }
+
+  /* ───────────── Auth screens ───────────── */
+  function brand(big) {
+    return '<div class="brand"><i class="mk" aria-hidden="true"></i><span class="wm">Full<b>speed</b><small>CHAMPIONS</small></span></div>';
+  }
+
+  function renderAuth() {
+    document.getElementById('dock').hidden = true;
+    var ext = S.type === 'external', act = S.mode === 'activate';
+    var maxBonus = S.boot && S.boot.tiers ? S.boot.tiers[S.boot.tiers.length - 1].bonus : 3000;
+    var fields;
+    if (!act) {
+      fields =
+        '<div class="field"><label for="a-code">' + (ext ? 'رقم الموبايل' : 'كود طلبات بتاعك') + '</label>' +
+        '<input id="a-code" name="code" class="ltr" inputmode="numeric" autocomplete="username" placeholder="' + (ext ? '01xxxxxxxxx' : '5037723') + '" required></div>' +
+        '<div class="field"><label for="a-pass">كلمة المرور</label><input id="a-pass" name="password" type="password" autocomplete="current-password" required></div>';
+    } else if (ext) {
+      fields =
+        '<div class="field"><label for="a-name">اسمك</label><input id="a-name" name="name" autocomplete="name" placeholder="الاسم ثنائي على الأقل" required></div>' +
+        '<div class="field"><label for="a-phone">رقم الموبايل</label><input id="a-phone" name="phone" class="ltr" inputmode="numeric" placeholder="01xxxxxxxxx" required></div>' +
+        '<div class="field"><label for="a-pass">كلمة مرور جديدة</label><input id="a-pass" name="password" type="password" autocomplete="new-password" required><span class="hint">6 حروف أو أرقام على الأقل، ومش 123456.</span></div>';
+    } else {
+      fields =
+        '<div class="field"><label for="a-code">كود طلبات بتاعك</label><input id="a-code" name="code" class="ltr" inputmode="numeric" required></div>' +
+        '<div class="field"><label for="a-phone">رقم موبايلك المتسجل في الشركة</label><input id="a-phone" name="phone" class="ltr" inputmode="numeric" placeholder="01xxxxxxxxx" required><span class="hint">لازم يطابق الرقم اللي عند Full Speed، عشان محدش يفعّل كودك غيرك.</span></div>' +
+        '<div class="field"><label for="a-pass">كلمة مرور جديدة</label><input id="a-pass" name="password" type="password" autocomplete="new-password" required><span class="hint">6 حروف أو أرقام على الأقل.</span></div>';
+    }
+    app.innerHTML =
+      '<section class="auth">' + brand(true) +
+      '<div class="teaser"><p>رشّح طيار جديد، وتابعه لحد ما يشتغل</p><span class="num">' + money(maxBonus) + ' <small style="font-size:22px">ج</small></span><strong>لحد كده على كل طيار</strong></div>' +
+      (live ? '' : '<div class="demo-flag">نسخة تجريبية ببيانات وهمية — اكتب أي كود وأي كلمة مرور</div>') +
+      '<div class="card form" style="gap:14px">' +
+        '<div class="seg" role="group" aria-label="نوع الحساب">' +
+          '<button type="button" data-type="internal" aria-pressed="' + !ext + '">طيار في Full Speed</button>' +
+          '<button type="button" data-type="external" aria-pressed="' + ext + '">شريك من بره</button>' +
+        '</div>' +
+        '<form class="form" id="authForm" novalidate>' + fields +
+          '<button class="btn btn-primary btn-block" type="submit">' + (act ? (ext ? 'اعمل حسابك' : 'فعّل حسابك') : 'دخول') + '</button>' +
+        '</form>' +
+        '<button type="button" class="link-btn" data-mode="' + (act ? 'login' : 'activate') + '">' +
+          (act ? 'عندك حساب؟ ادخل' : (ext ? 'أول مرة؟ اعمل حساب شريك' : 'أول مرة؟ فعّل حسابك')) + '</button>' +
+      '</div></section>';
+
+    app.querySelectorAll('[data-type]').forEach(function (b) { b.onclick = function () { S.type = b.dataset.type; renderAuth(); }; });
+    app.querySelector('[data-mode]').onclick = function (e) { S.mode = e.currentTarget.dataset.mode; renderAuth(); };
+    document.getElementById('authForm').onsubmit = async function (e) {
+      e.preventDefault();
+      var form = e.currentTarget, btn = form.querySelector('[type=submit]'), d = formData(form);
+      d.type = S.type;
+      busy(btn, true);
+      var res = await call(act ? 'activate' : 'login', d);
+      busy(btn, false);
+      if (!res.ok) { showErrors(form, res.fields); return; }
+      startSession(res.data.token, res.data.dashboard);
+      toast(act ? 'أهلاً بيك في Full Speed Champions 🎉' : 'أهلاً ' + first(res.data.dashboard.user.name));
+    };
+  }
+
+  function startSession(token, dash) {
+    S.token = token; store('fs_token', token);
+    S.dash = dash; S.view = 'home';
+    renderApp();
+  }
+
+  function signOut() {
+    S.token = null; S.dash = null; store('fs_token', null);
+    S.mode = 'login'; renderAuth();
+  }
+
+  /* ───────────── Signed-in shell ───────────── */
+  function topbar() {
+    var u = S.dash.user;
+    return '<header class="topbar"><div class="brand"><i class="mk" aria-hidden="true"></i>' +
+      '<p class="hello">أهلاً يا ' + esc(first(cleanName(u.name)) || 'بطل') + '<small>' + (u.type === 'external' ? 'شريك Full Speed' : 'كود ' + esc(u.code)) + '</small></p></div>' +
+      '<div class="icons">' +
+        '<button class="icon-btn" type="button" id="refreshBtn" aria-label="تحديث البيانات">' + icon('refresh') + '</button>' +
+        '<button class="icon-btn" type="button" id="themeBtn" aria-label="تبديل الوضع الفاتح والداكن">' + icon('theme') + '</button>' +
+      '</div></header>';
+  }
+
+  function renderApp() {
+    var dock = document.getElementById('dock');
+    dock.hidden = false;
+    dock.querySelectorAll('[data-go]').forEach(function (b) {
+      b.setAttribute('aria-current', b.dataset.go === S.view ? 'page' : 'false');
+      b.onclick = function () { S.view = b.dataset.go; renderApp(); window.scrollTo(0, 0); };
+    });
+    var n = S.dash.totals.nudges, badge = document.getElementById('nudgeBadge');
+    badge.hidden = !n; badge.textContent = n;
+
+    var body = { home: viewHome, pipeline: viewPipeline, bonus: viewBonus, profile: viewProfile }[S.view]();
+    app.innerHTML = topbar() + (live ? '' : '<div class="demo-flag">نسخة تجريبية — الأسماء والأرقام وهمية</div>') + '<div class="view">' + body + '</div>';
+    document.getElementById('themeBtn').onclick = toggleTheme;
+    document.getElementById('refreshBtn').onclick = refresh;
+    bindView();
+  }
+
+  async function refresh() {
+    var btn = document.getElementById('refreshBtn');
+    btn.setAttribute('aria-busy', 'true');
+    var res = await call('session', { token: S.token });
+    btn.removeAttribute('aria-busy');
+    if (res.ok) { S.dash = res.data.dashboard; renderApp(); toast('البيانات اتحدّثت'); }
+  }
+
+  /* ───────────── Home ───────────── */
+  var STATE = {
+    active: ['بيتحسب', 'green'], upcoming: ['لسه هيبدأ', 'blue'],
+    maxed: ['قفل الحد الأقصى', 'gold'], closed: ['المدة خلصت', 'dim']
+  };
+
+  function viewHome() {
+    var d = S.dash, t = d.totals;
+    var nudge = t.nudges ? '<button type="button" class="nudge-bar" data-go-view="pipeline" data-filter="nudge">' + icon('bell') +
+      '<span><b>' + t.nudges + (t.nudges === 1 ? ' مرشح محتاج' : ' مرشحين محتاجين') + ' متابعة</b><br><span class="muted" style="font-size:13px">بقالهم ' + d.season.nudgeAfterDays + ' أيام أو أكتر من غير تحديث. كلمهم يكملوا ورقهم.</span></span></button>' : '';
+
+    var team = d.team.length ? d.team.map(slip).join('') :
+      '<div class="empty">لسه مافيش حد من ترشيحاتك اتعين من ' + fmtDay(d.season.start, true) + '.<br>ابعت لينكك أو رشّح أول طيار.</div>';
+
+    return '<section class="card hero">' +
+        '<span class="eyebrow">إجمالي البونص</span>' +
+        '<div class="num total">' + money(t.bonus) + '<small>جنيه</small></div>' +
+        '<div class="split">' +
+          '<div><span class="num" style="color:var(--gold)">' + money(t.payable) + '</span><span class="lbl">جاهز للصرف</span></div>' +
+          '<div><span class="num">' + money(t.pending) + '</span><span class="lbl">لسه بيتحسب ويزيد</span></div>' +
+        '</div>' +
+        (t.nextPayout ? '<div class="payout">' + icon('cal').replace('<svg', '<svg width="16" height="16"') + 'أقرب صرف: <b>' + fmtDay(t.nextPayout) + '</b></div>' : '') +
+      '</section>' +
+      '<div class="stats">' +
+        '<div class="stat"><span class="num">' + t.riders + '</span><span>طيار اتعين</span></div>' +
+        '<div class="stat"><span class="num">' + money(t.orders) + '</span><span>أوردر مكتمل</span></div>' +
+        '<div class="stat"><span class="num">' + t.applicants + '</span><span>مرشح في الطريق</span></div>' +
+      '</div>' +
+      '<div class="actions">' +
+        '<button type="button" class="btn btn-primary" data-open="candidate">' + icon('plus') + 'رشّح طيار</button>' +
+        '<button type="button" class="btn btn-ghost" data-go-view="profile">' + icon('share') + 'ابعت لينكك</button>' +
+      '</div>' + nudge +
+      '<h2 class="section">فريقك من ' + fmtDay(d.season.start) + '<span class="count">' + d.team.length + ' طيار</span></h2>' +
+      '<div class="list">' + team + '</div>';
+  }
+
+  function slip(r) {
+    var tiers = S.dash.season.tiers, max = tiers[tiers.length - 1].orders;
+    var pct = Math.min(100, r.orders / max * 100);
+    var ticks = tiers.map(function (x) { return '<b style="inset-inline-start:' + (x.orders / max * 100) + '%"></b>'; }).join('');
+    var st = STATE[r.state] || STATE.active;
+    var legend;
+    if (r.state === 'maxed') legend = '<span>🏆 قفل ' + money(tiers[tiers.length - 1].bonus) + ' ج — الصرف ' + fmtDay(r.payoutDate) + '</span>';
+    else if (r.state === 'closed') legend = '<span>البونص اتثبت على <strong>' + money(r.bonus) + ' ج</strong> — آخر يوم كان ' + fmtDay(r.lastDay) + '</span>';
+    else legend = '<span>' + (r.nextOrders ? 'باقي <strong>' + r.ordersToNext + '</strong> أوردر ← ' + money(r.nextBonus) + ' ج' : '') + '</span>' +
+      '<span>' + (r.daysLeft === 0 ? '<strong style="color:var(--danger)">النهارده آخر يوم</strong>' : 'باقي <strong>' + r.daysLeft + '</strong> يوم (لحد ' + fmtDay(r.lastDay) + ')') + '</span>';
+    var wa = r.phone ? '<a class="wa" href="https://wa.me/' + intl(r.phone) + '" target="_blank" rel="noopener" aria-label="واتساب ' + esc(r.name) + '">' + icon('wa') + '</a>' +
+      '<a href="tel:+' + intl(r.phone) + '" aria-label="اتصال">' + icon('phone') + '</a>' : '';
+    return '<article class="slip ' + r.state + '">' +
+      '<div class="slip-head"><div><h3 class="slip-name">' + esc(cleanName(r.name)) + '</h3>' +
+        '<div class="slip-meta"><span class="ltr">#' + esc(r.code) + '</span><span>' + esc(r.zone || '—') + '</span><span>اتعين ' + fmtDay(r.hireDate) + '</span></div></div>' +
+        '<div class="contact">' + wa + '</div></div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill ' + st[1] + '">' + st[0] + '</span>' +
+        (r.vehicle ? '<span class="pill dim">' + esc(r.vehicle) + '</span>' : '') + '</div>' +
+      '<div class="figures">' +
+        '<div><span class="num">' + money(r.orders) + '</span><span>أوردر</span></div>' +
+        '<div><span class="num gold">' + money(r.bonus) + '</span><span>بونص (ج)</span></div>' +
+        '<div><span class="num">' + (r.state === 'active' ? r.daysLeft : '—') + '</span><span>يوم باقي</span></div>' +
+      '</div>' +
+      '<div style="display:grid;gap:6px"><div class="track" role="img" aria-label="' + r.orders + ' من ' + max + ' أوردر"><i style="width:' + pct + '%"></i>' + ticks + '</div>' +
+      '<div class="track-legend">' + legend + '</div></div>' +
+    '</article>';
+  }
+
+  /* ───────────── Pipeline ───────────── */
+  var FILTERS = [
+    ['all', 'الكل', function () { return true; }],
+    ['nudge', 'محتاج متابعة', function (p) { return p.nudge; }],
+    ['moving', 'في الطريق', function (p) { return !p.rejected && p.status !== 'اشتغل'; }],
+    ['hired', 'اشتغل', function (p) { return p.status === 'اشتغل'; }],
+    ['rejected', 'مرفوض', function (p) { return p.rejected; }]
+  ];
+
+  function viewPipeline() {
+    var p = S.dash.pipeline;
+    var chips = FILTERS.map(function (f) {
+      var n = p.filter(f[2]).length;
+      return '<button type="button" class="chip" data-filter="' + f[0] + '" aria-pressed="' + (S.filter === f[0]) + '">' + f[1] + '<span class="n">' + n + '</span></button>';
+    }).join('');
+    var pick = FILTERS.filter(function (f) { return f[0] === S.filter; })[0] || FILTERS[0];
+    var list = p.filter(pick[2]);
+    return '<h2 class="section">المرشحين بتوعك<span class="count">من ' + fmtDay(S.dash.season.start) + '</span></h2>' +
+      '<div class="chips" role="group" aria-label="فلترة">' + chips + '</div>' +
+      '<button type="button" class="btn btn-primary" data-open="candidate">' + icon('plus') + 'رشّح طيار جديد</button>' +
+      '<div class="list">' + (list.length ? list.map(appCard).join('') : '<div class="empty">مافيش مرشحين هنا.</div>') + '</div>';
+  }
+
+  function appCard(a) {
+    var steps = S.dash.statuses.slice(0, 5);
+    var stage = a.rejected ? Math.max(0, a.stage) : a.stage;
+    var stepper = '<div class="steps' + (a.rejected ? ' rejected' : '') + '">' + steps.map(function (s, i) {
+      var cls = a.rejected ? (i === 0 ? 'now' : '') : (i < stage ? 'done' : i === stage ? (stage === 4 ? 'done' : 'now') : '');
+      return '<div class="' + cls + '">' + esc(s.replace('تم حضور ', '')) + '</div>';
+    }).join('') + '</div>';
+    var pill = a.status === 'اشتغل' ? 'green' : a.rejected ? 'red' : a.status === 'جديد' ? 'dim' : 'blue';
+    var me = first(cleanName(S.dash.user.name));
+    var msg = 'أهلاً ' + first(a.name) + '، أنا ' + me + ' من Full Speed 👋 طلبك عندنا حالته "' + a.status + '". لو محتاج مساعدة تكمل الورق كلمني، عايزين ننزّلك الشغل بسرعة 🚀';
+    var nudge = a.nudge ? '<div class="note warn"><b>محتاج متابعة:</b> بقاله ' + a.daysWaiting + ' يوم على "' + esc(a.status) + '". ' +
+      '<a href="https://wa.me/' + intl(a.phone) + '?text=' + encodeURIComponent(msg) + '" target="_blank" rel="noopener">ابعتله رسالة جاهزة على واتساب ←</a></div>' : '';
+    var note = a.note ? '<div class="note"><b>ملاحظة الإدارة:</b> ' + esc(a.note) + '</div>' : '';
+    var hired = a.status === 'اشتغل' && a.hiredCode ? '<div class="note" style="background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 30%,transparent)"><b style="color:var(--green-hi)">اتعين ✓</b> كوده <span class="ltr">#' + esc(a.hiredCode) + '</span>' + (a.hiredDate ? ' من ' + fmtDay(a.hiredDate) : '') + ' — تابعه في الرئيسية.</div>' : '';
+    return '<article class="slip">' +
+      '<div class="slip-head"><div><h3 class="slip-name">' + esc(a.name) + '</h3>' +
+      '<div class="slip-meta"><span>اتقدم ' + fmtDay(a.submitted) + '</span><span>' + esc(a.zone) + '</span><span class="ltr">' + esc(a.phone || '') + '</span></div></div>' +
+      '<span class="pill ' + pill + '">' + esc(a.status) + '</span></div>' +
+      stepper + hired + nudge + note +
+    '</article>';
+  }
+
+  /* ───────────── Bonus guide ───────────── */
+  function viewBonus() {
+    var tiers = (S.dash ? S.dash.season.tiers : S.boot.tiers), months = S.dash ? S.dash.season.windowMonths : 2;
+    var top = tiers[tiers.length - 1];
+    var ladder = tiers.map(function (t) {
+      return '<div class="rung"><span class="num orders">' + t.orders + '</span><span class="bar" style="width:' + (t.bonus / top.bonus * 100) + '%"></span><span class="num money">' + money(t.bonus) + '</span></div>';
+    }).join('');
+    return '<section class="card"><span class="eyebrow">برنامج بونص ترشيحي</span>' +
+      '<h2 class="section" style="margin-top:4px">إزاي بتكسب</h2>' +
+      '<ul class="rules" style="margin-top:12px">' +
+        '<li>' + icon('check') + '<span>المرشح لازم يكون <b>جديد على Full Speed</b> — مالوش أي بيانات قديمة عندنا.</span></li>' +
+        '<li>' + icon('check') + '<span>بنحسب <b>الأوردرات المكتملة بس</b> اللي عملها المرشح.</span></li>' +
+        '<li>' + icon('check') + '<span>الأوردرات بتتحسب خلال <b>' + (months === 2 ? 'شهرين' : months + ' شهور') + '</b> من تاريخ تعيينه.</span></li>' +
+        '<li>' + icon('check') + '<span>البونص بيتصرف بعد ما المدة تخلص، أو أول ما يوصل <b>' + top.orders + ' أوردر</b>.</span></li>' +
+      '</ul>' +
+      '<p class="example">مثال: لو اتعين <b>8 نوفمبر</b>، آخر يوم بيتحسب هو <b>7 يناير</b>. اللي يوصله لحد اليوم ده بيتثبت ومش بيقل.</p>' +
+    '</section>' +
+    '<section class="card"><h2 class="section">الشرايح<span class="count">أوردر ← جنيه</span></h2><div class="ladder" style="margin-top:12px">' + ladder + '</div></section>' +
+    '<section class="card sim"><h2 class="section">احسبها بنفسك</h2>' +
+      '<div class="field"><label>عدد الطيارين اللي هترشحهم</label><div class="stepper"><button type="button" id="simMinus" aria-label="أقل">−</button><output id="simRiders" class="num">3</output><button type="button" id="simPlus" aria-label="أكتر">+</button></div></div>' +
+      '<div class="field"><label for="simOrders">متوسط أوردرات كل واحد في الشهرين: <b class="num" id="simOrdersOut" style="font-size:20px">400</b></label>' +
+      '<input type="range" id="simOrders" min="0" max="' + (top.orders + 150) + '" step="10" value="400"></div>' +
+      '<div class="sim-out"><div><span class="muted" style="font-size:13px">هتكسب حوالي</span><div class="num" id="simTotal">0</div></div><span class="muted" id="simPer" style="font-size:13px"></span></div>' +
+    '</section>';
+  }
+
+  function tierBonus(orders) {
+    var tiers = S.dash ? S.dash.season.tiers : S.boot.tiers, b = 0;
+    tiers.forEach(function (t) { if (orders >= t.orders) b = t.bonus; });
+    return b;
+  }
+
+  function bindSim() {
+    var riders = 3;
+    var o = document.getElementById('simOrders');
+    if (!o) return;
+    function upd() {
+      var per = tierBonus(+o.value);
+      document.getElementById('simRiders').textContent = riders;
+      document.getElementById('simOrdersOut').textContent = o.value;
+      document.getElementById('simTotal').textContent = money(per * riders) + ' ج';
+      document.getElementById('simPer').textContent = per ? money(per) + ' ج × ' + riders : 'أقل من أول شريحة';
+    }
+    document.getElementById('simMinus').onclick = function () { riders = Math.max(1, riders - 1); upd(); };
+    document.getElementById('simPlus').onclick = function () { riders = Math.min(50, riders + 1); upd(); };
+    o.oninput = upd; upd();
+  }
+
+  /* ───────────── Profile ───────────── */
+  function appLink() {
+    var base = (S.boot && S.boot.appUrl) || location.href.split('#')[0].split('?')[0];
+    return base + '?ref=' + encodeURIComponent(S.dash.user.refParam);
+  }
+
+  function viewProfile() {
+    var u = S.dash.user, ext = u.type === 'external';
+    var shareText = 'عايز تشتغل طيار مع Full Speed على طلبات؟ 🛵\n1) سجّل في طلبات من اللينك ده:\n' + u.talabatLink + '\n2) وابعت بياناتك هنا عشان نتابعك لحد ما تنزل الشغل:\n' + appLink();
+    var rows = ext ? [
+      ['الاسم', esc(u.name)], ['الموبايل', '<span class="ltr">' + esc(u.phone) + '</span>'], ['كود الشريك', '<span class="ltr">' + esc(u.code) + '</span>']
+    ] : [
+      ['الموبايل', '<span class="ltr">' + esc(u.phone || '—') + '</span>'], ['المشرف', esc(u.supervisor || '—')],
+      ['المنطقة', esc(u.zone || '—')], ['المركبة', esc(u.vehicle || '—')]
+    ];
+    return '<section class="card pass">' +
+      '<div class="pass-top"><i class="mk" aria-hidden="true"></i><div style="min-width:0"><span class="eyebrow">' + (ext ? 'شريك Full Speed' : 'طيار Full Speed') + '</span><h3>' + esc(cleanName(u.name)) + '</h3></div>' +
+      (ext ? '' : '<span class="num code-big ltr" style="margin-inline-start:auto">' + esc(u.code) + '</span>') + '</div>' +
+      rows.map(function (r) { return '<div class="kv"><span>' + r[0] + '</span><span>' + r[1] + '</span></div>'; }).join('') +
+    '</section>' +
+    '<section class="card linkbox"><h2 class="section">لينكاتك</h2>' +
+      '<span class="muted" style="font-size:13px">1. لينك التسجيل في طلبات' + (ext ? ' (الموحّد للشركاء)' : ' — باسم كودك') + '</span><code id="lnkTalabat">' + esc(u.talabatLink) + '</code>' +
+      '<span class="muted" style="font-size:13px">2. لينك استمارة Full Speed — أي حد يسجل منه بيتحسب عليك</span><code id="lnkApp">' + esc(appLink()) + '</code>' +
+      '<div class="actions"><a class="btn btn-primary" href="https://wa.me/?text=' + encodeURIComponent(shareText) + '" target="_blank" rel="noopener">' + icon('wa') + 'ابعتهم واتساب</a>' +
+      '<button type="button" class="btn btn-ghost" data-copy="' + esc(shareText) + '">' + icon('copy') + 'انسخ الرسالة</button></div>' +
+    '</section>' +
+    '<section class="card"><h2 class="section">تغيير كلمة المرور</h2>' +
+      '<form class="form" id="pwForm" style="margin-top:12px" novalidate>' +
+        '<div class="field"><label for="pw-cur">الحالية</label><input id="pw-cur" name="current" type="password" autocomplete="current-password"></div>' +
+        '<div class="field"><label for="pw-new">الجديدة</label><input id="pw-new" name="next" type="password" autocomplete="new-password"></div>' +
+        '<button class="btn btn-ghost" type="submit">غيّر كلمة المرور</button>' +
+      '</form></section>' +
+    '<button type="button" class="btn btn-ghost btn-block" id="logoutBtn" style="color:var(--danger)">تسجيل خروج</button>';
+  }
+
+  /* ───────────── Candidate form (sheet + public page) ───────────── */
+  function candidateFields(zones) {
+    var opts = '<option value="">اختار المنطقة…</option>' + (zones || []).map(function (z) { return '<option>' + esc(z) + '</option>'; }).join('');
+    return '<div class="field"><label for="c-name">الاسم زي البطاقة</label><input id="c-name" name="fullName" autocomplete="off" placeholder="ثلاثي على الأقل" required></div>' +
+      '<div class="field"><label for="c-mobile">رقم الموبايل</label><input id="c-mobile" name="mobile" class="ltr" inputmode="numeric" maxlength="11" placeholder="01xxxxxxxxx" required></div>' +
+      '<div class="field"><label for="c-nid">الرقم القومي</label><input id="c-nid" name="nationalId" class="ltr" inputmode="numeric" maxlength="14" placeholder="14 رقم" required><span class="derived" id="nidOut"></span></div>' +
+      '<div class="field"><label for="c-address">العنوان</label><input id="c-address" name="address" placeholder="المحافظة - المنطقة - الشارع" required></div>' +
+      '<div class="field"><label for="c-zone">منطقة الشغل</label><select id="c-zone" name="zone" required>' + opts + '</select></div>' +
+      '<div class="row2"><div class="field"><label for="c-idexp">انتهاء البطاقة</label><input id="c-idexp" name="idExpiry" type="date" required></div>' +
+      '<div class="field"><label for="c-licexp">انتهاء الرخصة</label><input id="c-licexp" name="licenseExpiry" type="date"><span class="hint">مش مطلوبة للعجلة</span></div></div>' +
+      '<div class="field"><label for="c-plate">رقم اللوحة</label><input id="c-plate" name="plate" placeholder="سيبها فاضية لو عجلة"></div>';
+  }
+
+  function bindNid(root) {
+    var nid = root.querySelector('[name=nationalId]'), out = root.querySelector('#nidOut');
+    if (!nid) return;
+    nid.oninput = function () {
+      var b = nidBirth(nid.value);
+      if (nid.value.replace(/\D/g, '').length < 14) { out.textContent = ''; return; }
+      if (!b) { out.textContent = 'الرقم ده مش صحيح'; out.style.color = 'var(--danger)'; return; }
+      var age = new Date().getFullYear() - b.getFullYear();
+      out.style.color = ''; out.textContent = 'مواليد ' + DFY.format(b) + ' (' + age + ' سنة تقريباً)';
+    };
+  }
+
+  function openCandidate() {
+    var sheet = document.getElementById('sheet');
+    sheet.innerHTML = '<div role="dialog" aria-modal="true" aria-labelledby="candTitle"><div class="inner">' +
+      '<div class="sheet-head"><h3 id="candTitle">ترشيح طيار جديد</h3><button type="button" class="icon-btn" data-close aria-label="إغلاق">' + icon('x') + '</button></div>' +
+      '<p class="muted" style="margin:0;font-size:13px">بيتسجل على ' + (S.dash.user.type === 'external' ? 'حسابك كشريك' : 'كودك') + '. تاريخ الميلاد بيطلع لوحده من الرقم القومي.</p>' +
+      '<form class="form" id="candForm" novalidate>' + candidateFields(S.boot && S.boot.zones) +
+      '<button class="btn btn-primary btn-block" type="submit">ابعت للإدارة</button></form></div></div>';
+    sheet.hidden = false;
+    sheet.querySelector('[data-close]').onclick = closeSheet;
+    sheet.onclick = function (e) { if (e.target === sheet) closeSheet(); };
+    bindNid(sheet);
+    document.getElementById('candForm').onsubmit = async function (e) {
+      e.preventDefault();
+      var form = e.currentTarget, btn = form.querySelector('[type=submit]');
+      busy(btn, true, 'بنتأكد إنه جديد…');
+      var res = await call('submitCandidate', { token: S.token, form: formData(form) });
+      busy(btn, false);
+      if (!res.ok) { showErrors(form, res.fields); return; }
+      closeSheet(); S.dash = res.data.dashboard; S.view = 'pipeline'; S.filter = 'all'; renderApp(); toast(res.data.message);
+    };
+    setTimeout(function () { var f = document.getElementById('c-name'); if (f) f.focus(); }, 50);
+  }
+  function closeSheet() { var s = document.getElementById('sheet'); s.hidden = true; s.innerHTML = ''; }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
+
+  function renderPublicApply() {
+    document.getElementById('dock').hidden = true;
+    var r = S.boot.referrer;
+    if (!r || !r.valid) {
+      app.innerHTML = '<section class="auth">' + brand(true) + '<div class="card" style="text-align:center"><h2 class="section" style="justify-content:center">اللينك ده مش صحيح</h2><p class="muted">اطلب لينك الترشيح تاني من الشخص اللي رشّحك.</p></div></section>';
+      return;
+    }
+    app.innerHTML = '<section class="auth" style="align-content:start">' + brand(true) +
+      (live ? '' : '<div class="demo-flag">نسخة تجريبية — مفيش حاجة بتتبعت فعلاً</div>') +
+      '<div class="card"><span class="eyebrow">استمارة انضمام</span><h2 class="section" style="margin-top:4px">' + esc(r.firstName) + ' رشّحك تشتغل معانا 🛵</h2>' +
+      '<p class="muted" style="margin:6px 0 0;font-size:14px">املا بياناتك وفريق Full Speed هيكلمك يكمل معاك التعيين على طلبات.</p></div>' +
+      '<form class="card form" id="pubForm" novalidate>' + candidateFields(S.boot.zones) +
+      '<button class="btn btn-primary btn-block" type="submit">ابعت طلبي</button></form></section>';
+    bindNid(app);
+    document.getElementById('pubForm').onsubmit = async function (e) {
+      e.preventDefault();
+      var form = e.currentTarget, btn = form.querySelector('[type=submit]');
+      busy(btn, true);
+      var res = await call('publicApply', { ref: S.ref, form: formData(form) });
+      busy(btn, false);
+      if (!res.ok) { showErrors(form, res.fields); return; }
+      app.innerHTML = '<section class="auth">' + brand(true) + '<div class="card done-screen"><div class="tick">' + icon('check') + '</div>' +
+        '<h2 class="section">طلبك وصل ✓</h2><p class="muted" style="margin:0">فريق Full Speed هيكلمك على رقمك قريب.<br>لو لسه ما سجلتش في طلبات، اطلب اللينك من ' + esc(res.data.referrer) + '.</p></div></section>';
+    };
+  }
+
+  /* ───────────── Event wiring for the current view ───────────── */
+  function bindView() {
+    app.querySelectorAll('[data-open="candidate"]').forEach(function (b) { b.onclick = openCandidate; });
+    app.querySelectorAll('[data-go-view]').forEach(function (b) {
+      b.onclick = function () { S.view = b.dataset.goView; if (b.dataset.filter) S.filter = b.dataset.filter; renderApp(); window.scrollTo(0, 0); };
+    });
+    app.querySelectorAll('.chip[data-filter]').forEach(function (b) { b.onclick = function () { S.filter = b.dataset.filter; renderApp(); }; });
+    app.querySelectorAll('[data-copy]').forEach(function (b) { b.onclick = function () { copy(b.dataset.copy, b); }; });
+    bindSim();
+    var pw = document.getElementById('pwForm');
+    if (pw) pw.onsubmit = async function (e) {
+      e.preventDefault();
+      var btn = pw.querySelector('[type=submit]');
+      busy(btn, true);
+      var d = formData(pw); d.token = S.token;
+      var res = await call('changePassword', d);
+      busy(btn, false);
+      if (!res.ok) { showErrors(pw, res.fields); return; }
+      S.token = res.data.token; store('fs_token', S.token); pw.reset(); toast('كلمة المرور اتغيرت، وخرجناك من أي جهاز تاني.');
+    };
+    var lo = document.getElementById('logoutBtn');
+    if (lo) lo.onclick = async function () { call('logout', { token: S.token }, { quiet: true }); signOut(); toast('خرجت من حسابك'); };
+  }
+
+  /* ───────────── Start ───────────── */
+  (async function start() {
+    app.innerHTML = '<section class="auth">' + brand(true) + '<p class="muted" style="text-align:center">بنجهّز…</p></section>';
+    S.ref = await Backend.ref();
+    var boot = await Backend.call('bootstrap', { ref: S.ref });
+    S.boot = boot.ok ? boot.data : { zones: [], tiers: [{ orders: 850, bonus: 3000 }] };
+    if (S.ref) { renderPublicApply(); return; }
+    var token = store('fs_token');
+    if (token) {
+      var res = await Backend.call('session', { token: token });
+      if (res.ok) { S.token = token; S.dash = res.data.dashboard; renderApp(); return; }
+      store('fs_token', null);
+    }
+    renderAuth();
+  })();
+})();
+</script>

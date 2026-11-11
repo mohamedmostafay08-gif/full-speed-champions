@@ -1,0 +1,10 @@
+{
+  "name": "full-speed-champions",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Full Speed referral & bonus platform (Google Apps Script + Google Sheets)",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "build": "node build.js"
+  }
+}
