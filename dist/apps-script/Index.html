@@ -1,5 +1,5 @@
 <title>Full Speed Champions</title>
-<script>window.FS_BUILD="3b6fd56af9";</script>
+<script>window.FS_BUILD="d23a014058";</script>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="theme-color" content="#070A08">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -147,17 +147,34 @@ h2.section .count { font: 600 12px var(--f-body); color: var(--muted); }
 .pw-wrap svg { width: 20px; height: 20px; }
 
 /* ── Auth ── */
-.auth { min-height: 100vh; min-height: 100dvh; display: grid; align-content: center; gap: 20px; padding-block: 24px; }
+.auth { min-height: 100vh; min-height: 100dvh; display: grid; align-content: center; gap: 16px; padding-block: 20px; }
 .auth .brand { justify-content: center; }
-.auth .mk { width: 58px; height: 58px; }
-.auth .wm { font-size: 30px; }
-.teaser { text-align: center; display: grid; gap: 2px; }
-.teaser .num { font-size: 58px; color: var(--gold); }
-.teaser p { margin: 0; color: var(--muted); font-size: 14px; }
-.teaser strong { font: 700 17px var(--f-display); color: var(--ink); }
-.how3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; font-size: 12px; color: var(--muted); }
-.how3 div { display: grid; gap: 4px; justify-items: center; }
-.how3 b { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--green-soft); color: var(--green-hi); font: 800 15px var(--f-num); }
+.auth .mk { width: 64px; height: 64px; }
+.auth .wm { font-size: 32px; }
+/* Gold "prize" card: the money and a rising ladder of the real tiers */
+.prize { position: relative; overflow: hidden; border-radius: 22px; padding: 16px 18px 14px; border: 1px solid color-mix(in srgb, var(--gold) 40%, var(--line));
+  background: radial-gradient(120% 100% at 100% 0%, var(--gold-soft), transparent 65%), var(--surface); display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: end; }
+.prize p { margin: 0; grid-column: 1 / -1; color: var(--muted); font-size: 13px; }
+.prize .num { font-size: 56px; color: var(--gold); display: flex; align-items: baseline; gap: 6px; }
+.prize .num small { font: 700 18px var(--f-display); color: var(--muted); }
+.prize strong { grid-column: 1; font: 700 15px var(--f-display); }
+.mini-ladder { grid-row: 2 / 4; grid-column: 2; display: flex; align-items: flex-end; gap: 3px; height: 64px; }
+.mini-ladder i { width: 7px; border-radius: 3px 3px 1px 1px; background: linear-gradient(0deg, color-mix(in srgb, var(--gold) 45%, transparent), var(--gold)); }
+/* Three steps joined by a line */
+.how3 { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; font-size: 12px; color: var(--muted); }
+.how3::before { content: ""; position: absolute; top: 19px; inset-inline: 16.6%; height: 2px; background: repeating-linear-gradient(90deg, var(--line-2) 0 6px, transparent 6px 10px); }
+.how3 div { position: relative; display: grid; gap: 6px; justify-items: center; }
+.how3 b { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 1px solid color-mix(in srgb, var(--green) 45%, var(--line-2)); color: var(--green-hi); }
+.how3 b svg { width: 19px; height: 19px; }
+.how3 span { color: var(--ink); font-weight: 600; }
+.auth-card { gap: 14px; }
+.auth-foot { display: grid; gap: 4px; justify-items: center; text-align: center; }
+.auth-foot a { color: var(--muted); font-size: 13px; min-height: var(--tap); display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.auth-foot a svg { width: 16px; height: 16px; color: var(--green-hi); }
+/* Browser autofill: keep our field colours instead of the blue/yellow default */
+.field input:-webkit-autofill, .field input:-webkit-autofill:hover, .field input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink); caret-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-2) inset; box-shadow: 0 0 0 1000px var(--bg-2) inset; transition: background-color 9999s; }
 
 /* ── Skeleton ── */
 .sk { border-radius: 16px; background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%); background-size: 200% 100%; animation: sk 1.2s linear infinite; }
@@ -343,6 +360,7 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
   <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
   <symbol id="i-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></symbol>
   <symbol id="i-wa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9.5c.5 2 2.5 4 4.5 4.5l1-1.2 2 .9c-.3 1.3-1.4 2-2.7 1.8A7 7 0 0 1 8 9.7C7.8 8.4 8.6 7.3 9.8 7l.9 2z"/></symbol>
   <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/></symbol>
@@ -570,22 +588,33 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
         '<div class="field"><label for="a-phone">رقم موبايلك المتسجل في الشركة</label><input id="a-phone" name="phone" class="ltr" inputmode="numeric" maxlength="11" enterkeyhint="next" placeholder="01xxxxxxxxx" required><span class="hint">لازم يطابق رقمك عند Full Speed، عشان محدش يفعّل كودك غيرك.</span></div>' +
         pwField('a-pass', 'اختار كلمة مرور', 'new-password', '6 حروف أو أرقام على الأقل.');
     }
+    var ladder = (S.boot && S.boot.tiers && S.boot.tiers.length > 1 ? S.boot.tiers : [{ bonus: 600 }, { bonus: 1200 }, { bonus: 1800 }, { bonus: 2400 }, { bonus: 3000 }])
+      .map(function (t) { return '<i style="height:' + Math.max(12, t.bonus / top.bonus * 100) + '%"></i>'; }).join('');
+    var support = S.boot && S.boot.support;
     app.innerHTML =
       '<section class="auth">' + brand() +
-      '<div class="teaser"><p>رشّح طيار جديد وتابعه لحد ما يشتغل</p><span class="num">' + money(top.bonus) + ' <small style="font-size:22px">ج</small></span><strong>لحد كده على كل طيار</strong></div>' +
-      '<div class="how3" aria-label="الخطوات"><div><b>1</b>ابعت لينكك</div><div><b>2</b>صاحبك يتعين</div><div><b>3</b>تقبض بونصه</div></div>' +
+      '<div class="prize"><p>رشّح طيار جديد وتابعه لحد ما يشتغل</p>' +
+        '<span class="num">' + money(top.bonus) + '<small>جنيه</small></span>' +
+        '<div class="mini-ladder" aria-hidden="true">' + ladder + '</div>' +
+        '<strong>لحد كده على كل طيار</strong></div>' +
+      '<div class="how3" aria-label="الخطوات">' +
+        '<div><b>' + icon('share') + '</b><span>ابعت لينكك</span></div>' +
+        '<div><b>' + icon('people') + '</b><span>صاحبك يتعين</span></div>' +
+        '<div><b>' + icon('trophy') + '</b><span>تقبض بونصه</span></div></div>' +
       (live ? '' : '<div class="demo-flag">نسخة تجريبية ببيانات وهمية — اكتب أي كود وأي كلمة مرور</div>') +
-      '<div class="card form" style="gap:14px">' +
+      '<div class="card form auth-card">' +
         '<div class="seg" role="group" aria-label="نوع الحساب">' +
-          '<button type="button" data-type="internal" aria-pressed="' + !ext + '">طيار في Full Speed</button>' +
-          '<button type="button" data-type="external" aria-pressed="' + ext + '">شريك من بره</button>' +
+          '<button type="button" data-type="internal" aria-pressed="' + !ext + '">🛵 طيار في Full Speed</button>' +
+          '<button type="button" data-type="external" aria-pressed="' + ext + '">🤝 شريك من بره</button>' +
         '</div>' +
         '<form class="form" id="authForm" novalidate>' + fields +
           '<button class="btn btn-primary btn-block" type="submit">' + (act ? (ext ? 'اعمل حسابك' : 'فعّل حسابك') : 'دخول') + '</button>' +
         '</form>' +
-        '<button type="button" class="link-btn" data-mode="' + (act ? 'login' : 'activate') + '">' +
-          (act ? 'عندك حساب؟ ادخل' : (ext ? 'أول مرة؟ اعمل حساب شريك' : 'أول مرة؟ فعّل حسابك')) + '</button>' +
-      '</div></section>';
+        '<button type="button" class="btn btn-ghost btn-block" data-mode="' + (act ? 'login' : 'activate') + '">' +
+          (act ? 'عندي حساب، عايز أدخل' : (ext ? 'أول مرة؟ اعمل حساب شريك' : 'أول مرة؟ فعّل حسابك')) + '</button>' +
+      '</div>' +
+      (support ? '<div class="auth-foot"><a href="' + wa(support.replace(/^20/, '0'), 'محتاج مساعدة في Full Speed Champions') + '" target="_blank" rel="noopener">' + icon('wa') + 'نسيت كلمة المرور أو محتاج مساعدة؟ كلّمنا</a></div>' : '') +
+      '</section>';
 
     app.querySelectorAll('[data-type]').forEach(function (b) { b.onclick = function () { S.type = b.dataset.type; renderAuth(); }; });
     app.querySelector('[data-mode]').onclick = function (e) { S.mode = e.currentTarget.dataset.mode; renderAuth(); };

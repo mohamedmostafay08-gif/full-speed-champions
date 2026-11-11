@@ -80,7 +80,7 @@
 
   var handlers = {
     bootstrap: function (p) {
-      return { ok: true, data: { zones: zones, tiers: cfg.TIERS, windowMonths: 2, appUrl: 'https://script.google.com/macros/s/…/exec',
+      return { ok: true, data: { zones: zones, tiers: cfg.TIERS, windowMonths: 2, support: '201097865980', appUrl: 'https://script.google.com/macros/s/…/exec',
         referrer: p.ref ? { valid: true, firstName: 'Ziad' } : null } };
     },
     login: function (p) {

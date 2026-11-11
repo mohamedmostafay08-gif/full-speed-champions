@@ -1,6 +1,6 @@
 // Service worker: يخلّي التطبيق يتثبت ويفتح بسرعة.
 // VERSION بيتغيّر لوحده مع كل build (build.js)، فالموبايلات بتاخد التحديث من غير ما حد يعمل حاجة.
-var VERSION = 'fsc-99528d8e0a';
+var VERSION = 'fsc-b375680009';
 var SHELL = ['./', './index.html', './config.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
