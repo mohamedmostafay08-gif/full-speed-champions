@@ -17,6 +17,8 @@ const logo = fs.readFileSync(path.join(root, 'assets/logo-mark.webp')).toString(
 const crypto = require('node:crypto');
 const raw = read('ui/Index.html').replace('__LOGO__', logo);
 const page = raw.replace('<!--WEB_HEAD-->', '');
+const viewport = '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">';
+
 if (page.includes('<?')) throw new Error('Index.html must not contain "<?" (HtmlService scriptlets)');
 
 const server = ['Config', 'Core', 'Logic', 'Sheets', 'Auth', 'Code'];
@@ -33,10 +35,11 @@ out('dist/single-file/appsscript.json', read('src/appsscript.json'));
 
 const shared = ['Config', 'Core', 'Logic'].map((f) => read(`src/${f}.js`)).join('\n');
 const demo = `<script>\n${shared}\n${read('ui/demo.js')}\n</script>`;
-out('dist/preview.html', page.replace('<!--DEMO-->', demo));
+out('dist/preview.html', raw.replace('<!--WEB_HEAD-->', viewport).replace('<!--DEMO-->', demo));
 
 // GitHub Pages app (docs/): same page + manifest, icons, service worker and the /exec link.
-const webHead = `<link rel="manifest" href="manifest.webmanifest">
+const webHead = viewport + `
+<link rel="manifest" href="manifest.webmanifest">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

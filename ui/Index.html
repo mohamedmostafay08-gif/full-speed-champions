@@ -6,22 +6,24 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Cairo:wght@600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
 <style>
-/* Layout: one phone-width "dispatch board" column; rider slips stacked like
-   order tickets, money always in gold, a dock at the bottom. Dark-first,
-   same palette and type as the Full Speed site. */
+/* Layout: one phone-width column built for the thumb. Summary first (the
+   money, in gold), then one clear next step, then the team as order slips.
+   A dock with a raised "رشّح" button sits in thumb reach. Dark-first, same
+   palette and type as the Full Speed site. */
 :root {
   --bg: #070A08; --bg-2: #0B120D; --surface: #0F1912; --surface-2: #13201A;
   --line: #1D2C21; --line-2: #2A3E2F;
   --ink: #DCF0E0; --muted: #94AC99; --dim: #5F7265;
-  --green: #34B24C; --green-hi: #5BD06F; --on-green: #04140A; --green-soft: rgba(52,178,76,.12);
-  --gold: #E2A838; --gold-soft: rgba(226,168,56,.12);
+  --green: #34B24C; --green-hi: #5BD06F; --on-green: #04140A; --green-soft: rgba(52,178,76,.13);
+  --gold: #E2A838; --gold-hi: #F4C86A; --gold-soft: rgba(226,168,56,.13); --on-gold: #1A1204;
   --danger: #FF7A6E; --danger-soft: rgba(255,122,110,.12);
   --info: #7DB8FF; --info-soft: rgba(125,184,255,.12);
-  --shadow: 0 18px 40px -22px rgba(0,0,0,.8);
+  --shadow: 0 18px 40px -22px rgba(0,0,0,.85);
   --f-display: "Cairo", "IBM Plex Sans Arabic", system-ui, sans-serif;
   --f-body: "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-num: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
   --ease: cubic-bezier(.16,1,.3,1);
+  --tap: 44px;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
@@ -29,10 +31,10 @@
   --line: #DCE5DB; --line-2: #C4D2C4;
   --ink: #0C150E; --muted: #46594B; --dim: #7A9180;
   --green: #187A31; --green-hi: #136B2A; --on-green: #FFFFFF; --green-soft: rgba(24,122,49,.09);
-  --gold: #946609; --gold-soft: rgba(148,102,9,.1);
+  --gold: #946609; --gold-hi: #B07A0B; --gold-soft: rgba(148,102,9,.1); --on-gold: #FFFFFF;
   --danger: #C2362B; --danger-soft: rgba(194,54,43,.08);
   --info: #1F5FAD; --info-soft: rgba(31,95,173,.08);
-  --shadow: 0 14px 32px -20px rgba(12,40,20,.25);
+  --shadow: 0 14px 32px -20px rgba(12,40,20,.28);
   color-scheme: light;
 } }
 :root[data-theme="light"] {
@@ -40,31 +42,34 @@
   --line: #DCE5DB; --line-2: #C4D2C4;
   --ink: #0C150E; --muted: #46594B; --dim: #7A9180;
   --green: #187A31; --green-hi: #136B2A; --on-green: #FFFFFF; --green-soft: rgba(24,122,49,.09);
-  --gold: #946609; --gold-soft: rgba(148,102,9,.1);
+  --gold: #946609; --gold-hi: #B07A0B; --gold-soft: rgba(148,102,9,.1); --on-gold: #FFFFFF;
   --danger: #C2362B; --danger-soft: rgba(194,54,43,.08);
   --info: #1F5FAD; --info-soft: rgba(31,95,173,.08);
-  --shadow: 0 14px 32px -20px rgba(12,40,20,.25);
+  --shadow: 0 14px 32px -20px rgba(12,40,20,.28);
   color-scheme: light;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
-html { direction: rtl; }
+html { direction: rtl; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 html, body { min-height: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
   font: 400 15px/1.6 var(--f-body);
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: contain;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 button, input, select { font: inherit; color: inherit; }
-button { cursor: pointer; }
+button { cursor: pointer; touch-action: manipulation; }
+a { touch-action: manipulation; }
 :focus-visible { outline: 2px solid var(--green-hi); outline-offset: 2px; }
 .num { font-family: var(--f-num); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .01em; line-height: 1; }
 .ltr { direction: ltr; unicode-bidi: isolate; }
 .muted { color: var(--muted); }
-.shell { max-width: 460px; margin: 0 auto; padding-block: 12px 112px; display: grid; gap: 16px; }
+.shell { max-width: 480px; margin: 0 auto; padding-block: 8px calc(118px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 /* ── Brand ── */
 .brand { display: flex; align-items: center; gap: 10px; }
@@ -75,17 +80,25 @@ button { cursor: pointer; }
 
 /* ── Top bar ── */
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
-.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); padding-block: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
-.hello { font: 700 17px/1.3 var(--f-display); margin: 0; }
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); padding-block: 8px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); }
+.topbar .brand { min-width: 0; }
+.topbar .mk { width: 36px; height: 36px; }
+.hello { font: 700 16px/1.25 var(--f-display); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hello small { display: block; font: 500 12px var(--f-body); color: var(--muted); }
-.icons { display: flex; gap: 6px; }
-.icon-btn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line-2); background: var(--surface); display: grid; place-items: center; }
-.icon-btn svg { width: 18px; height: 18px; }
+.icons { display: flex; gap: 6px; flex: none; }
+.icon-btn { width: var(--tap); height: var(--tap); border-radius: 50%; border: 1px solid var(--line-2); background: var(--surface); display: grid; place-items: center; padding: 0; }
+.icon-btn svg { width: 19px; height: 19px; }
 .icon-btn[aria-busy="true"] svg { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Pull to refresh ── */
+.ptr { position: fixed; z-index: 19; top: calc(env(safe-area-inset-top, 0px) + 64px); left: 50%; width: 40px; height: 40px; margin-left: -20px; border-radius: 50%; background: var(--surface); border: 1px solid var(--line-2); display: grid; place-items: center; color: var(--green-hi); box-shadow: var(--shadow); opacity: 0; transform: translateY(-30px) scale(.6); transition: opacity .2s, transform .2s; pointer-events: none; }
+.ptr svg { width: 20px; height: 20px; }
+.ptr.ready svg { transform: rotate(180deg); transition: transform .2s; }
+.ptr.spin svg { animation: spin 1s linear infinite; }
+
 /* ── Cards & bits ── */
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 16px; }
 .eyebrow { font: 600 11px/1.4 var(--f-body); letter-spacing: .14em; text-transform: uppercase; color: var(--green); }
 h2.section { font: 700 16px/1.4 var(--f-display); margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 h2.section .count { font: 600 12px var(--f-body); color: var(--muted); }
@@ -96,110 +109,151 @@ h2.section .count { font: 600 12px var(--f-body); color: var(--muted); }
 .pill.blue { background: var(--info-soft); color: var(--info); border-color: color-mix(in srgb, var(--info) 35%, transparent); }
 .pill.dim { background: var(--surface-2); color: var(--muted); border-color: var(--line-2); }
 
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; padding: 13px 22px; border: 0; font: 700 15px var(--f-display); text-decoration: none; transition: transform .3s var(--ease), background .2s; }
-.btn:active { transform: scale(.97); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border-radius: 999px; padding: 12px 22px; border: 0; font: 700 15px var(--f-display); text-decoration: none; transition: transform .25s var(--ease), background .2s; user-select: none; }
+.btn:active { transform: scale(.96); }
 .btn-primary { background: var(--green); color: var(--on-green); }
 .btn-primary:hover { background: var(--green-hi); }
-.btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+.btn-gold { background: var(--gold); color: var(--on-gold); }
+.btn-ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line-2); }
+.btn-wa { background: #25D366; color: #052E16; }
+.btn-sm { min-height: var(--tap); padding: 8px 14px; font-size: 14px; }
 .btn-block { width: 100%; }
 .btn[disabled] { opacity: .55; pointer-events: none; }
-.btn svg { width: 18px; height: 18px; flex: none; }
-.link-btn { background: none; border: 0; color: var(--green-hi); font: 600 14px var(--f-body); padding: 6px; text-decoration: underline; text-underline-offset: 4px; }
+.btn svg { width: 19px; height: 19px; flex: none; }
+.link-btn { background: none; border: 0; color: var(--green-hi); font: 600 14px var(--f-body); min-height: var(--tap); padding: 6px 10px; text-decoration: underline; text-underline-offset: 4px; }
+.row-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.row-btns > * { min-width: 0; }
 
 /* ── Forms ── */
 .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; }
-.seg button { border: 0; background: transparent; border-radius: 999px; padding: 9px 6px; font: 600 14px var(--f-display); color: var(--muted); }
+.seg button { border: 0; background: transparent; border-radius: 999px; min-height: var(--tap); padding: 8px 6px; font: 600 14px var(--f-display); color: var(--muted); }
 .seg button[aria-pressed="true"] { background: var(--green); color: var(--on-green); }
 .form { display: grid; gap: 12px; }
 .field { display: grid; gap: 5px; align-content: start; }
 .field label { font: 600 13px var(--f-body); color: var(--muted); }
-.field input, .field select { width: 100%; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); font-size: 16px; }
+.field input, .field select { width: 100%; min-height: 50px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--bg-2); font-size: 16px; }
 .field input:focus, .field select:focus { border-color: var(--green); outline: none; box-shadow: 0 0 0 3px var(--green-soft); }
 .field input.ltr { text-align: right; }
 .field .hint { font-size: 12px; color: var(--dim); }
-.field .err { font-size: 12px; color: var(--danger); }
+.field .err { font-size: 13px; color: var(--danger); }
 .field.bad input, .field.bad select { border-color: var(--danger); }
+.field.ok input { border-color: color-mix(in srgb, var(--green) 60%, var(--line-2)); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .row2 > * { min-width: 0; }
 .derived { font-size: 13px; color: var(--green-hi); min-height: 1em; }
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-inline-end: 52px; }
+.pw-wrap button { position: absolute; inset-inline-end: 3px; top: 3px; width: var(--tap); height: var(--tap); border: 0; background: none; color: var(--muted); display: grid; place-items: center; }
+.pw-wrap svg { width: 20px; height: 20px; }
 
 /* ── Auth ── */
-.auth { min-height: 100vh; display: grid; align-content: center; gap: 22px; padding-block: 28px; }
+.auth { min-height: 100vh; min-height: 100dvh; display: grid; align-content: center; gap: 20px; padding-block: 24px; }
 .auth .brand { justify-content: center; }
-.auth .mk { width: 56px; height: 56px; }
+.auth .mk { width: 58px; height: 58px; }
 .auth .wm { font-size: 30px; }
-.teaser { text-align: center; display: grid; gap: 4px; }
-.teaser .num { font-size: 52px; color: var(--gold); }
+.teaser { text-align: center; display: grid; gap: 2px; }
+.teaser .num { font-size: 58px; color: var(--gold); }
 .teaser p { margin: 0; color: var(--muted); font-size: 14px; }
-.teaser strong { font: 700 18px var(--f-display); color: var(--ink); }
+.teaser strong { font: 700 17px var(--f-display); color: var(--ink); }
+.how3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; font-size: 12px; color: var(--muted); }
+.how3 div { display: grid; gap: 4px; justify-items: center; }
+.how3 b { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--green-soft); color: var(--green-hi); font: 800 15px var(--f-num); }
+
+/* ── Skeleton ── */
+.sk { border-radius: 16px; background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%); background-size: 200% 100%; animation: sk 1.2s linear infinite; }
+@keyframes sk { to { background-position: -200% 0; } }
 
 /* ── Home ── */
-.hero { position: relative; overflow: hidden; border-color: color-mix(in srgb, var(--gold) 30%, var(--line)); background:
-  radial-gradient(120% 90% at 100% 0%, var(--gold-soft), transparent 60%), var(--surface); }
-.hero .num.total { font-size: 64px; color: var(--gold); display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
+.hero { position: relative; overflow: hidden; border-color: color-mix(in srgb, var(--gold) 32%, var(--line)); background: radial-gradient(120% 90% at 100% 0%, var(--gold-soft), transparent 60%), var(--surface); }
+.hero .num.total { font-size: 66px; color: var(--gold); display: flex; align-items: baseline; gap: 6px; margin-top: 4px; }
 .hero .num.total small { font: 700 18px var(--f-display); color: var(--muted); }
-.split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border-radius: 12px; overflow: hidden; margin-top: 14px; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border-radius: 14px; overflow: hidden; margin-top: 12px; }
 .split > div { background: var(--surface-2); padding: 10px 12px; }
 .split .num { font-size: 26px; display: block; }
 .split .lbl { font-size: 12px; color: var(--muted); }
-.payout { margin-top: 12px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.potential { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 14px; background: var(--green-soft); border-radius: 12px; padding: 9px 12px; color: var(--ink); }
+.potential b { color: var(--green-hi); font-family: var(--f-num); font-size: 19px; }
+.potential svg { width: 18px; height: 18px; color: var(--green-hi); flex: none; }
+.payout { margin-top: 10px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.payout svg { width: 16px; height: 16px; }
 .payout b { color: var(--ink); }
+
+.coach { display: grid; gap: 12px; border-color: color-mix(in srgb, var(--green) 35%, var(--line)); background: linear-gradient(135deg, var(--green-soft), transparent 70%), var(--surface); }
+.coach.warn { border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); background: linear-gradient(135deg, var(--gold-soft), transparent 70%), var(--surface); }
+.coach-head { display: flex; gap: 12px; align-items: flex-start; }
+.coach-ico { width: 42px; height: 42px; border-radius: 14px; flex: none; display: grid; place-items: center; background: var(--green-soft); color: var(--green-hi); }
+.coach.warn .coach-ico { background: var(--gold-soft); color: var(--gold); }
+.coach-ico svg { width: 22px; height: 22px; }
+.coach h3 { margin: 0; font: 700 15px/1.4 var(--f-display); }
+.coach p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
-.stat .num { font-size: 30px; display: block; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px; text-align: center; }
+.stat .num { font-size: 32px; display: block; }
 .stat span:last-child { font-size: 12px; color: var(--muted); }
-.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.nudge-bar { display: flex; align-items: center; gap: 10px; border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); background: var(--gold-soft); border-radius: 14px; padding: 12px 14px; text-align: start; width: 100%; }
-.nudge-bar b { font-family: var(--f-display); }
-.nudge-bar svg { width: 20px; height: 20px; color: var(--gold); flex: none; }
+
+.badges { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.badge { display: grid; justify-items: center; gap: 6px; text-align: center; font-size: 11px; line-height: 1.35; color: var(--dim); }
+.badge i { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; border: 2px dashed var(--line-2); font-style: normal; font-size: 22px; filter: grayscale(1); opacity: .55; }
+.badge.got { color: var(--ink); font-weight: 600; }
+.badge.got i { border: 2px solid var(--gold); background: var(--gold-soft); filter: none; opacity: 1; box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 12%, transparent); }
+.badge small { color: var(--dim); font-weight: 400; }
+
+.onboard { display: grid; gap: 14px; }
+.onboard ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; counter-reset: s; }
+.onboard li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; }
+.onboard li::before { counter-increment: s; content: counter(s); width: 28px; height: 28px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--green-soft); color: var(--green-hi); font: 800 15px var(--f-num); }
 
 /* ── Rider slip ── */
 .list { display: grid; gap: 10px; }
-.slip { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: grid; gap: 12px; }
-.slip.maxed { border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
-.slip.closed { opacity: .82; }
+.slip { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: grid; gap: 12px; }
+.slip.maxed { border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); background: radial-gradient(90% 60% at 100% 0%, var(--gold-soft), transparent 70%), var(--surface); }
+.slip.closed { opacity: .8; }
+.slip.urgent { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
 .slip-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .slip-head > div:first-child { min-width: 0; }
-.slip-name { font: 700 15px/1.35 var(--f-display); margin: 0; overflow-wrap: anywhere; }
-.slip-meta { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; }
-.contact { display: flex; gap: 6px; flex: none; }
-.contact a { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line-2); color: var(--ink); }
-.contact a.wa { color: var(--green-hi); border-color: color-mix(in srgb, var(--green) 40%, transparent); background: var(--green-soft); }
-.contact svg { width: 16px; height: 16px; }
-.figures { display: grid; grid-template-columns: 1fr 1fr 1fr; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; }
-.figures > div { padding: 8px 10px; }
+.slip-name { font: 700 16px/1.35 var(--f-display); margin: 0; overflow-wrap: anywhere; }
+.slip-meta { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 2px; }
+.figures { display: grid; grid-template-columns: 1fr 1fr 1fr; background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px; }
+.figures > div { padding: 9px 10px; text-align: center; }
 .figures > div + div { border-inline-start: 1px solid var(--line); }
-.figures .num { font-size: 24px; display: block; }
+.figures .num { font-size: 27px; display: block; }
 .figures .gold { color: var(--gold); }
+.figures .red { color: var(--danger); }
 .figures span:last-child { font-size: 11px; color: var(--muted); }
 /* Order track: 0 → 850 orders, a tick at every bonus tier */
-.track { position: relative; height: 10px; border-radius: 6px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; }
-.track i { position: absolute; inset-block: 0; inset-inline-start: 0; background: linear-gradient(90deg, var(--green), var(--green-hi)); border-radius: 6px; transition: width .8s var(--ease); }
-.slip.maxed .track i { background: linear-gradient(90deg, var(--gold), #F4C86A); }
+.track { position: relative; height: 12px; border-radius: 7px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; }
+.track i { position: absolute; inset-block: 0; inset-inline-start: 0; width: 0; background: linear-gradient(270deg, var(--green), var(--green-hi)); border-radius: 7px; transition: width 1s var(--ease); }
+.slip.maxed .track i { background: linear-gradient(270deg, var(--gold), var(--gold-hi)); }
 .slip.closed .track i { background: var(--dim); }
-.track b { position: absolute; inset-block: 0; width: 1px; background: color-mix(in srgb, var(--bg) 70%, transparent); }
-.track-legend { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); gap: 8px; }
-.track-legend strong { color: var(--ink); font-weight: 600; }
+.track b { position: absolute; inset-block: 0; width: 1px; background: color-mix(in srgb, var(--bg) 75%, transparent); }
+.goal { font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.goal strong { color: var(--green-hi); font-family: var(--f-num); font-size: 18px; }
+.goal .gold { color: var(--gold); }
+.slip-actions { display: flex; gap: 8px; }
+.slip-actions .btn { flex: 1; }
+.round { width: var(--tap); height: var(--tap); flex: none; border-radius: 50%; border: 1px solid var(--line-2); display: grid; place-items: center; color: var(--ink); background: var(--surface); }
+.round svg { width: 18px; height: 18px; }
 
 /* ── Pipeline ── */
-.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
-.chips::-webkit-scrollbar { display: none; }
-.chip { flex: none; border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 7px 12px; font: 600 13px var(--f-body); color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { min-height: 40px; border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 6px 13px; font: 600 13px var(--f-body); color: var(--muted); }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.chip .n { font-family: var(--f-num); font-weight: 800; margin-inline-start: 4px; }
+.chip .n { font-family: var(--f-num); font-weight: 800; margin-inline-start: 5px; }
 .steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
-.steps div { display: grid; gap: 5px; text-align: center; font-size: 11px; color: var(--dim); }
-.steps div::before { content: ""; height: 5px; border-radius: 3px; background: var(--line-2); }
+.steps div { display: grid; gap: 5px; text-align: center; font-size: 11px; line-height: 1.3; color: var(--dim); }
+.steps div::before { content: ""; height: 6px; border-radius: 3px; background: var(--line-2); }
 .steps .done { color: var(--green-hi); }
 .steps .done::before { background: var(--green); }
 .steps .now { color: var(--ink); font-weight: 600; }
 .steps .now::before { background: var(--green-hi); box-shadow: 0 0 0 3px var(--green-soft); }
 .steps.rejected .now::before { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
-.note { border-radius: 12px; padding: 10px 12px; font-size: 13px; background: var(--info-soft); border: 1px solid color-mix(in srgb, var(--info) 30%, transparent); }
+.note { border-radius: 14px; padding: 10px 12px; font-size: 13px; background: var(--info-soft); border: 1px solid color-mix(in srgb, var(--info) 30%, transparent); }
 .note b { color: var(--info); }
-.note.warn { background: var(--gold-soft); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
+.note.warn { background: var(--gold-soft); border-color: color-mix(in srgb, var(--gold) 35%, transparent); display: grid; gap: 8px; }
 .note.warn b { color: var(--gold); }
-.note a { color: inherit; font-weight: 600; }
+.note.ok { background: var(--green-soft); border-color: color-mix(in srgb, var(--green) 30%, transparent); }
+.note.ok b { color: var(--green-hi); }
 
 /* ── Bonus guide ── */
 .rules { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
@@ -208,58 +262,75 @@ h2.section .count { font: 600 12px var(--f-body); color: var(--muted); }
 .example { font-size: 13px; color: var(--muted); border-top: 1px dashed var(--line-2); padding-top: 10px; margin-top: 12px; }
 .example b { color: var(--ink); }
 .ladder { display: grid; gap: 4px; }
-.rung { display: grid; grid-template-columns: 70px 1fr 74px; align-items: center; gap: 10px; font-size: 13px; }
-.rung .bar { height: 14px; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 55%, transparent), var(--gold)); }
-.rung .num { font-size: 17px; }
+.rung { display: grid; grid-template-columns: 52px 1fr 70px; align-items: center; gap: 10px; font-size: 13px; padding: 2px 4px; border-radius: 8px; }
+.rung .bar { height: 14px; border-radius: 4px; background: linear-gradient(270deg, color-mix(in srgb, var(--gold) 50%, transparent), var(--gold)); justify-self: start; }
+.rung .num { font-size: 18px; }
 .rung .money { color: var(--gold); text-align: end; }
-.rung.hit .orders { color: var(--green-hi); }
+.rung.hit { background: var(--gold-soft); }
 .sim { display: grid; gap: 14px; }
-.stepper { display: flex; align-items: center; gap: 10px; }
-.stepper button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line-2); background: var(--bg-2); font: 700 20px var(--f-num); }
-.stepper output { min-width: 48px; text-align: center; font-size: 30px; }
-input[type="range"] { width: 100%; accent-color: var(--green); }
+.stepper { display: flex; align-items: center; gap: 12px; }
+.stepper button { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line-2); background: var(--bg-2); font: 700 22px var(--f-num); }
+.stepper output { min-width: 48px; text-align: center; font-size: 34px; }
+input[type="range"] { width: 100%; height: 32px; accent-color: var(--green); }
 .sim-out { display: flex; justify-content: space-between; align-items: end; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
-.sim-out .num { font-size: 44px; color: var(--gold); }
+.sim-out .num { font-size: 48px; color: var(--gold); }
 
 /* ── Profile ── */
-.pass { display: grid; gap: 0; }
 .pass-top { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px dashed var(--line-2); }
-.pass-top .mk { width: 46px; height: 46px; }
+.pass-top .mk { width: 48px; height: 48px; }
 .pass-top h3 { margin: 0; font: 800 18px/1.3 var(--f-display); }
 .kv { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .kv:last-child { border-bottom: 0; }
 .kv span:first-child { color: var(--muted); }
 .kv span:last-child { font-weight: 600; text-align: end; overflow-wrap: anywhere; }
-.code-big { font-size: 26px; color: var(--green-hi); }
-.linkbox { display: grid; gap: 8px; }
-.linkbox code { display: block; direction: ltr; text-align: left; font: 500 12px/1.5 ui-monospace, Menlo, monospace; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; overflow-wrap: anywhere; user-select: all; }
-.linkbox .actions .btn { padding: 10px 14px; font-size: 14px; }
+.code-big { font-size: 28px; color: var(--green-hi); }
+.invite { display: grid; gap: 12px; border-color: color-mix(in srgb, var(--green) 35%, var(--line)); }
+.qr { display: grid; justify-items: center; gap: 8px; padding: 14px; background: #fff; border-radius: 16px; color: #0C150E; font-size: 13px; text-align: center; }
+.qr canvas, .qr img { width: 200px !important; height: 200px !important; }
+details.links summary { cursor: pointer; min-height: var(--tap); display: flex; align-items: center; font-size: 13px; color: var(--muted); }
+details.links code { display: block; direction: ltr; text-align: left; font: 500 12px/1.5 ui-monospace, Menlo, monospace; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; overflow-wrap: anywhere; user-select: all; margin-top: 6px; }
 
-/* ── Dock ── */
-.dock { position: fixed; inset: auto 0 0; z-index: 25; padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); pointer-events: none; }
-.dock nav { pointer-events: auto; max-width: 460px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 6px; border-radius: 22px; background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line-2); box-shadow: var(--shadow); }
+/* ── Dock with raised action ── */
+.dock { position: fixed; inset: auto 0 0; z-index: 25; padding: 8px max(12px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); pointer-events: none; }
+.dock nav { pointer-events: auto; max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; padding: 6px; border-radius: 24px; background: color-mix(in srgb, var(--surface) 94%, transparent); border: 1px solid var(--line-2); box-shadow: var(--shadow); }
 @supports (backdrop-filter: blur(1px)) { .dock nav { backdrop-filter: blur(14px); } }
-.dock button { border: 0; background: none; border-radius: 16px; padding: 7px 0 6px; display: grid; justify-items: center; gap: 2px; font: 600 11px var(--f-body); color: var(--muted); position: relative; }
-.dock button svg { width: 22px; height: 22px; }
+.dock button { border: 0; background: none; border-radius: 16px; min-height: 52px; padding: 6px 0 4px; display: grid; justify-items: center; align-content: center; gap: 2px; font: 600 11px var(--f-body); color: var(--muted); position: relative; }
+.dock button svg { width: 23px; height: 23px; }
 .dock button[aria-current="page"] { color: var(--green-hi); background: var(--green-soft); }
-.dock .badge { position: absolute; top: 3px; inset-inline-end: calc(50% - 20px); min-width: 17px; height: 17px; border-radius: 9px; background: var(--gold); color: var(--on-green); font: 800 11px/17px var(--f-num); padding: 0 4px; }
+.dock .fab { background: none; }
+.dock .fab span.f { width: 58px; height: 58px; margin-top: -30px; border-radius: 50%; display: grid; place-items: center; background: var(--green); color: var(--on-green); box-shadow: 0 10px 24px -8px var(--green), 0 0 0 5px var(--bg); }
+.dock .fab span.f svg { width: 28px; height: 28px; }
+.dock .fab { color: var(--ink); }
+.dock .dot { position: absolute; top: 4px; inset-inline-end: calc(50% - 22px); min-width: 18px; height: 18px; border-radius: 9px; background: var(--gold); color: var(--on-gold); font: 800 11px/18px var(--f-num); padding: 0 4px; }
 
 /* ── Sheet & toast ── */
-.sheet { position: fixed; inset: 0; z-index: 40; display: grid; align-items: end; background: rgba(0,0,0,.55); }
-.sheet > div { background: var(--bg); border-top: 1px solid var(--line-2); border-radius: 24px 24px 0 0; max-height: 92vh; overflow-y: auto; padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
-.sheet .inner { max-width: 460px; margin: 0 auto; display: grid; gap: 14px; }
-.sheet-head { display: flex; justify-content: space-between; align-items: center; }
+.sheet { position: fixed; inset: 0; z-index: 40; display: grid; align-items: end; background: rgba(0,0,0,.6); }
+.sheet > div { background: var(--bg); border-top: 1px solid var(--line-2); border-radius: 26px 26px 0 0; max-height: 94vh; max-height: 94dvh; overflow-y: auto; overscroll-behavior: contain; padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); animation: up .35s var(--ease) both; }
+.sheet .grab { width: 44px; height: 5px; border-radius: 3px; background: var(--line-2); margin: 0 auto 10px; }
+.sheet .inner { max-width: 480px; margin: 0 auto; display: grid; gap: 14px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .sheet-head h3 { margin: 0; font: 800 19px var(--f-display); }
-.toast { position: fixed; z-index: 50; top: calc(14px + env(safe-area-inset-top, 0px)); left: 50%; transform: translate(-50%, calc(-100% - 40px)); transition: transform .4s var(--ease); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px; font: 600 14px var(--f-body); max-width: calc(100% - 32px); text-align: center; box-shadow: var(--shadow); }
+.sheet .sticky-cta { position: sticky; bottom: calc(-20px - env(safe-area-inset-bottom, 0px)); background: var(--bg); padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px)); margin-bottom: calc(-20px - env(safe-area-inset-bottom, 0px)); }
+@keyframes up { from { transform: translateY(40px); opacity: .6; } to { transform: none; opacity: 1; } }
+.toast { position: fixed; z-index: 50; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translate(-50%, calc(-100% - 40px)); transition: transform .4s var(--ease); background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 999px; font: 600 14px var(--f-body); max-width: calc(100% - 32px); text-align: center; box-shadow: var(--shadow); }
 .toast.show { transform: translate(-50%, 0); }
 .toast.bad { background: var(--danger); color: #fff; }
-.empty { text-align: center; padding: 26px 16px; color: var(--muted); font-size: 14px; border: 1px dashed var(--line-2); border-radius: 16px; }
+.empty { text-align: center; padding: 26px 16px; color: var(--muted); font-size: 14px; border: 1px dashed var(--line-2); border-radius: 18px; display: grid; gap: 12px; justify-items: center; }
 .demo-flag { font: 600 12px var(--f-body); color: var(--gold); text-align: center; border: 1px dashed color-mix(in srgb, var(--gold) 50%, transparent); border-radius: 999px; padding: 4px 10px; }
-.done-screen { text-align: center; display: grid; gap: 12px; justify-items: center; padding-block: 30px; }
-.done-screen .tick { width: 72px; height: 72px; border-radius: 50%; background: var(--green-soft); display: grid; place-items: center; color: var(--green-hi); }
-.done-screen .tick svg { width: 36px; height: 36px; }
-.view { display: grid; gap: 16px; animation: rise .35s var(--ease) both; }
+.done-screen { text-align: center; display: grid; gap: 12px; justify-items: center; padding-block: 18px; }
+.done-screen .tick { width: 84px; height: 84px; border-radius: 50%; background: var(--green-soft); display: grid; place-items: center; color: var(--green-hi); animation: pop .5s var(--ease) both; }
+.done-screen .tick svg { width: 44px; height: 44px; }
+.done-screen h3 { margin: 0; font: 800 21px var(--f-display); }
+.done-screen p { margin: 0; color: var(--muted); font-size: 14px; }
+@keyframes pop { from { transform: scale(.4); } 60% { transform: scale(1.08); } to { transform: none; } }
+.view { display: grid; gap: 14px; animation: rise .35s var(--ease) both; }
 @keyframes rise { from { transform: translateY(8px); } to { transform: none; } }
+#confetti { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+@media (max-width: 360px) {
+  .hero .num.total { font-size: 54px; }
+  .stat .num, .figures .num { font-size: 24px; }
+  .badge i { width: 44px; height: 44px; font-size: 19px; }
+}
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
 </style>
 
@@ -269,9 +340,9 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
   <symbol id="i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 14v4M8 21h8M9 18h6"/></symbol>
   <symbol id="i-id" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="11" r="2.2"/><path d="M5.8 16c.6-1.5 1.8-2.3 3.2-2.3s2.6.8 3.2 2.3M15 10h3M15 13h3"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
   <symbol id="i-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></symbol>
-  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
-  <symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-wa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9.5c.5 2 2.5 4 4.5 4.5l1-1.2 2 .9c-.3 1.3-1.4 2-2.7 1.8A7 7 0 0 1 8 9.7C7.8 8.4 8.6 7.3 9.8 7l.9 2z"/></symbol>
   <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/></symbol>
@@ -279,19 +350,26 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
   <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
   <symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M13 3 4 14h7l-1 7 9-11h-7z"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
 </svg>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="ptr" id="ptr" aria-hidden="true"><svg><use href="#i-down"/></svg></div>
 <main class="shell" id="app"></main>
 <div class="dock" id="dock" hidden>
   <nav aria-label="التنقل">
-    <button type="button" data-go="home"><svg><use href="#i-home"/></svg>الرئيسية</button>
-    <button type="button" data-go="pipeline"><svg><use href="#i-people"/></svg>المرشحين<span class="badge" id="nudgeBadge" hidden></span></button>
-    <button type="button" data-go="bonus"><svg><use href="#i-trophy"/></svg>البونص</button>
-    <button type="button" data-go="profile"><svg><use href="#i-id"/></svg>حسابي</button>
+    <button type="button" data-go="home"><svg aria-hidden="true"><use href="#i-home"/></svg>الرئيسية</button>
+    <button type="button" data-go="pipeline"><svg aria-hidden="true"><use href="#i-people"/></svg>المرشحين<span class="dot" id="nudgeBadge" hidden></span></button>
+    <button type="button" class="fab" data-act="candidate" aria-label="رشّح طيار جديد"><span class="f"><svg aria-hidden="true"><use href="#i-plus"/></svg></span>رشّح</button>
+    <button type="button" data-go="bonus"><svg aria-hidden="true"><use href="#i-trophy"/></svg>البونص</button>
+    <button type="button" data-go="profile"><svg aria-hidden="true"><use href="#i-id"/></svg>حسابي</button>
   </nav>
 </div>
 <div class="sheet" id="sheet" hidden></div>
+<canvas id="confetti" hidden></canvas>
 
 <!--DEMO-->
 
@@ -324,10 +402,7 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
   } : IS_GAS ? {
     call: function (action, payload) {
       return new Promise(function (resolve) {
-        google.script.run
-          .withSuccessHandler(resolve)
-          .withFailureHandler(function () { resolve({ ok: false, error: 'مافيش اتصال بالسيرفر. اتأكد من النت وجرّب تاني.' }); })
-          .api(action, payload);
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(function () { resolve(OFFLINE); }).api(action, payload);
       });
     },
     ref: function () {
@@ -339,8 +414,9 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
 
   var S = { token: null, dash: null, boot: null, view: 'home', filter: 'all', ref: '', mode: 'login', type: 'internal' };
   var app = document.getElementById('app');
+  var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* ───────────── Small helpers ───────────── */
+  /* ───────────── Helpers ───────────── */
   function esc(v) {
     return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -352,10 +428,13 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
   var DF = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { day: 'numeric', month: 'long' });
   var DFY = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' });
   function fmtDay(s, withYear) { var d = day(s); return d ? (withYear ? DFY : DF).format(d) : '—'; }
-  function intl(phone) { return phone ? '20' + String(phone).slice(1) : ''; }
-  function first(name) { return String(name || '').trim().split(/\s+/)[0].replace(/_.*$/, ''); }
+  function intl(phone) { var d = String(phone || '').replace(/\D/g, ''); if (d.length === 11 && d[0] === '0') return '20' + d.slice(1); return d; }
   function cleanName(name) { return String(name || '').replace(/\s*_?FULL\s*SPEED(_BC)?\s*$/i, '').trim(); }
+  function first(name) { return cleanName(name).split(/\s+/)[0] || ''; }
   function icon(id) { return '<svg aria-hidden="true"><use href="#i-' + id + '"/></svg>'; }
+  function wa(phone, text) { return 'https://wa.me/' + (phone ? intl(phone) : '') + (text ? '?text=' + encodeURIComponent(text) : ''); }
+  function buzz() { try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {} }
+  function plural(n, one, many) { return n === 1 ? one : n + ' ' + many; }
 
   var toastTimer;
   function toast(msg, bad) {
@@ -364,21 +443,18 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = 'toast' + (bad ? ' bad' : ''); }, 3400);
   }
 
-  function copy(text, btn) {
-    function done() { toast('اتنسخ ✓'); }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done, function () { selectNear(btn); });
-    } else selectNear(btn);
-  }
-  function selectNear(btn) {
-    var code = btn && btn.closest('.linkbox') && btn.closest('.linkbox').querySelector('code');
-    if (!code) return;
-    var r = document.createRange(); r.selectNodeContents(code);
-    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
-    toast('اضغط نسخ من القايمة');
+  function copy(text) {
+    function fallback() {
+      var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); toast('اتنسخ ✓'); } catch (e) { toast('مقدرناش ننسخ، انسخ اللينك من تحت', true); }
+      ta.remove();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { toast('اتنسخ ✓'); }, fallback);
+    else fallback();
   }
 
-  /* Egyptian national ID → birth date (mirrors parseNationalId on the server) */
+  /* Egyptian national ID → birth date (same rule as the server) */
   function nidBirth(v) {
     var s = String(v || '').replace(/\D/g, '');
     if (!/^[23]\d{13}$/.test(s)) return null;
@@ -389,6 +465,7 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
 
   async function call(action, payload, opts) {
     var res = await Backend.call(action, payload);
+    if (!res || typeof res !== 'object') res = OFFLINE;
     if (!res.ok && res.error === 'SESSION_EXPIRED') { signOut(); toast('انتهت الجلسة، ادخل تاني.', true); return res; }
     if (!res.ok && !(opts && opts.quiet)) toast(res.error, true);
     return res;
@@ -402,14 +479,56 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
 
   function showErrors(form, fields) {
     form.querySelectorAll('.field').forEach(function (f) { f.classList.remove('bad'); var e = f.querySelector('.err'); if (e) e.remove(); });
+    var firstBad = null;
     Object.keys(fields || {}).forEach(function (k) {
       var input = form.querySelector('[name="' + k + '"]');
       if (!input) return;
       var f = input.closest('.field'); f.classList.add('bad');
       var e = document.createElement('div'); e.className = 'err'; e.textContent = fields[k]; f.appendChild(e);
+      if (!firstBad) firstBad = input;
     });
+    if (firstBad) { firstBad.focus({ preventScroll: true }); firstBad.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' }); }
   }
   function formData(form) { var o = {}; new FormData(form).forEach(function (v, k) { o[k] = String(v).trim(); }); return o; }
+
+  /* Numbers count up when a screen opens — the money feels earned. */
+  function countUp(root) {
+    root.querySelectorAll('[data-count]').forEach(function (el) {
+      var to = +el.dataset.count, suffix = el.dataset.suffix || '';
+      if (reduced || to < 20) { el.textContent = money(to) + suffix; return; }
+      var t0 = performance.now(), dur = 900;
+      (function step(t) {
+        var k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+        el.textContent = money(Math.round(to * e)) + suffix;
+        if (k < 1) requestAnimationFrame(step);
+      })(t0);
+    });
+    requestAnimationFrame(function () {
+      root.querySelectorAll('.track i[data-w]').forEach(function (i) { i.style.width = i.dataset.w + '%'; });
+    });
+  }
+
+  /* Small confetti burst for real wins (new candidate, a rider hitting the max). */
+  function confetti() {
+    if (reduced) return;
+    var c = document.getElementById('confetti'), ctx = c.getContext('2d');
+    var W = c.width = innerWidth, H = c.height = innerHeight;
+    var colors = ['#34B24C', '#5BD06F', '#E2A838', '#F4C86A', '#DCF0E0'];
+    var parts = Array.from({ length: 110 }, function () {
+      return { x: W / 2, y: H * .35, vx: (Math.random() - .5) * 12, vy: Math.random() * -12 - 3, r: Math.random() * 5 + 3,
+        c: colors[(Math.random() * colors.length) | 0], a: Math.random() * 6, va: (Math.random() - .5) * .3 };
+    });
+    c.hidden = false;
+    var t0 = performance.now();
+    (function frame(t) {
+      ctx.clearRect(0, 0, W, H);
+      parts.forEach(function (p) {
+        p.vy += .35; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.a += p.va;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.fillStyle = p.c; ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); ctx.restore();
+      });
+      if (t - t0 < 1800) requestAnimationFrame(frame); else { ctx.clearRect(0, 0, W, H); c.hidden = true; }
+    })(t0);
+  }
 
   /* ───────────── Theme ───────────── */
   function applyTheme(t) { if (t) document.documentElement.setAttribute('data-theme', t); }
@@ -421,35 +540,40 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
     applyTheme(next); store('fs_theme', next);
   }
 
-  /* ───────────── Auth screens ───────────── */
-  function brand(big) {
+  /* ───────────── Auth ───────────── */
+  function brand() {
     return '<div class="brand"><i class="mk" aria-hidden="true"></i><span class="wm">Full<b>speed</b><small>CHAMPIONS</small></span></div>';
+  }
+  function pwField(id, label, auto, hint) {
+    return '<div class="field"><label for="' + id + '">' + label + '</label><div class="pw-wrap"><input id="' + id + '" name="password" type="password" autocomplete="' + auto + '" enterkeyhint="go" required>' +
+      '<button type="button" class="pw-toggle" aria-label="إظهار كلمة المرور">' + icon('eye') + '</button></div>' + (hint ? '<span class="hint">' + hint + '</span>' : '') + '</div>';
   }
 
   function renderAuth() {
     document.getElementById('dock').hidden = true;
     var ext = S.type === 'external', act = S.mode === 'activate';
-    var maxBonus = S.boot && S.boot.tiers ? S.boot.tiers[S.boot.tiers.length - 1].bonus : 3000;
+    var top = S.boot && S.boot.tiers ? S.boot.tiers[S.boot.tiers.length - 1] : { bonus: 3000, orders: 850 };
     var fields;
     if (!act) {
       fields =
         '<div class="field"><label for="a-code">' + (ext ? 'رقم الموبايل' : 'كود طلبات بتاعك') + '</label>' +
-        '<input id="a-code" name="code" class="ltr" inputmode="numeric" autocomplete="username" placeholder="' + (ext ? '01xxxxxxxxx' : '5037723') + '" required></div>' +
-        '<div class="field"><label for="a-pass">كلمة المرور</label><input id="a-pass" name="password" type="password" autocomplete="current-password" required></div>';
+        '<input id="a-code" name="code" class="ltr" inputmode="numeric" autocomplete="username" enterkeyhint="next" placeholder="' + (ext ? '01xxxxxxxxx' : 'مثلاً 5037723') + '" required></div>' +
+        pwField('a-pass', 'كلمة المرور', 'current-password');
     } else if (ext) {
       fields =
-        '<div class="field"><label for="a-name">اسمك</label><input id="a-name" name="name" autocomplete="name" placeholder="الاسم ثنائي على الأقل" required></div>' +
-        '<div class="field"><label for="a-phone">رقم الموبايل</label><input id="a-phone" name="phone" class="ltr" inputmode="numeric" placeholder="01xxxxxxxxx" required></div>' +
-        '<div class="field"><label for="a-pass">كلمة مرور جديدة</label><input id="a-pass" name="password" type="password" autocomplete="new-password" required><span class="hint">6 حروف أو أرقام على الأقل، ومش 123456.</span></div>';
+        '<div class="field"><label for="a-name">اسمك</label><input id="a-name" name="name" autocomplete="name" enterkeyhint="next" placeholder="الاسم ثنائي على الأقل" required></div>' +
+        '<div class="field"><label for="a-phone">رقم الموبايل</label><input id="a-phone" name="phone" class="ltr" inputmode="numeric" maxlength="11" enterkeyhint="next" placeholder="01xxxxxxxxx" required></div>' +
+        pwField('a-pass', 'اختار كلمة مرور', 'new-password', '6 حروف أو أرقام على الأقل، ومش 123456.');
     } else {
       fields =
-        '<div class="field"><label for="a-code">كود طلبات بتاعك</label><input id="a-code" name="code" class="ltr" inputmode="numeric" required></div>' +
-        '<div class="field"><label for="a-phone">رقم موبايلك المتسجل في الشركة</label><input id="a-phone" name="phone" class="ltr" inputmode="numeric" placeholder="01xxxxxxxxx" required><span class="hint">لازم يطابق الرقم اللي عند Full Speed، عشان محدش يفعّل كودك غيرك.</span></div>' +
-        '<div class="field"><label for="a-pass">كلمة مرور جديدة</label><input id="a-pass" name="password" type="password" autocomplete="new-password" required><span class="hint">6 حروف أو أرقام على الأقل.</span></div>';
+        '<div class="field"><label for="a-code">كود طلبات بتاعك</label><input id="a-code" name="code" class="ltr" inputmode="numeric" enterkeyhint="next" required></div>' +
+        '<div class="field"><label for="a-phone">رقم موبايلك المتسجل في الشركة</label><input id="a-phone" name="phone" class="ltr" inputmode="numeric" maxlength="11" enterkeyhint="next" placeholder="01xxxxxxxxx" required><span class="hint">لازم يطابق رقمك عند Full Speed، عشان محدش يفعّل كودك غيرك.</span></div>' +
+        pwField('a-pass', 'اختار كلمة مرور', 'new-password', '6 حروف أو أرقام على الأقل.');
     }
     app.innerHTML =
-      '<section class="auth">' + brand(true) +
-      '<div class="teaser"><p>رشّح طيار جديد، وتابعه لحد ما يشتغل</p><span class="num">' + money(maxBonus) + ' <small style="font-size:22px">ج</small></span><strong>لحد كده على كل طيار</strong></div>' +
+      '<section class="auth">' + brand() +
+      '<div class="teaser"><p>رشّح طيار جديد وتابعه لحد ما يشتغل</p><span class="num">' + money(top.bonus) + ' <small style="font-size:22px">ج</small></span><strong>لحد كده على كل طيار</strong></div>' +
+      '<div class="how3" aria-label="الخطوات"><div><b>1</b>ابعت لينكك</div><div><b>2</b>صاحبك يتعين</div><div><b>3</b>تقبض بونصه</div></div>' +
       (live ? '' : '<div class="demo-flag">نسخة تجريبية ببيانات وهمية — اكتب أي كود وأي كلمة مرور</div>') +
       '<div class="card form" style="gap:14px">' +
         '<div class="seg" role="group" aria-label="نوع الحساب">' +
@@ -465,39 +589,69 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
 
     app.querySelectorAll('[data-type]').forEach(function (b) { b.onclick = function () { S.type = b.dataset.type; renderAuth(); }; });
     app.querySelector('[data-mode]').onclick = function (e) { S.mode = e.currentTarget.dataset.mode; renderAuth(); };
+    bindPwToggles(app);
     document.getElementById('authForm').onsubmit = async function (e) {
       e.preventDefault();
       var form = e.currentTarget, btn = form.querySelector('[type=submit]'), d = formData(form);
       d.type = S.type;
-      busy(btn, true);
+      busy(btn, true, act ? 'بنفعّل حسابك…' : 'بندخلك…');
       var res = await call(act ? 'activate' : 'login', d);
       busy(btn, false);
       if (!res.ok) { showErrors(form, res.fields); return; }
+      buzz();
       startSession(res.data.token, res.data.dashboard);
-      toast(act ? 'أهلاً بيك في Full Speed Champions 🎉' : 'أهلاً ' + first(res.data.dashboard.user.name));
+      toast(act ? 'أهلاً بيك في Full Speed Champions 🎉' : 'أهلاً يا ' + first(res.data.dashboard.user.name) + ' 👋');
+      if (act) confetti();
     };
+  }
+
+  function bindPwToggles(root) {
+    root.querySelectorAll('.pw-toggle').forEach(function (b) {
+      b.onclick = function () {
+        var i = b.parentNode.querySelector('input'), show = i.type === 'password';
+        i.type = show ? 'text' : 'password'; b.setAttribute('aria-label', show ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور');
+      };
+    });
   }
 
   function startSession(token, dash) {
     S.token = token; store('fs_token', token);
     S.dash = dash; S.view = 'home';
     renderApp();
+    celebrateOnce();
+  }
+
+  /* One celebration per newly-maxed rider, remembered on this phone. */
+  function celebrateOnce() {
+    var maxed = (S.dash.team || []).filter(function (t) { return t.state === 'maxed'; }).map(function (t) { return t.code; });
+    var seen = (store('fs_seen_max') || '').split(',');
+    var fresh = maxed.filter(function (c) { return seen.indexOf(c) === -1; });
+    if (!fresh.length) return;
+    store('fs_seen_max', maxed.join(','));
+    setTimeout(function () { confetti(); toast('🏆 مبروك! ' + plural(fresh.length, 'طيار', 'طيارين') + ' قفل الحد الأقصى للبونص'); }, 500);
   }
 
   function signOut() {
     S.token = null; S.dash = null; store('fs_token', null);
-    S.mode = 'login'; renderAuth();
+    S.mode = 'login'; closeSheet(); renderAuth();
   }
 
   /* ───────────── Signed-in shell ───────────── */
+  function greeting() { var h = new Date().getHours(); return h < 12 ? 'صباح الخير' : 'مساء الخير'; }
+
   function topbar() {
     var u = S.dash.user;
     return '<header class="topbar"><div class="brand"><i class="mk" aria-hidden="true"></i>' +
-      '<p class="hello">أهلاً يا ' + esc(first(cleanName(u.name)) || 'بطل') + '<small>' + (u.type === 'external' ? 'شريك Full Speed' : 'كود ' + esc(u.code)) + '</small></p></div>' +
+      '<p class="hello">' + greeting() + ' يا ' + esc(first(u.name) || 'بطل') + '<small>' + (u.type === 'external' ? 'شريك Full Speed' : 'كود ' + esc(u.code)) + '</small></p></div>' +
       '<div class="icons">' +
         '<button class="icon-btn" type="button" id="refreshBtn" aria-label="تحديث البيانات">' + icon('refresh') + '</button>' +
         '<button class="icon-btn" type="button" id="themeBtn" aria-label="تبديل الوضع الفاتح والداكن">' + icon('theme') + '</button>' +
       '</div></header>';
+  }
+
+  function go(view, filter) {
+    S.view = view; if (filter) S.filter = filter;
+    renderApp(); window.scrollTo(0, 0); buzz();
   }
 
   function renderApp() {
@@ -505,87 +659,183 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
     dock.hidden = false;
     dock.querySelectorAll('[data-go]').forEach(function (b) {
       b.setAttribute('aria-current', b.dataset.go === S.view ? 'page' : 'false');
-      b.onclick = function () { S.view = b.dataset.go; renderApp(); window.scrollTo(0, 0); };
+      b.onclick = function () { go(b.dataset.go); };
     });
+    dock.querySelector('[data-act=candidate]').onclick = function () { buzz(); openCandidate(); };
     var n = S.dash.totals.nudges, badge = document.getElementById('nudgeBadge');
     badge.hidden = !n; badge.textContent = n;
 
     var body = { home: viewHome, pipeline: viewPipeline, bonus: viewBonus, profile: viewProfile }[S.view]();
     app.innerHTML = topbar() + (live ? '' : '<div class="demo-flag">نسخة تجريبية — الأسماء والأرقام وهمية</div>') + '<div class="view">' + body + '</div>';
     document.getElementById('themeBtn').onclick = toggleTheme;
-    document.getElementById('refreshBtn').onclick = refresh;
+    document.getElementById('refreshBtn').onclick = function () { refresh(); };
     bindView();
+    countUp(app);
   }
 
-  async function refresh() {
+  async function refresh(quiet) {
     var btn = document.getElementById('refreshBtn');
-    btn.setAttribute('aria-busy', 'true');
+    if (btn) btn.setAttribute('aria-busy', 'true');
     var res = await call('session', { token: S.token });
-    btn.removeAttribute('aria-busy');
-    if (res.ok) { S.dash = res.data.dashboard; renderApp(); toast('البيانات اتحدّثت'); }
+    if (btn) btn.removeAttribute('aria-busy');
+    if (res.ok) { S.dash = res.data.dashboard; renderApp(); if (!quiet) toast('البيانات اتحدّثت ✓'); celebrateOnce(); }
+    return res;
   }
+
+  /* Pull down at the top of the page to refresh. */
+  (function pullToRefresh() {
+    var ptr = document.getElementById('ptr'), y0 = null, dy = 0, busyNow = false;
+    addEventListener('touchstart', function (e) {
+      if (!S.dash || busyNow || window.scrollY > 0 || !document.getElementById('sheet').hidden) { y0 = null; return; }
+      y0 = e.touches[0].clientY; dy = 0;
+    }, { passive: true });
+    addEventListener('touchmove', function (e) {
+      if (y0 === null) return;
+      dy = Math.max(0, e.touches[0].clientY - y0);
+      var k = Math.min(1, dy / 90);
+      ptr.style.opacity = k; ptr.style.transform = 'translateY(' + (k * 24 - 30) + 'px) scale(' + (.6 + k * .4) + ')';
+      ptr.classList.toggle('ready', dy > 90);
+    }, { passive: true });
+    addEventListener('touchend', async function () {
+      if (y0 === null) return;
+      y0 = null;
+      if (dy > 90) {
+        busyNow = true; ptr.classList.add('spin'); buzz();
+        await refresh();
+        busyNow = false;
+      }
+      ptr.classList.remove('spin', 'ready'); ptr.style.opacity = 0; ptr.style.transform = '';
+    });
+  })();
 
   /* ───────────── Home ───────────── */
   var STATE = {
     active: ['بيتحسب', 'green'], upcoming: ['لسه هيبدأ', 'blue'],
-    maxed: ['قفل الحد الأقصى', 'gold'], closed: ['المدة خلصت', 'dim']
+    maxed: ['🏆 قفل الحد الأقصى', 'gold'], closed: ['المدة خلصت', 'dim']
   };
+
+  function encourageMsg(r) {
+    var me = first(S.dash.user.name);
+    if (r.nextOrders) return 'يا ' + first(r.name) + ' عامل إيه؟ 💪 فاضلك ' + r.ordersToNext + ' أوردر بس وتوصل للشريحة الجاية، وقدامك ' + r.daysLeft + ' يوم. شد حيلك يا بطل! — ' + me;
+    return 'يا ' + first(r.name) + ' برافو عليك 🔥 كمّل كده! — ' + me;
+  }
+
+  /* The single most useful thing to do right now. */
+  function coachCard(d) {
+    var t = d.totals;
+    var close = d.team.filter(function (r) { return r.state === 'active' && r.nextOrders; })
+      .sort(function (a, b) { return (a.daysLeft - b.daysLeft) || (a.ordersToNext - b.ordersToNext); });
+    var urgent = close.filter(function (r) { return r.daysLeft <= 7; })[0];
+    if (urgent) {
+      return '<section class="card coach warn"><div class="coach-head"><span class="coach-ico">' + icon('bolt') + '</span><div>' +
+        '<h3>' + esc(first(urgent.name)) + ' فاضله ' + urgent.ordersToNext + ' أوردر على ' + money(urgent.nextBonus) + ' ج</h3>' +
+        '<p>' + (urgent.daysLeft === 0 ? 'النهارده آخر يوم يتحسب.' : 'باقي ' + plural(urgent.daysLeft, 'يوم واحد', 'أيام') + ' بس.') + ' رسالة منك ممكن تفرق.</p></div></div>' +
+        (urgent.phone ? '<a class="btn btn-wa btn-sm" href="' + wa(urgent.phone, encourageMsg(urgent)) + '" target="_blank" rel="noopener">' + icon('wa') + 'شجّعه على واتساب</a>' : '') + '</section>';
+    }
+    if (t.nudges) {
+      return '<section class="card coach warn"><div class="coach-head"><span class="coach-ico">' + icon('bell') + '</span><div>' +
+        '<h3>' + plural(t.nudges, 'مرشح واحد محتاج', 'مرشحين محتاجين') + ' متابعة</h3>' +
+        '<p>بقالهم ' + d.season.nudgeAfterDays + ' أيام أو أكتر على نفس الخطوة. كل يوم تأخير بيقلل فرصتهم.</p></div></div>' +
+        '<button type="button" class="btn btn-gold btn-sm" data-go-view="pipeline" data-filter="nudge">تابعهم دلوقتي</button></section>';
+    }
+    if (close[0]) {
+      var c = close[0];
+      return '<section class="card coach"><div class="coach-head"><span class="coach-ico">' + icon('up') + '</span><div>' +
+        '<h3>' + esc(first(c.name)) + ' قرّب: ' + c.ordersToNext + ' أوردر ويفتح ' + money(c.nextBonus) + ' ج</h3>' +
+        '<p>قدامه ' + plural(c.daysLeft, 'يوم واحد', 'يوم') + '. فريقك ماشي كويس، كمّل.</p></div></div></section>';
+    }
+    return '<section class="card coach"><div class="coach-head"><span class="coach-ico">' + icon('plus') + '</span><div>' +
+      '<h3>كل طيار جديد = لحد ' + money(d.season.tiers[d.season.tiers.length - 1].bonus) + ' ج ليك</h3>' +
+      '<p>فكّر في 3 أصحاب ممكن يشتغلوا، وابعتلهم لينكك النهارده.</p></div></div>' +
+      '<button type="button" class="btn btn-primary btn-sm" data-go-view="profile">ابعت لينكك</button></section>';
+  }
+
+  function badges(d) {
+    var top = d.season.tiers[d.season.tiers.length - 1];
+    var list = [
+      ['🎯', 'أول ترشيح', d.pipeline.length + d.team.length >= 1],
+      ['🛵', 'أول تعيين', d.team.length >= 1],
+      ['🔥', '5 طيارين', d.team.length >= 5, d.team.length + '/5'],
+      ['🏆', 'أول ' + money(top.bonus), d.totals.maxed >= 1]
+    ];
+    return '<section class="card" style="display:grid;gap:12px"><h2 class="section">إنجازاتك<span class="count">' + list.filter(function (b) { return b[2]; }).length + ' من ' + list.length + '</span></h2>' +
+      '<div class="badges">' + list.map(function (b) {
+        return '<div class="badge' + (b[2] ? ' got' : '') + '"><i>' + b[0] + '</i><span>' + esc(b[1]) + (b[3] && !b[2] ? '<br><small>' + b[3] + '</small>' : '') + '</span></div>';
+      }).join('') + '</div></section>';
+  }
 
   function viewHome() {
     var d = S.dash, t = d.totals;
-    var nudge = t.nudges ? '<button type="button" class="nudge-bar" data-go-view="pipeline" data-filter="nudge">' + icon('bell') +
-      '<span><b>' + t.nudges + (t.nudges === 1 ? ' مرشح محتاج' : ' مرشحين محتاجين') + ' متابعة</b><br><span class="muted" style="font-size:13px">بقالهم ' + d.season.nudgeAfterDays + ' أيام أو أكتر من غير تحديث. كلمهم يكملوا ورقهم.</span></span></button>' : '';
+    if (!d.team.length && !d.pipeline.length) return onboarding(d);
 
+    var potential = d.team.reduce(function (s, r) { return s + (r.state === 'active' && r.nextBonus ? r.nextBonus - r.bonus : 0); }, 0);
     var team = d.team.length ? d.team.map(slip).join('') :
-      '<div class="empty">لسه مافيش حد من ترشيحاتك اتعين من ' + fmtDay(d.season.start, true) + '.<br>ابعت لينكك أو رشّح أول طيار.</div>';
+      '<div class="empty">' + icon('people').replace('<svg', '<svg width="34" height="34"') + '<span>لسه مافيش حد من مرشحينك اتعين.<br>تابعهم من "المرشحين" لحد ما يشتغلوا.</span>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-go-view="pipeline">تابع المرشحين</button></div>';
 
     return '<section class="card hero">' +
-        '<span class="eyebrow">إجمالي البونص</span>' +
-        '<div class="num total">' + money(t.bonus) + '<small>جنيه</small></div>' +
+        '<span class="eyebrow">إجمالي البونص بتاعك</span>' +
+        '<div class="num total"><span data-count="' + t.bonus + '">0</span><small>جنيه</small></div>' +
         '<div class="split">' +
-          '<div><span class="num" style="color:var(--gold)">' + money(t.payable) + '</span><span class="lbl">جاهز للصرف</span></div>' +
-          '<div><span class="num">' + money(t.pending) + '</span><span class="lbl">لسه بيتحسب ويزيد</span></div>' +
+          '<div><span class="num" style="color:var(--gold)" data-count="' + t.payable + '">0</span><span class="lbl">جاهز للصرف</span></div>' +
+          '<div><span class="num" data-count="' + t.pending + '">0</span><span class="lbl">لسه بيتحسب ويزيد</span></div>' +
         '</div>' +
-        (t.nextPayout ? '<div class="payout">' + icon('cal').replace('<svg', '<svg width="16" height="16"') + 'أقرب صرف: <b>' + fmtDay(t.nextPayout) + '</b></div>' : '') +
+        (potential ? '<div class="potential">' + icon('up') + '<span>لو كل طيار وصل الشريحة الجاية: <b>+' + money(potential) + '</b> ج زيادة</span></div>' : '') +
+        (t.nextPayout ? '<div class="payout">' + icon('cal') + 'أقرب صرف: <b>' + fmtDay(t.nextPayout) + '</b></div>' : '') +
       '</section>' +
+      coachCard(d) +
       '<div class="stats">' +
-        '<div class="stat"><span class="num">' + t.riders + '</span><span>طيار اتعين</span></div>' +
-        '<div class="stat"><span class="num">' + money(t.orders) + '</span><span>أوردر مكتمل</span></div>' +
-        '<div class="stat"><span class="num">' + t.applicants + '</span><span>مرشح في الطريق</span></div>' +
+        '<div class="stat"><span class="num" data-count="' + t.riders + '">0</span><span>طيار اتعين</span></div>' +
+        '<div class="stat"><span class="num" data-count="' + t.orders + '">0</span><span>أوردر مكتمل</span></div>' +
+        '<div class="stat"><span class="num" data-count="' + t.applicants + '">0</span><span>مرشح</span></div>' +
       '</div>' +
-      '<div class="actions">' +
-        '<button type="button" class="btn btn-primary" data-open="candidate">' + icon('plus') + 'رشّح طيار</button>' +
-        '<button type="button" class="btn btn-ghost" data-go-view="profile">' + icon('share') + 'ابعت لينكك</button>' +
-      '</div>' + nudge +
-      '<h2 class="section">فريقك من ' + fmtDay(d.season.start) + '<span class="count">' + d.team.length + ' طيار</span></h2>' +
+      badges(d) +
+      '<h2 class="section">فريقك<span class="count">من ' + fmtDay(d.season.start) + ' · ' + plural(d.team.length, 'طيار واحد', 'طيار') + '</span></h2>' +
       '<div class="list">' + team + '</div>';
   }
 
+  function onboarding(d) {
+    var top = d.season.tiers[d.season.tiers.length - 1];
+    return '<section class="card hero" style="text-align:center">' +
+        '<span class="eyebrow">ابدأ من هنا</span>' +
+        '<div class="num total" style="justify-content:center"><span data-count="' + top.bonus + '">0</span><small>ج</small></div>' +
+        '<p style="margin:4px 0 0;font:700 16px var(--f-display)">تقدر تكسبهم على كل طيار ترشّحه</p>' +
+      '</section>' +
+      '<section class="card onboard"><h2 class="section">إزاي تكسب في 3 خطوات</h2><ol>' +
+        '<li><span><b>ابعت لينكك</b> لأي حد عايز يشتغل طيار. من "حسابي" بضغطة واحدة على واتساب.</span></li>' +
+        '<li><span><b>يتسجل ويتعين</b> — وإنت تتابعه خطوة بخطوة من "المرشحين".</span></li>' +
+        '<li><span><b>تقبض بونصه</b> حسب أوردراته في أول ' + (d.season.windowMonths === 2 ? 'شهرين' : d.season.windowMonths + ' شهور') + '، لحد ' + money(top.bonus) + ' ج.</span></li>' +
+      '</ol>' +
+      '<div class="row-btns"><button type="button" class="btn btn-primary" data-act="candidate">' + icon('plus') + 'رشّح حد</button>' +
+      '<button type="button" class="btn btn-ghost" data-go-view="profile">' + icon('wa') + 'ابعت لينكك</button></div></section>' +
+      badges(d);
+  }
+
   function slip(r) {
-    var tiers = S.dash.season.tiers, max = tiers[tiers.length - 1].orders;
+    var tiers = S.dash.season.tiers, top = tiers[tiers.length - 1], max = top.orders;
     var pct = Math.min(100, r.orders / max * 100);
     var ticks = tiers.map(function (x) { return '<b style="inset-inline-start:' + (x.orders / max * 100) + '%"></b>'; }).join('');
     var st = STATE[r.state] || STATE.active;
-    var legend;
-    if (r.state === 'maxed') legend = '<span>🏆 قفل ' + money(tiers[tiers.length - 1].bonus) + ' ج — الصرف ' + fmtDay(r.payoutDate) + '</span>';
-    else if (r.state === 'closed') legend = '<span>البونص اتثبت على <strong>' + money(r.bonus) + ' ج</strong> — آخر يوم كان ' + fmtDay(r.lastDay) + '</span>';
-    else legend = '<span>' + (r.nextOrders ? 'باقي <strong>' + r.ordersToNext + '</strong> أوردر ← ' + money(r.nextBonus) + ' ج' : '') + '</span>' +
-      '<span>' + (r.daysLeft === 0 ? '<strong style="color:var(--danger)">النهارده آخر يوم</strong>' : 'باقي <strong>' + r.daysLeft + '</strong> يوم (لحد ' + fmtDay(r.lastDay) + ')') + '</span>';
-    var wa = r.phone ? '<a class="wa" href="https://wa.me/' + intl(r.phone) + '" target="_blank" rel="noopener" aria-label="واتساب ' + esc(r.name) + '">' + icon('wa') + '</a>' +
-      '<a href="tel:+' + intl(r.phone) + '" aria-label="اتصال">' + icon('phone') + '</a>' : '';
-    return '<article class="slip ' + r.state + '">' +
+    var urgent = r.state === 'active' && r.daysLeft <= 7;
+    var goal;
+    if (r.state === 'maxed') goal = '<span class="gold">🏆 قفل ' + money(top.bonus) + ' ج — الصرف ' + fmtDay(r.payoutDate) + '</span>';
+    else if (r.state === 'closed') goal = '<span>البونص اتثبت على <b class="gold">' + money(r.bonus) + ' ج</b> · الصرف ' + fmtDay(r.payoutDate) + '</span>';
+    else if (r.nextOrders) goal = '<span>باقي <strong>' + r.ordersToNext + '</strong> أوردر ويفتح <b class="gold">' + money(r.nextBonus) + ' ج</b></span>';
+    else goal = '';
+    var actions = (r.state === 'active' && r.phone) ?
+      '<div class="slip-actions"><a class="btn btn-ghost btn-sm" href="' + wa(r.phone, encourageMsg(r)) + '" target="_blank" rel="noopener">' + icon('wa') + 'شجّعه</a>' +
+      '<a class="round" href="tel:+' + intl(r.phone) + '" aria-label="اتصل بـ ' + esc(first(r.name)) + '">' + icon('phone') + '</a></div>' : '';
+    return '<article class="slip ' + r.state + (urgent ? ' urgent' : '') + '">' +
       '<div class="slip-head"><div><h3 class="slip-name">' + esc(cleanName(r.name)) + '</h3>' +
         '<div class="slip-meta"><span class="ltr">#' + esc(r.code) + '</span><span>' + esc(r.zone || '—') + '</span><span>اتعين ' + fmtDay(r.hireDate) + '</span></div></div>' +
-        '<div class="contact">' + wa + '</div></div>' +
-      '<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill ' + st[1] + '">' + st[0] + '</span>' +
-        (r.vehicle ? '<span class="pill dim">' + esc(r.vehicle) + '</span>' : '') + '</div>' +
+        '<span class="pill ' + st[1] + '">' + st[0] + '</span></div>' +
       '<div class="figures">' +
-        '<div><span class="num">' + money(r.orders) + '</span><span>أوردر</span></div>' +
-        '<div><span class="num gold">' + money(r.bonus) + '</span><span>بونص (ج)</span></div>' +
-        '<div><span class="num">' + (r.state === 'active' ? r.daysLeft : '—') + '</span><span>يوم باقي</span></div>' +
+        '<div><span class="num" data-count="' + r.orders + '">0</span><span>أوردر</span></div>' +
+        '<div><span class="num gold" data-count="' + r.bonus + '">0</span><span>بونص (ج)</span></div>' +
+        '<div><span class="num' + (urgent ? ' red' : '') + '">' + (r.state === 'active' ? r.daysLeft : '—') + '</span><span>' + (r.state === 'active' ? 'يوم باقي' : 'لحد ' + fmtDay(r.lastDay)) + '</span></div>' +
       '</div>' +
-      '<div style="display:grid;gap:6px"><div class="track" role="img" aria-label="' + r.orders + ' من ' + max + ' أوردر"><i style="width:' + pct + '%"></i>' + ticks + '</div>' +
-      '<div class="track-legend">' + legend + '</div></div>' +
+      '<div class="track" role="img" aria-label="' + r.orders + ' من ' + max + ' أوردر"><i data-w="' + pct.toFixed(1) + '"></i>' + ticks + '</div>' +
+      (goal ? '<div class="goal">' + goal + '</div>' : '') + actions +
     '</article>';
   }
 
@@ -602,83 +852,87 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
     var p = S.dash.pipeline;
     var chips = FILTERS.map(function (f) {
       var n = p.filter(f[2]).length;
+      if (f[0] !== 'all' && !n && S.filter !== f[0]) return '';
       return '<button type="button" class="chip" data-filter="' + f[0] + '" aria-pressed="' + (S.filter === f[0]) + '">' + f[1] + '<span class="n">' + n + '</span></button>';
     }).join('');
     var pick = FILTERS.filter(function (f) { return f[0] === S.filter; })[0] || FILTERS[0];
     var list = p.filter(pick[2]);
-    return '<h2 class="section">المرشحين بتوعك<span class="count">من ' + fmtDay(S.dash.season.start) + '</span></h2>' +
+    var hired = p.filter(function (x) { return x.status === 'اشتغل'; }).length;
+    return '<h2 class="section">المرشحين بتوعك<span class="count">' + (p.length ? hired + ' من ' + p.length + ' اشتغلوا' : '') + '</span></h2>' +
       '<div class="chips" role="group" aria-label="فلترة">' + chips + '</div>' +
-      '<button type="button" class="btn btn-primary" data-open="candidate">' + icon('plus') + 'رشّح طيار جديد</button>' +
-      '<div class="list">' + (list.length ? list.map(appCard).join('') : '<div class="empty">مافيش مرشحين هنا.</div>') + '</div>';
+      '<div class="list">' + (list.length ? list.map(appCard).join('') :
+        '<div class="empty">' + (p.length ? 'مافيش مرشحين في القسم ده.' : 'لسه مارشحتش حد.<br>اضغط + تحت وابدأ بأول واحد.') + '</div>') + '</div>';
   }
 
   function appCard(a) {
     var steps = S.dash.statuses.slice(0, 5);
-    var stage = a.rejected ? Math.max(0, a.stage) : a.stage;
-    var stepper = '<div class="steps' + (a.rejected ? ' rejected' : '') + '">' + steps.map(function (s, i) {
+    var stage = a.stage;
+    var stepper = '<div class="steps' + (a.rejected ? ' rejected' : '') + '" aria-label="الحالة: ' + esc(a.status) + '">' + steps.map(function (s, i) {
       var cls = a.rejected ? (i === 0 ? 'now' : '') : (i < stage ? 'done' : i === stage ? (stage === 4 ? 'done' : 'now') : '');
       return '<div class="' + cls + '">' + esc(s.replace('تم حضور ', '')) + '</div>';
     }).join('') + '</div>';
     var pill = a.status === 'اشتغل' ? 'green' : a.rejected ? 'red' : a.status === 'جديد' ? 'dim' : 'blue';
-    var me = first(cleanName(S.dash.user.name));
-    var msg = 'أهلاً ' + first(a.name) + '، أنا ' + me + ' من Full Speed 👋 طلبك عندنا حالته "' + a.status + '". لو محتاج مساعدة تكمل الورق كلمني، عايزين ننزّلك الشغل بسرعة 🚀';
-    var nudge = a.nudge ? '<div class="note warn"><b>محتاج متابعة:</b> بقاله ' + a.daysWaiting + ' يوم على "' + esc(a.status) + '". ' +
-      '<a href="https://wa.me/' + intl(a.phone) + '?text=' + encodeURIComponent(msg) + '" target="_blank" rel="noopener">ابعتله رسالة جاهزة على واتساب ←</a></div>' : '';
+    var me = first(S.dash.user.name);
+    var msg = 'أهلاً ' + first(a.name) + '، أنا ' + me + ' من Full Speed 👋 طلبك عندنا "' + a.status + '". لو محتاج مساعدة تكمل الورق كلمني، عايزين ننزّلك الشغل بسرعة 🚀';
+    var nudge = a.nudge ? '<div class="note warn"><span><b>محتاج متابعة:</b> بقاله ' + plural(a.daysWaiting, 'يوم', 'يوم') + ' على "' + esc(a.status) + '".</span>' +
+      (a.phone ? '<a class="btn btn-wa btn-sm" href="' + wa(a.phone, msg) + '" target="_blank" rel="noopener">' + icon('wa') + 'ابعتله رسالة جاهزة</a>' : '') + '</div>' : '';
     var note = a.note ? '<div class="note"><b>ملاحظة الإدارة:</b> ' + esc(a.note) + '</div>' : '';
-    var hired = a.status === 'اشتغل' && a.hiredCode ? '<div class="note" style="background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 30%,transparent)"><b style="color:var(--green-hi)">اتعين ✓</b> كوده <span class="ltr">#' + esc(a.hiredCode) + '</span>' + (a.hiredDate ? ' من ' + fmtDay(a.hiredDate) : '') + ' — تابعه في الرئيسية.</div>' : '';
+    var hired = a.status === 'اشتغل' && a.hiredCode ? '<div class="note ok"><b>اتعين ✓</b> كوده <span class="ltr">#' + esc(a.hiredCode) + '</span>' + (a.hiredDate ? ' من ' + fmtDay(a.hiredDate) : '') + ' — تابع أوردراته في الرئيسية.</div>' : '';
     return '<article class="slip">' +
       '<div class="slip-head"><div><h3 class="slip-name">' + esc(a.name) + '</h3>' +
-      '<div class="slip-meta"><span>اتقدم ' + fmtDay(a.submitted) + '</span><span>' + esc(a.zone) + '</span><span class="ltr">' + esc(a.phone || '') + '</span></div></div>' +
+      '<div class="slip-meta"><span>اتقدم ' + fmtDay(a.submitted) + '</span><span>' + esc(a.zone) + '</span></div></div>' +
       '<span class="pill ' + pill + '">' + esc(a.status) + '</span></div>' +
       stepper + hired + nudge + note +
+      (!a.nudge && a.phone && a.status !== 'اشتغل' && !a.rejected ? '<div class="slip-actions"><a class="btn btn-ghost btn-sm" href="' + wa(a.phone, msg) + '" target="_blank" rel="noopener">' + icon('wa') + 'كلّمه</a><a class="round" href="tel:+' + intl(a.phone) + '" aria-label="اتصال">' + icon('phone') + '</a></div>' : '') +
     '</article>';
   }
 
   /* ───────────── Bonus guide ───────────── */
   function viewBonus() {
-    var tiers = (S.dash ? S.dash.season.tiers : S.boot.tiers), months = S.dash ? S.dash.season.windowMonths : 2;
+    var tiers = S.dash.season.tiers, months = S.dash.season.windowMonths;
     var top = tiers[tiers.length - 1];
     var ladder = tiers.map(function (t) {
-      return '<div class="rung"><span class="num orders">' + t.orders + '</span><span class="bar" style="width:' + (t.bonus / top.bonus * 100) + '%"></span><span class="num money">' + money(t.bonus) + '</span></div>';
+      return '<div class="rung" data-orders="' + t.orders + '"><span class="num orders">' + t.orders + '</span><span class="bar" style="width:' + (t.bonus / top.bonus * 100) + '%"></span><span class="num money">' + money(t.bonus) + '</span></div>';
     }).join('');
-    return '<section class="card"><span class="eyebrow">برنامج بونص ترشيحي</span>' +
-      '<h2 class="section" style="margin-top:4px">إزاي بتكسب</h2>' +
+    return '<section class="card sim"><span class="eyebrow">احسبها بنفسك</span>' +
+      '<div class="field"><label>هترشّح كام طيار؟</label><div class="stepper"><button type="button" id="simMinus" aria-label="أقل">−</button><output id="simRiders" class="num">3</output><button type="button" id="simPlus" aria-label="أكتر">+</button></div></div>' +
+      '<div class="field"><label for="simOrders">كل واحد هيعمل كام أوردر في ' + (months === 2 ? 'الشهرين' : months + ' شهور') + '؟ <b class="num" id="simOrdersOut" style="font-size:22px">400</b></label>' +
+      '<input type="range" id="simOrders" min="0" max="' + (top.orders + 150) + '" step="10" value="400"></div>' +
+      '<div class="sim-out"><div><span class="muted" style="font-size:13px">هتكسب حوالي</span><div class="num" id="simTotal">0</div></div><span class="muted" id="simPer" style="font-size:13px;text-align:end"></span></div>' +
+    '</section>' +
+    '<section class="card"><h2 class="section">الشرايح<span class="count">أوردر ← جنيه</span></h2><div class="ladder" id="ladder" style="margin-top:12px">' + ladder + '</div></section>' +
+    '<section class="card"><span class="eyebrow">برنامج بونص ترشيحي</span>' +
+      '<h2 class="section" style="margin-top:4px">الشروط</h2>' +
       '<ul class="rules" style="margin-top:12px">' +
         '<li>' + icon('check') + '<span>المرشح لازم يكون <b>جديد على Full Speed</b> — مالوش أي بيانات قديمة عندنا.</span></li>' +
-        '<li>' + icon('check') + '<span>بنحسب <b>الأوردرات المكتملة بس</b> اللي عملها المرشح.</span></li>' +
+        '<li>' + icon('check') + '<span>بنحسب <b>الأوردرات المكتملة بس</b>.</span></li>' +
         '<li>' + icon('check') + '<span>الأوردرات بتتحسب خلال <b>' + (months === 2 ? 'شهرين' : months + ' شهور') + '</b> من تاريخ تعيينه.</span></li>' +
         '<li>' + icon('check') + '<span>البونص بيتصرف بعد ما المدة تخلص، أو أول ما يوصل <b>' + top.orders + ' أوردر</b>.</span></li>' +
       '</ul>' +
-      '<p class="example">مثال: لو اتعين <b>8 نوفمبر</b>، آخر يوم بيتحسب هو <b>7 يناير</b>. اللي يوصله لحد اليوم ده بيتثبت ومش بيقل.</p>' +
-    '</section>' +
-    '<section class="card"><h2 class="section">الشرايح<span class="count">أوردر ← جنيه</span></h2><div class="ladder" style="margin-top:12px">' + ladder + '</div></section>' +
-    '<section class="card sim"><h2 class="section">احسبها بنفسك</h2>' +
-      '<div class="field"><label>عدد الطيارين اللي هترشحهم</label><div class="stepper"><button type="button" id="simMinus" aria-label="أقل">−</button><output id="simRiders" class="num">3</output><button type="button" id="simPlus" aria-label="أكتر">+</button></div></div>' +
-      '<div class="field"><label for="simOrders">متوسط أوردرات كل واحد في الشهرين: <b class="num" id="simOrdersOut" style="font-size:20px">400</b></label>' +
-      '<input type="range" id="simOrders" min="0" max="' + (top.orders + 150) + '" step="10" value="400"></div>' +
-      '<div class="sim-out"><div><span class="muted" style="font-size:13px">هتكسب حوالي</span><div class="num" id="simTotal">0</div></div><span class="muted" id="simPer" style="font-size:13px"></span></div>' +
+      '<p class="example">مثال: لو اتعين <b>8 نوفمبر</b>، آخر يوم بيتحسب <b>7 يناير</b>. اللي يوصله لحد اليوم ده بيتثبت ومش بيقل.</p>' +
     '</section>';
   }
 
   function tierBonus(orders) {
-    var tiers = S.dash ? S.dash.season.tiers : S.boot.tiers, b = 0;
-    tiers.forEach(function (t) { if (orders >= t.orders) b = t.bonus; });
+    var b = 0;
+    S.dash.season.tiers.forEach(function (t) { if (orders >= t.orders) b = t.bonus; });
     return b;
   }
 
   function bindSim() {
-    var riders = 3;
     var o = document.getElementById('simOrders');
     if (!o) return;
+    var riders = 3;
     function upd() {
       var per = tierBonus(+o.value);
       document.getElementById('simRiders').textContent = riders;
       document.getElementById('simOrdersOut').textContent = o.value;
       document.getElementById('simTotal').textContent = money(per * riders) + ' ج';
-      document.getElementById('simPer').textContent = per ? money(per) + ' ج × ' + riders : 'أقل من أول شريحة';
+      document.getElementById('simPer').textContent = per ? money(per) + ' ج × ' + riders : 'محتاج ' + S.dash.season.tiers[0].orders + ' أوردر على الأقل';
+      document.querySelectorAll('#ladder .rung').forEach(function (r) { r.classList.toggle('hit', +r.dataset.orders <= +o.value); });
     }
-    document.getElementById('simMinus').onclick = function () { riders = Math.max(1, riders - 1); upd(); };
-    document.getElementById('simPlus').onclick = function () { riders = Math.min(50, riders + 1); upd(); };
+    document.getElementById('simMinus').onclick = function () { riders = Math.max(1, riders - 1); buzz(); upd(); };
+    document.getElementById('simPlus').onclick = function () { riders = Math.min(50, riders + 1); buzz(); upd(); };
     o.oninput = upd; upd();
   }
 
@@ -688,124 +942,173 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
     var base = IS_APP ? here : ((S.boot && S.boot.appUrl) || here);
     return base + '?ref=' + encodeURIComponent(S.dash.user.refParam);
   }
+  function inviteText() {
+    return 'عايز تشتغل طيار مع Full Speed على طلبات؟ 🛵💰\n1) سجّل في طلبات من اللينك ده:\n' + S.dash.user.talabatLink +
+      '\n2) وابعت بياناتك هنا عشان نتابعك لحد ما تنزل الشغل:\n' + appLink();
+  }
 
   function viewProfile() {
     var u = S.dash.user, ext = u.type === 'external';
-    var shareText = 'عايز تشتغل طيار مع Full Speed على طلبات؟ 🛵\n1) سجّل في طلبات من اللينك ده:\n' + u.talabatLink + '\n2) وابعت بياناتك هنا عشان نتابعك لحد ما تنزل الشغل:\n' + appLink();
     var rows = ext ? [
       ['الاسم', esc(u.name)], ['الموبايل', '<span class="ltr">' + esc(u.phone) + '</span>'], ['كود الشريك', '<span class="ltr">' + esc(u.code) + '</span>']
     ] : [
       ['الموبايل', '<span class="ltr">' + esc(u.phone || '—') + '</span>'], ['المشرف', esc(u.supervisor || '—')],
       ['المنطقة', esc(u.zone || '—')], ['المركبة', esc(u.vehicle || '—')]
     ];
-    return '<section class="card pass">' +
-      '<div class="pass-top"><i class="mk" aria-hidden="true"></i><div style="min-width:0"><span class="eyebrow">' + (ext ? 'شريك Full Speed' : 'طيار Full Speed') + '</span><h3>' + esc(cleanName(u.name)) + '</h3></div>' +
+    return '<section class="card invite"><span class="eyebrow">ادعي صحابك</span>' +
+      '<h2 class="section">كل واحد يشتغل من لينكك = بونص ليك</h2>' +
+      '<a class="btn btn-wa btn-block" href="' + wa('', inviteText()) + '" target="_blank" rel="noopener">' + icon('wa') + 'ابعت الدعوة على واتساب</a>' +
+      '<div class="row-btns"><button type="button" class="btn btn-ghost btn-sm" id="copyInvite">' + icon('copy') + 'انسخ الرسالة</button>' +
+      '<button type="button" class="btn btn-ghost btn-sm" id="qrBtn" aria-expanded="false">' + icon('qr') + 'كود QR</button></div>' +
+      '<div class="qr" id="qrBox" hidden><div id="qrCode"></div><span>خلّي صاحبك يصوّر الكود بكاميرا موبايله</span></div>' +
+      '<details class="links"><summary>اللينكات بالتفصيل</summary>' +
+        '<span class="muted" style="font-size:12px">لينك التسجيل في طلبات' + (ext ? ' (الموحّد للشركاء)' : ' — باسم كودك') + '</span><code>' + esc(u.talabatLink) + '</code>' +
+        '<span class="muted" style="font-size:12px;display:block;margin-top:8px">لينك استمارة Full Speed</span><code>' + esc(appLink()) + '</code>' +
+      '</details></section>' +
+    '<section class="card"><div class="pass-top"><i class="mk" aria-hidden="true"></i><div style="min-width:0"><span class="eyebrow">' + (ext ? 'شريك Full Speed' : 'طيار Full Speed') + '</span><h3>' + esc(cleanName(u.name)) + '</h3></div>' +
       (ext ? '' : '<span class="num code-big ltr" style="margin-inline-start:auto">' + esc(u.code) + '</span>') + '</div>' +
       rows.map(function (r) { return '<div class="kv"><span>' + r[0] + '</span><span>' + r[1] + '</span></div>'; }).join('') +
     '</section>' +
-    '<section class="card linkbox"><h2 class="section">لينكاتك</h2>' +
-      '<span class="muted" style="font-size:13px">1. لينك التسجيل في طلبات' + (ext ? ' (الموحّد للشركاء)' : ' — باسم كودك') + '</span><code id="lnkTalabat">' + esc(u.talabatLink) + '</code>' +
-      '<span class="muted" style="font-size:13px">2. لينك استمارة Full Speed — أي حد يسجل منه بيتحسب عليك</span><code id="lnkApp">' + esc(appLink()) + '</code>' +
-      '<div class="actions"><a class="btn btn-primary" href="https://wa.me/?text=' + encodeURIComponent(shareText) + '" target="_blank" rel="noopener">' + icon('wa') + 'ابعتهم واتساب</a>' +
-      '<button type="button" class="btn btn-ghost" data-copy="' + esc(shareText) + '">' + icon('copy') + 'انسخ الرسالة</button></div>' +
-    '</section>' +
     (IS_GAS && S.boot && /github\.io/.test(S.boot.appUrl || '') ?
-      '<section class="card"><h2 class="section">ثبّت التطبيق على موبايلك</h2><p class="muted" style="margin:6px 0 12px;font-size:13px">أسرع، وبيفتح بأيقونة على الشاشة من غير المتصفح.</p>' +
-      '<a class="btn btn-ghost btn-block" href="' + esc(S.boot.appUrl) + '" target="_blank" rel="noopener">افتح التطبيق</a></section>' : '') +
-    '<section class="card"><h2 class="section">تغيير كلمة المرور</h2>' +
+      '<section class="card" style="display:grid;gap:10px"><h2 class="section">ثبّت التطبيق على موبايلك</h2><p class="muted" style="margin:0;font-size:13px">أسرع، وبيفتح بأيقونة على الشاشة.</p>' +
+      '<a class="btn btn-primary btn-block" href="' + esc(S.boot.appUrl) + '" target="_blank" rel="noopener">افتح التطبيق</a></section>' : '') +
+    '<details class="card"><summary style="font:700 15px var(--f-display);min-height:28px;cursor:pointer">تغيير كلمة المرور</summary>' +
       '<form class="form" id="pwForm" style="margin-top:12px" novalidate>' +
         '<div class="field"><label for="pw-cur">الحالية</label><input id="pw-cur" name="current" type="password" autocomplete="current-password"></div>' +
         '<div class="field"><label for="pw-new">الجديدة</label><input id="pw-new" name="next" type="password" autocomplete="new-password"></div>' +
         '<button class="btn btn-ghost" type="submit">غيّر كلمة المرور</button>' +
-      '</form></section>' +
+      '</form></details>' +
     '<button type="button" class="btn btn-ghost btn-block" id="logoutBtn" style="color:var(--danger)">تسجيل خروج</button>';
   }
 
-  /* ───────────── Candidate form (sheet + public page) ───────────── */
+  var qrLoading = null;
+  function loadQr() {
+    if (window.QRCode) return Promise.resolve();
+    if (qrLoading) return qrLoading;
+    qrLoading = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+      s.onload = resolve; s.onerror = function () { qrLoading = null; reject(); };
+      document.head.appendChild(s);
+    });
+    return qrLoading;
+  }
+
+  /* ───────────── Candidate form ───────────── */
   function candidateFields(zones) {
     var opts = '<option value="">اختار المنطقة…</option>' + (zones || []).map(function (z) { return '<option>' + esc(z) + '</option>'; }).join('');
-    return '<div class="field"><label for="c-name">الاسم زي البطاقة</label><input id="c-name" name="fullName" autocomplete="off" placeholder="ثلاثي على الأقل" required></div>' +
-      '<div class="field"><label for="c-mobile">رقم الموبايل</label><input id="c-mobile" name="mobile" class="ltr" inputmode="numeric" maxlength="11" placeholder="01xxxxxxxxx" required></div>' +
-      '<div class="field"><label for="c-nid">الرقم القومي</label><input id="c-nid" name="nationalId" class="ltr" inputmode="numeric" maxlength="14" placeholder="14 رقم" required><span class="derived" id="nidOut"></span></div>' +
-      '<div class="field"><label for="c-address">العنوان</label><input id="c-address" name="address" placeholder="المحافظة - المنطقة - الشارع" required></div>' +
+    return '<div class="field"><label for="c-name">الاسم زي البطاقة</label><input id="c-name" name="fullName" autocomplete="off" enterkeyhint="next" placeholder="ثلاثي على الأقل" required></div>' +
+      '<div class="field"><label for="c-mobile">رقم الموبايل</label><input id="c-mobile" name="mobile" type="tel" class="ltr" inputmode="numeric" maxlength="11" enterkeyhint="next" placeholder="01xxxxxxxxx" required></div>' +
+      '<div class="field"><label for="c-nid">الرقم القومي</label><input id="c-nid" name="nationalId" class="ltr" inputmode="numeric" maxlength="14" enterkeyhint="next" placeholder="14 رقم" required><span class="derived" id="nidOut"></span></div>' +
       '<div class="field"><label for="c-zone">منطقة الشغل</label><select id="c-zone" name="zone" required>' + opts + '</select></div>' +
+      '<div class="field"><label for="c-address">العنوان</label><input id="c-address" name="address" enterkeyhint="next" placeholder="المحافظة - المنطقة - الشارع" required></div>' +
       '<div class="row2"><div class="field"><label for="c-idexp">انتهاء البطاقة</label><input id="c-idexp" name="idExpiry" type="date" required></div>' +
       '<div class="field"><label for="c-licexp">انتهاء الرخصة</label><input id="c-licexp" name="licenseExpiry" type="date"><span class="hint">مش مطلوبة للعجلة</span></div></div>' +
-      '<div class="field"><label for="c-plate">رقم اللوحة</label><input id="c-plate" name="plate" placeholder="سيبها فاضية لو عجلة"></div>';
+      '<div class="field"><label for="c-plate">رقم اللوحة</label><input id="c-plate" name="plate" enterkeyhint="done" placeholder="سيبها فاضية لو عجلة"></div>';
   }
 
   function bindNid(root) {
-    var nid = root.querySelector('[name=nationalId]'), out = root.querySelector('#nidOut');
+    var nid = root.querySelector('[name=nationalId]'), out = root.querySelector('#nidOut'), mob = root.querySelector('[name=mobile]');
+    if (mob) mob.addEventListener('input', function () {
+      mob.value = mob.value.replace(/\D/g, '').slice(0, 11);
+      mob.closest('.field').classList.toggle('ok', /^01[0125]\d{8}$/.test(mob.value));
+    });
     if (!nid) return;
-    nid.oninput = function () {
+    nid.addEventListener('input', function () {
+      nid.value = nid.value.replace(/\D/g, '').slice(0, 14);
+      var f = nid.closest('.field'); f.classList.remove('ok');
+      if (nid.value.length < 14) { out.textContent = nid.value.length ? (14 - nid.value.length) + ' أرقام فاضلة' : ''; out.style.color = 'var(--dim)'; return; }
       var b = nidBirth(nid.value);
-      if (nid.value.replace(/\D/g, '').length < 14) { out.textContent = ''; return; }
-      if (!b) { out.textContent = 'الرقم ده مش صحيح'; out.style.color = 'var(--danger)'; return; }
+      if (!b) { out.textContent = 'الرقم ده مش صحيح، راجعه'; out.style.color = 'var(--danger)'; return; }
       var age = new Date().getFullYear() - b.getFullYear();
-      out.style.color = ''; out.textContent = 'مواليد ' + DFY.format(b) + ' (' + age + ' سنة تقريباً)';
-    };
+      f.classList.add('ok'); out.style.color = ''; out.textContent = '✓ مواليد ' + DFY.format(b) + ' (' + age + ' سنة تقريباً)';
+    });
   }
 
   function openCandidate() {
     var sheet = document.getElementById('sheet');
-    sheet.innerHTML = '<div role="dialog" aria-modal="true" aria-labelledby="candTitle"><div class="inner">' +
+    sheet.innerHTML = '<div role="dialog" aria-modal="true" aria-labelledby="candTitle"><div class="grab"></div><div class="inner">' +
       '<div class="sheet-head"><h3 id="candTitle">ترشيح طيار جديد</h3><button type="button" class="icon-btn" data-close aria-label="إغلاق">' + icon('x') + '</button></div>' +
       '<p class="muted" style="margin:0;font-size:13px">بيتسجل على ' + (S.dash.user.type === 'external' ? 'حسابك كشريك' : 'كودك') + '. تاريخ الميلاد بيطلع لوحده من الرقم القومي.</p>' +
       '<form class="form" id="candForm" novalidate>' + candidateFields(S.boot && S.boot.zones) +
-      '<button class="btn btn-primary btn-block" type="submit">ابعت للإدارة</button></form></div></div>';
+      '<div class="sticky-cta"><button class="btn btn-primary btn-block" type="submit">ابعت للإدارة</button></div></form></div></div>';
     sheet.hidden = false;
+    document.body.style.overflow = 'hidden';
     sheet.querySelector('[data-close]').onclick = closeSheet;
     sheet.onclick = function (e) { if (e.target === sheet) closeSheet(); };
     bindNid(sheet);
     document.getElementById('candForm').onsubmit = async function (e) {
       e.preventDefault();
-      var form = e.currentTarget, btn = form.querySelector('[type=submit]');
+      var form = e.currentTarget, btn = form.querySelector('[type=submit]'), data = formData(form);
       busy(btn, true, 'بنتأكد إنه جديد…');
-      var res = await call('submitCandidate', { token: S.token, form: formData(form) });
+      var res = await call('submitCandidate', { token: S.token, form: data });
       busy(btn, false);
       if (!res.ok) { showErrors(form, res.fields); return; }
-      closeSheet(); S.dash = res.data.dashboard; S.view = 'pipeline'; S.filter = 'all'; renderApp(); toast(res.data.message);
+      S.dash = res.data.dashboard; S.filter = 'all';
+      buzz(); confetti();
+      var name = String(data.fullName).split(/\s+/)[0];
+      var msg = 'أهلاً ' + name + ' 👋 أنا ' + first(S.dash.user.name) + '، رشّحتك تشتغل مع Full Speed على طلبات 🛵\nسجّل من اللينك ده عشان نكمّل التعيين:\n' + S.dash.user.talabatLink;
+      sheet.querySelector('.inner').innerHTML = '<div class="done-screen"><div class="tick">' + icon('check') + '</div>' +
+        '<h3>' + esc(name) + ' اتسجل ✓</h3><p>الإدارة هتكلمه قريب. الخطوة الجاية: ابعتله لينك التسجيل في طلبات عشان يتحسب عليك.</p></div>' +
+        '<a class="btn btn-wa btn-block" href="' + wa(data.mobile, msg) + '" target="_blank" rel="noopener">' + icon('wa') + 'ابعت لـ ' + esc(name) + ' لينك طلبات</a>' +
+        '<div class="row-btns"><button type="button" class="btn btn-ghost" id="again">رشّح حد تاني</button><button type="button" class="btn btn-ghost" id="doneBtn">تمام</button></div>';
+      document.getElementById('again').onclick = openCandidate;
+      document.getElementById('doneBtn').onclick = function () { closeSheet(); go('pipeline'); };
     };
-    setTimeout(function () { var f = document.getElementById('c-name'); if (f) f.focus(); }, 50);
+    setTimeout(function () { var f = document.getElementById('c-name'); if (f && !('ontouchstart' in window)) f.focus(); }, 60);
   }
-  function closeSheet() { var s = document.getElementById('sheet'); s.hidden = true; s.innerHTML = ''; }
+  function closeSheet() {
+    var s = document.getElementById('sheet');
+    if (s.hidden) return;
+    s.hidden = true; s.innerHTML = ''; document.body.style.overflow = '';
+    if (S.dash) renderApp();
+  }
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
 
   function renderPublicApply() {
     document.getElementById('dock').hidden = true;
     var r = S.boot.referrer;
     if (!r || !r.valid) {
-      app.innerHTML = '<section class="auth">' + brand(true) + '<div class="card" style="text-align:center"><h2 class="section" style="justify-content:center">اللينك ده مش صحيح</h2><p class="muted">اطلب لينك الترشيح تاني من الشخص اللي رشّحك.</p></div></section>';
+      app.innerHTML = '<section class="auth">' + brand() + '<div class="card" style="text-align:center;display:grid;gap:8px"><h2 class="section" style="justify-content:center">اللينك ده مش صحيح</h2><p class="muted" style="margin:0">اطلب لينك الترشيح تاني من الشخص اللي رشّحك.</p></div></section>';
       return;
     }
-    app.innerHTML = '<section class="auth" style="align-content:start">' + brand(true) +
+    app.innerHTML = '<section class="auth" style="align-content:start">' + brand() +
       (live ? '' : '<div class="demo-flag">نسخة تجريبية — مفيش حاجة بتتبعت فعلاً</div>') +
       '<div class="card"><span class="eyebrow">استمارة انضمام</span><h2 class="section" style="margin-top:4px">' + esc(r.firstName) + ' رشّحك تشتغل معانا 🛵</h2>' +
-      '<p class="muted" style="margin:6px 0 0;font-size:14px">املا بياناتك وفريق Full Speed هيكلمك يكمل معاك التعيين على طلبات.</p></div>' +
+      '<p class="muted" style="margin:6px 0 0;font-size:14px">املا بياناتك في دقيقة، وفريق Full Speed هيكلمك يكمل معاك التعيين على طلبات.</p></div>' +
       '<form class="card form" id="pubForm" novalidate>' + candidateFields(S.boot.zones) +
       '<button class="btn btn-primary btn-block" type="submit">ابعت طلبي</button></form></section>';
     bindNid(app);
     document.getElementById('pubForm').onsubmit = async function (e) {
       e.preventDefault();
       var form = e.currentTarget, btn = form.querySelector('[type=submit]');
-      busy(btn, true);
+      busy(btn, true, 'بنبعت طلبك…');
       var res = await call('publicApply', { ref: S.ref, form: formData(form) });
       busy(btn, false);
       if (!res.ok) { showErrors(form, res.fields); return; }
-      app.innerHTML = '<section class="auth">' + brand(true) + '<div class="card done-screen"><div class="tick">' + icon('check') + '</div>' +
-        '<h2 class="section">طلبك وصل ✓</h2><p class="muted" style="margin:0">فريق Full Speed هيكلمك على رقمك قريب.<br>لو لسه ما سجلتش في طلبات، اطلب اللينك من ' + esc(res.data.referrer) + '.</p></div></section>';
+      confetti();
+      app.innerHTML = '<section class="auth">' + brand() + '<div class="card done-screen"><div class="tick">' + icon('check') + '</div>' +
+        '<h3>طلبك وصل ✓</h3><p>فريق Full Speed هيكلمك على رقمك قريب.<br>لو لسه ما سجلتش في طلبات، اطلب اللينك من ' + esc(res.data.referrer) + '.</p></div></section>';
     };
   }
 
-  /* ───────────── Event wiring for the current view ───────────── */
+  /* ───────────── Wiring ───────────── */
   function bindView() {
-    app.querySelectorAll('[data-open="candidate"]').forEach(function (b) { b.onclick = openCandidate; });
-    app.querySelectorAll('[data-go-view]').forEach(function (b) {
-      b.onclick = function () { S.view = b.dataset.goView; if (b.dataset.filter) S.filter = b.dataset.filter; renderApp(); window.scrollTo(0, 0); };
-    });
-    app.querySelectorAll('.chip[data-filter]').forEach(function (b) { b.onclick = function () { S.filter = b.dataset.filter; renderApp(); }; });
-    app.querySelectorAll('[data-copy]').forEach(function (b) { b.onclick = function () { copy(b.dataset.copy, b); }; });
+    app.querySelectorAll('[data-act="candidate"]').forEach(function (b) { b.onclick = function () { buzz(); openCandidate(); }; });
+    app.querySelectorAll('[data-go-view]').forEach(function (b) { b.onclick = function () { go(b.dataset.goView, b.dataset.filter); }; });
+    app.querySelectorAll('.chip[data-filter]').forEach(function (b) { b.onclick = function () { S.filter = b.dataset.filter; buzz(); renderApp(); }; });
     bindSim();
+    var ci = document.getElementById('copyInvite');
+    if (ci) ci.onclick = function () { copy(inviteText()); };
+    var qb = document.getElementById('qrBtn');
+    if (qb) qb.onclick = function () {
+      var box = document.getElementById('qrBox'), open = box.hidden;
+      box.hidden = !open; qb.setAttribute('aria-expanded', String(open));
+      if (!open || document.getElementById('qrCode').childNodes.length) return;
+      loadQr().then(function () {
+        new window.QRCode(document.getElementById('qrCode'), { text: appLink(), width: 200, height: 200, colorDark: '#0C150E', colorLight: '#ffffff' });
+      }, function () { document.getElementById('qrCode').textContent = 'مقدرناش نحمّل الـ QR دلوقتي. ابعت اللينك على واتساب.'; });
+    };
     var pw = document.getElementById('pwForm');
     if (pw) pw.onsubmit = async function (e) {
       e.preventDefault();
@@ -818,20 +1121,27 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
       S.token = res.data.token; store('fs_token', S.token); pw.reset(); toast('كلمة المرور اتغيرت، وخرجناك من أي جهاز تاني.');
     };
     var lo = document.getElementById('logoutBtn');
-    if (lo) lo.onclick = async function () { call('logout', { token: S.token }, { quiet: true }); signOut(); toast('خرجت من حسابك'); };
+    if (lo) lo.onclick = function () { call('logout', { token: S.token }, { quiet: true }); signOut(); toast('خرجت من حسابك'); };
   }
 
   /* ───────────── Start ───────────── */
+  function skeleton() {
+    app.innerHTML = '<div style="display:grid;gap:14px;padding-top:56px">' +
+      '<div class="sk" style="height:190px"></div><div class="sk" style="height:96px"></div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div class="sk" style="height:78px"></div><div class="sk" style="height:78px"></div><div class="sk" style="height:78px"></div></div>' +
+      '<div class="sk" style="height:220px"></div></div>';
+  }
+
   (async function start() {
-    app.innerHTML = '<section class="auth">' + brand(true) + '<p class="muted" style="text-align:center">بنجهّز…</p></section>';
+    var token = store('fs_token');
+    if (token) skeleton(); else app.innerHTML = '<section class="auth">' + brand() + '<p class="muted" style="text-align:center">بنجهّز…</p></section>';
     S.ref = await Backend.ref();
     var boot = await Backend.call('bootstrap', { ref: S.ref });
-    S.boot = boot.ok ? boot.data : { zones: [], tiers: [{ orders: 850, bonus: 3000 }] };
+    S.boot = boot && boot.ok ? boot.data : { zones: [], tiers: [{ orders: 850, bonus: 3000 }] };
     if (S.ref) { renderPublicApply(); return; }
-    var token = store('fs_token');
     if (token) {
       var res = await Backend.call('session', { token: token });
-      if (res.ok) { S.token = token; S.dash = res.data.dashboard; renderApp(); return; }
+      if (res && res.ok) { S.token = token; S.dash = res.data.dashboard; renderApp(); celebrateOnce(); return; }
       store('fs_token', null);
     }
     renderAuth();
