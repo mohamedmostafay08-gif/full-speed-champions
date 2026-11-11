@@ -54,6 +54,7 @@ test('status spellings and old values map onto the new pipeline', () => {
   assert.equal(L.normalizeStatus(''), 'جديد');
   assert.equal(L.normalizeStatus('ارفع استمارة'), 'جديد');
   assert.equal(L.normalizeStatus('ارفع استماره'), 'جديد');
+  assert.equal(L.normalizeStatus('ارفع استعلام'), 'جديد');
   assert.equal(L.normalizeStatus('حالة مش معروفة'), '');
 });
 
