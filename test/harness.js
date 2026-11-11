@@ -110,7 +110,8 @@ function makeEnv(tabs) {
       getProjectTriggers: () => triggers,
       newTrigger: (fn) => { const t = { getHandlerFunction: () => fn }; const chain = new Proxy({}, { get: (_, k) => k === 'create' ? () => triggers.push(t) : () => chain }); return chain; }
     },
-    HtmlService: {}
+    HtmlService: {},
+    ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (t) => ({ text: t, setMimeType() { return this; } }) }
   };
   const ctx = vm.createContext(g);
   const dir = path.join(__dirname, '..', 'src');

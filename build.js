@@ -14,7 +14,9 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const out = (p, s) => { fs.mkdirSync(path.dirname(path.join(root, p)), { recursive: true }); fs.writeFileSync(path.join(root, p), s); };
 
 const logo = fs.readFileSync(path.join(root, 'assets/logo-mark.webp')).toString('base64');
-const page = read('ui/Index.html').replace('__LOGO__', logo);
+const crypto = require('node:crypto');
+const raw = read('ui/Index.html').replace('__LOGO__', logo);
+const page = raw.replace('<!--WEB_HEAD-->', '');
 if (page.includes('<?')) throw new Error('Index.html must not contain "<?" (HtmlService scriptlets)');
 
 const server = ['Config', 'Core', 'Logic', 'Sheets', 'Auth', 'Code'];
@@ -33,6 +35,40 @@ const shared = ['Config', 'Core', 'Logic'].map((f) => read(`src/${f}.js`)).join(
 const demo = `<script>\n${shared}\n${read('ui/demo.js')}\n</script>`;
 out('dist/preview.html', page.replace('<!--DEMO-->', demo));
 
+// GitHub Pages app (docs/): same page + manifest, icons, service worker and the /exec link.
+const webHead = `<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Champions">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script src="config.js"></script>
+<script>
+if ('serviceWorker' in navigator) addEventListener('load', function () { navigator.serviceWorker.register('sw.js'); });
+// "ثبّت التطبيق" button, shown only when the browser offers installation.
+addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault();
+  var b = document.createElement('button');
+  b.type = 'button'; b.className = 'btn btn-primary install-btn'; b.textContent = 'ثبّت التطبيق';
+  b.onclick = function () { e.prompt(); b.remove(); };
+  document.body.appendChild(b);
+});
+</script>
+<style>.install-btn{position:fixed;z-index:35;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(96px + env(safe-area-inset-bottom,0px));padding:10px 16px;font-size:14px;box-shadow:var(--shadow)}</style>`;
+const docsPage = raw.replace('<!--WEB_HEAD-->', webHead).replace('<!--DEMO-->', '');
+const version = crypto.createHash('sha256').update(docsPage + read('web/config.js')).digest('hex').slice(0, 10);
+out('docs/index.html', docsPage);
+out('docs/config.js', read('web/config.js'));
+out('docs/manifest.webmanifest', read('web/manifest.webmanifest'));
+out('docs/sw.js', read('web/sw.js').replace('__VERSION__', version));
+out('docs/.nojekyll', '');
+for (const f of fs.readdirSync(path.join(root, 'web/icons'))) {
+  fs.mkdirSync(path.join(root, 'docs/icons'), { recursive: true });
+  fs.copyFileSync(path.join(root, 'web/icons', f), path.join(root, 'docs/icons', f));
+}
+
 const kb = (p) => (fs.statSync(path.join(root, p)).size / 1024).toFixed(0) + ' KB';
 console.log('dist/apps-script/  →', server.length, 'server files + Index.html (' + kb('dist/apps-script/Index.html') + ')');
 console.log('dist/preview.html  →', kb('dist/preview.html'));
+console.log('docs/ (GitHub Pages) → version', version);

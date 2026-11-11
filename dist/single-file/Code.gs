@@ -29,7 +29,8 @@ var CONFIG_DEFAULTS = {
   LOCK_MINUTES: 15,
   PUBLIC_APPLY_PER_HOUR: 30,          // per referral link
   MIN_PASSWORD_LENGTH: 6,
-  SUPPORT_WHATSAPP: '201097865980'
+  SUPPORT_WHATSAPP: '201097865980',
+  PUBLIC_APP_URL: 'https://mohamedmostafay08-gif.github.io/full-speed-champions/'  // the installable app (GitHub Pages)
 };
 
 /** Tab names. Existing tabs keep their current names. */
@@ -1137,13 +1138,23 @@ function setupFullSpeed() {
         LOCK_MINUTES: 'مدة القفل بالدقايق',
         PUBLIC_APPLY_PER_HOUR: 'أقصى عدد طلبات من لينك واحد في الساعة',
         MIN_PASSWORD_LENGTH: 'أقل طول لكلمة المرور',
-        SUPPORT_WHATSAPP: 'رقم واتساب الدعم (بصيغة دولية)'
+        SUPPORT_WHATSAPP: 'رقم واتساب الدعم (بصيغة دولية)',
+        PUBLIC_APP_URL: 'لينك التطبيق على GitHub Pages — ده اللي بيتبعت للمرشحين'
       };
       var rows = Object.keys(CONFIG_DEFAULTS).map(function (k) { return [k, CONFIG_DEFAULTS[k], notes[k] || '']; });
       sh.getRange(2, 1, rows.length, 3).setValues(rows);
       sh.getRange('B2:B').setNumberFormat('@');
       report.push('اتعمل تاب ' + TABS.CONFIG);
     });
+
+    var cfgSheet = tab_(TABS.CONFIG);
+    var haveKeys = cfgSheet.getRange(1, 1, Math.max(1, cfgSheet.getLastRow()), 1).getValues().map(function (r) { return cleanText(r[0]); });
+    var missing = Object.keys(CONFIG_DEFAULTS).filter(function (k) { return haveKeys.indexOf(k) === -1; });
+    if (missing.length) {
+      cfgSheet.getRange(cfgSheet.getLastRow() + 1, 1, missing.length, 3)
+        .setValues(missing.map(function (k) { return [k, CONFIG_DEFAULTS[k], k === 'PUBLIC_APP_URL' ? 'لينك التطبيق على GitHub Pages — ده اللي بيتبعت للمرشحين' : '']; }));
+      report.push('إعدادات جديدة اتضافت لـ ' + TABS.CONFIG + ': ' + missing.join('، '));
+    }
 
     ensureTab_(TABS.TIERS, ['عدد الأوردرات', 'قيمة البونص (ج)'], function (sh) {
       var rows = DEFAULT_TIERS.map(function (t) { return [t.orders, t.bonus]; });
@@ -1560,6 +1571,21 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
 
+/**
+ * The installable app on GitHub Pages talks to the same api() through here:
+ * POST { action, payload } as plain text → JSON back.
+ */
+function doPost(e) {
+  var out;
+  try {
+    var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    out = api(String(body.action || ''), body.payload || {});
+  } catch (err) {
+    out = fail_('طلب غير صالح.');
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
 var ACTIONS_ = {
   bootstrap: bootstrap_,
   login: login_,
@@ -1625,7 +1651,7 @@ function bootstrap_(p) {
     zones: zones,
     referrer: referrer,
     support: loadConfig_().SUPPORT_WHATSAPP,
-    appUrl: ScriptApp.getService().getUrl(),
+    appUrl: loadConfig_().PUBLIC_APP_URL || ScriptApp.getService().getUrl(),
     tiers: loadConfig_().TIERS,
     windowMonths: loadConfig_().BONUS_WINDOW_MONTHS
   });

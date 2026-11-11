@@ -11,6 +11,21 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
 
+/**
+ * The installable app on GitHub Pages talks to the same api() through here:
+ * POST { action, payload } as plain text → JSON back.
+ */
+function doPost(e) {
+  var out;
+  try {
+    var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    out = api(String(body.action || ''), body.payload || {});
+  } catch (err) {
+    out = fail_('طلب غير صالح.');
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
 var ACTIONS_ = {
   bootstrap: bootstrap_,
   login: login_,
@@ -76,7 +91,7 @@ function bootstrap_(p) {
     zones: zones,
     referrer: referrer,
     support: loadConfig_().SUPPORT_WHATSAPP,
-    appUrl: ScriptApp.getService().getUrl(),
+    appUrl: loadConfig_().PUBLIC_APP_URL || ScriptApp.getService().getUrl(),
     tiers: loadConfig_().TIERS,
     windowMonths: loadConfig_().BONUS_WINDOW_MONTHS
   });

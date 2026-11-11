@@ -74,3 +74,11 @@ node build.js     # يبني dist/apps-script و dist/preview.html
 | `ui/Index.html` | الواجهة |
 | `ui/demo.js` | بيانات النسخة التجريبية |
 | `test/` | الاختبارات، ومعاها محاكي بسيط لخدمات Google |
+
+## التطبيق على GitHub Pages (التحديث من GitHub)
+
+- **لينك التطبيق:** https://mohamedmostafay08-gif.github.io/full-speed-champions/
+- **لينك السيرفر:** موجود في `web/config.js`. ده الـ `/exec` بتاع Apps Script.
+- **أي تعديل في الواجهة:** بيتعمل في `ui/Index.html`، وبعده `node build.js`، وبعده push على `main`. التطبيق بيتحدث لوحده خلال دقيقة، والموبايلات بتاخد النسخة الجديدة من غير ما حد يعمل حاجة.
+- **أي تعديل في السيرفر:** بيتعمل في `src/`. بعده الصق `dist/single-file/Code.gs` في Apps Script واعمل **Manage deployments ← ✏️ ← New version**، عشان لينك `/exec` يفضل زي ما هو.
+- **لينك Google القديم (`/exec`):** لسه شغال زي ما هو، وفيه زرار "افتح التطبيق" في صفحة "حسابي".

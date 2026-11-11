@@ -27,7 +27,8 @@ var CONFIG_DEFAULTS = {
   LOCK_MINUTES: 15,
   PUBLIC_APPLY_PER_HOUR: 30,          // per referral link
   MIN_PASSWORD_LENGTH: 6,
-  SUPPORT_WHATSAPP: '201097865980'
+  SUPPORT_WHATSAPP: '201097865980',
+  PUBLIC_APP_URL: 'https://mohamedmostafay08-gif.github.io/full-speed-champions/'  // the installable app (GitHub Pages)
 };
 
 /** Tab names. Existing tabs keep their current names. */

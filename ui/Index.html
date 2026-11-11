@@ -1,4 +1,5 @@
 <title>Full Speed Champions</title>
+<!--WEB_HEAD-->
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="theme-color" content="#070A08">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -300,9 +301,27 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
   document.documentElement.setAttribute('dir', 'rtl');
   document.documentElement.setAttribute('lang', 'ar');
 
-  /* ───────────── Backend: Apps Script, or the demo when previewed ───────────── */
-  var live = typeof google !== 'undefined' && google.script && google.script.run;
-  var Backend = live ? {
+  /* ───────────── Backend ─────────────
+     1. Inside Apps Script (the /exec link)  → google.script.run
+     2. The installed app on GitHub Pages    → fetch() to the /exec link (doPost)
+     3. The design preview                   → FS_DEMO with fake data */
+  var IS_GAS = typeof google !== 'undefined' && google.script && google.script.run;
+  var API_URL = window.FS_API_URL || '';
+  var IS_APP = !IS_GAS && !!API_URL;
+  var live = IS_GAS || IS_APP;
+  var OFFLINE = { ok: false, error: 'مافيش اتصال بالسيرفر. اتأكد من النت وجرّب تاني.' };
+  var Backend = IS_APP ? {
+    call: function (action, payload) {
+      var ctl = window.AbortController ? new AbortController() : null;
+      var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 30000);
+      // No Content-Type header: a "simple" request, so the browser skips the CORS preflight Apps Script can't answer.
+      return fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: action, payload: payload }), redirect: 'follow', signal: ctl ? ctl.signal : undefined })
+        .then(function (r) { return r.json(); })
+        .catch(function () { return OFFLINE; })
+        .finally(function () { clearTimeout(timer); });
+    },
+    ref: function () { return Promise.resolve(new URLSearchParams(location.search).get('ref') || ''); }
+  } : IS_GAS ? {
     call: function (action, payload) {
       return new Promise(function (resolve) {
         google.script.run
@@ -665,7 +684,8 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
 
   /* ───────────── Profile ───────────── */
   function appLink() {
-    var base = (S.boot && S.boot.appUrl) || location.href.split('#')[0].split('?')[0];
+    var here = location.href.split('#')[0].split('?')[0];
+    var base = IS_APP ? here : ((S.boot && S.boot.appUrl) || here);
     return base + '?ref=' + encodeURIComponent(S.dash.user.refParam);
   }
 
@@ -689,6 +709,9 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
       '<div class="actions"><a class="btn btn-primary" href="https://wa.me/?text=' + encodeURIComponent(shareText) + '" target="_blank" rel="noopener">' + icon('wa') + 'ابعتهم واتساب</a>' +
       '<button type="button" class="btn btn-ghost" data-copy="' + esc(shareText) + '">' + icon('copy') + 'انسخ الرسالة</button></div>' +
     '</section>' +
+    (IS_GAS && S.boot && /github\.io/.test(S.boot.appUrl || '') ?
+      '<section class="card"><h2 class="section">ثبّت التطبيق على موبايلك</h2><p class="muted" style="margin:6px 0 12px;font-size:13px">أسرع، وبيفتح بأيقونة على الشاشة من غير المتصفح.</p>' +
+      '<a class="btn btn-ghost btn-block" href="' + esc(S.boot.appUrl) + '" target="_blank" rel="noopener">افتح التطبيق</a></section>' : '') +
     '<section class="card"><h2 class="section">تغيير كلمة المرور</h2>' +
       '<form class="form" id="pwForm" style="margin-top:12px" novalidate>' +
         '<div class="field"><label for="pw-cur">الحالية</label><input id="pw-cur" name="current" type="password" autocomplete="current-password"></div>' +

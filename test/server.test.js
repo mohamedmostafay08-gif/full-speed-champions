@@ -167,6 +167,15 @@ test('hourly sync writes "اشتغل" and the rider code into New Applicants', (
   assert.equal(apps.rows[1][h.indexOf('كود بعد التعيين')], '5031339');
 });
 
+test('installable app: doPost speaks the same API as JSON', () => {
+  const { env } = ready();
+  const res = JSON.parse(env.ctx.doPost({ postData: { contents: JSON.stringify({ action: 'bootstrap', payload: { ref: '4722422' } }) } }).text);
+  assert.equal(res.ok, true);
+  assert.equal(res.data.appUrl, 'https://mohamedmostafay08-gif.github.io/full-speed-champions/');
+  assert.equal(JSON.parse(env.ctx.doPost({ postData: { contents: 'not json' } }).text).ok, false);
+  assert.ok(env.sheets['FS Config'].rows.some((r) => r[0] === 'PUBLIC_APP_URL'));
+});
+
 test('errors never leak internals', () => {
   const { env } = ready();
   delete env.sheets['FS Sessions'];

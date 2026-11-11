@@ -211,13 +211,23 @@ function setupFullSpeed() {
         LOCK_MINUTES: 'مدة القفل بالدقايق',
         PUBLIC_APPLY_PER_HOUR: 'أقصى عدد طلبات من لينك واحد في الساعة',
         MIN_PASSWORD_LENGTH: 'أقل طول لكلمة المرور',
-        SUPPORT_WHATSAPP: 'رقم واتساب الدعم (بصيغة دولية)'
+        SUPPORT_WHATSAPP: 'رقم واتساب الدعم (بصيغة دولية)',
+        PUBLIC_APP_URL: 'لينك التطبيق على GitHub Pages — ده اللي بيتبعت للمرشحين'
       };
       var rows = Object.keys(CONFIG_DEFAULTS).map(function (k) { return [k, CONFIG_DEFAULTS[k], notes[k] || '']; });
       sh.getRange(2, 1, rows.length, 3).setValues(rows);
       sh.getRange('B2:B').setNumberFormat('@');
       report.push('اتعمل تاب ' + TABS.CONFIG);
     });
+
+    var cfgSheet = tab_(TABS.CONFIG);
+    var haveKeys = cfgSheet.getRange(1, 1, Math.max(1, cfgSheet.getLastRow()), 1).getValues().map(function (r) { return cleanText(r[0]); });
+    var missing = Object.keys(CONFIG_DEFAULTS).filter(function (k) { return haveKeys.indexOf(k) === -1; });
+    if (missing.length) {
+      cfgSheet.getRange(cfgSheet.getLastRow() + 1, 1, missing.length, 3)
+        .setValues(missing.map(function (k) { return [k, CONFIG_DEFAULTS[k], k === 'PUBLIC_APP_URL' ? 'لينك التطبيق على GitHub Pages — ده اللي بيتبعت للمرشحين' : '']; }));
+      report.push('إعدادات جديدة اتضافت لـ ' + TABS.CONFIG + ': ' + missing.join('، '));
+    }
 
     ensureTab_(TABS.TIERS, ['عدد الأوردرات', 'قيمة البونص (ج)'], function (sh) {
       var rows = DEFAULT_TIERS.map(function (t) { return [t.orders, t.bonus]; });
