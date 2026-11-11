@@ -1,5 +1,5 @@
 <title>Full Speed Champions</title>
-<script>window.FS_BUILD="d23a014058";</script>
+<script>window.FS_BUILD="a0119d381e";</script>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="theme-color" content="#070A08">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -154,11 +154,13 @@ h2.section .count { font: 600 12px var(--f-body); color: var(--muted); }
 /* Gold "prize" card: the money and a rising ladder of the real tiers */
 .prize { position: relative; overflow: hidden; border-radius: 22px; padding: 16px 18px 14px; border: 1px solid color-mix(in srgb, var(--gold) 40%, var(--line));
   background: radial-gradient(120% 100% at 100% 0%, var(--gold-soft), transparent 65%), var(--surface); display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: end; }
-.prize p { margin: 0; grid-column: 1 / -1; color: var(--muted); font-size: 13px; }
+.prize .eyebrow { grid-column: 1 / -1; color: var(--gold); }
+.prize p { margin: 0; grid-column: 1 / -1; color: var(--ink); font-size: 14px; }
+.prize p.range { color: var(--muted); font-size: 12px; border-top: 1px dashed color-mix(in srgb, var(--gold) 30%, var(--line)); padding-top: 8px; margin-top: 6px; }
 .prize .num { font-size: 56px; color: var(--gold); display: flex; align-items: baseline; gap: 6px; }
 .prize .num small { font: 700 18px var(--f-display); color: var(--muted); }
-.prize strong { grid-column: 1; font: 700 15px var(--f-display); }
-.mini-ladder { grid-row: 2 / 4; grid-column: 2; display: flex; align-items: flex-end; gap: 3px; height: 64px; }
+.prize strong { grid-column: 1; font: 700 15px/1.4 var(--f-display); }
+.mini-ladder { grid-row: 3 / 5; grid-column: 2; display: flex; align-items: flex-end; gap: 3px; height: 64px; }
 .mini-ladder i { width: 7px; border-radius: 3px 3px 1px 1px; background: linear-gradient(0deg, color-mix(in srgb, var(--gold) 45%, transparent), var(--gold)); }
 /* Three steps joined by a line */
 .how3 { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; font-size: 12px; color: var(--muted); }
@@ -589,18 +591,22 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
         pwField('a-pass', 'اختار كلمة مرور', 'new-password', '6 حروف أو أرقام على الأقل.');
     }
     var ladder = (S.boot && S.boot.tiers && S.boot.tiers.length > 1 ? S.boot.tiers : [{ bonus: 600 }, { bonus: 1200 }, { bonus: 1800 }, { bonus: 2400 }, { bonus: 3000 }])
+      .filter(function (t, i, all) { return i % 2 === 0 || i === all.length - 1; })
       .map(function (t) { return '<i style="height:' + Math.max(12, t.bonus / top.bonus * 100) + '%"></i>'; }).join('');
     var support = S.boot && S.boot.support;
+    var first0 = (S.boot && S.boot.tiers && S.boot.tiers[0]) || { bonus: 600 };
     app.innerHTML =
       '<section class="auth">' + brand() +
-      '<div class="prize"><p>رشّح طيار جديد وتابعه لحد ما يشتغل</p>' +
+      '<div class="prize"><span class="eyebrow">بونص الترشيح</span>' +
+        '<p>صاحبك عايز يشتغل؟ رشّحه واكسب معاه 💪</p>' +
         '<span class="num">' + money(top.bonus) + '<small>جنيه</small></span>' +
         '<div class="mini-ladder" aria-hidden="true">' + ladder + '</div>' +
-        '<strong>لحد كده على كل طيار</strong></div>' +
+        '<strong>عن كل طيار يشتغل من ترشيحك</strong>' +
+        '<p class="range">البونص بيبدأ من ' + money(first0.bonus) + ' ج ويكبر مع أوردراته لحد ' + money(top.bonus) + ' ج</p></div>' +
       '<div class="how3" aria-label="الخطوات">' +
-        '<div><b>' + icon('share') + '</b><span>ابعت لينكك</span></div>' +
-        '<div><b>' + icon('people') + '</b><span>صاحبك يتعين</span></div>' +
-        '<div><b>' + icon('trophy') + '</b><span>تقبض بونصه</span></div></div>' +
+        '<div><b>' + icon('share') + '</b><span>ابعت لينكك لصاحبك</span></div>' +
+        '<div><b>' + icon('people') + '</b><span>يتعيّن ويشتغل</span></div>' +
+        '<div><b>' + icon('trophy') + '</b><span>تقبض بونصك 💰</span></div></div>' +
       (live ? '' : '<div class="demo-flag">نسخة تجريبية ببيانات وهمية — اكتب أي كود وأي كلمة مرور</div>') +
       '<div class="card form auth-card">' +
         '<div class="seg" role="group" aria-label="نوع الحساب">' +
@@ -608,10 +614,10 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
           '<button type="button" data-type="external" aria-pressed="' + ext + '">🤝 شريك من بره</button>' +
         '</div>' +
         '<form class="form" id="authForm" novalidate>' + fields +
-          '<button class="btn btn-primary btn-block" type="submit">' + (act ? (ext ? 'اعمل حسابك' : 'فعّل حسابك') : 'دخول') + '</button>' +
+          '<button class="btn btn-primary btn-block" type="submit">' + (act ? (ext ? 'اعمل حسابك وابدأ تكسب' : 'فعّل حسابك وابدأ تكسب') : 'ادخل وشوف أرباحك') + '</button>' +
         '</form>' +
         '<button type="button" class="btn btn-ghost btn-block" data-mode="' + (act ? 'login' : 'activate') + '">' +
-          (act ? 'عندي حساب، عايز أدخل' : (ext ? 'أول مرة؟ اعمل حساب شريك' : 'أول مرة؟ فعّل حسابك')) + '</button>' +
+          (act ? 'عندي حساب، عايز أدخل' : (ext ? 'أول مرة؟ اعمل حساب شريك في دقيقة' : 'أول مرة؟ فعّل حسابك في دقيقة')) + '</button>' +
       '</div>' +
       (support ? '<div class="auth-foot"><a href="' + wa(support.replace(/^20/, '0'), 'محتاج مساعدة في Full Speed Champions') + '" target="_blank" rel="noopener">' + icon('wa') + 'نسيت كلمة المرور أو محتاج مساعدة؟ كلّمنا</a></div>' : '') +
       '</section>';
@@ -774,7 +780,7 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
         '<p>قدامه ' + plural(c.daysLeft, 'يوم واحد', 'يوم') + '. فريقك ماشي كويس، كمّل.</p></div></div></section>';
     }
     return '<section class="card coach"><div class="coach-head"><span class="coach-ico">' + icon('plus') + '</span><div>' +
-      '<h3>كل طيار جديد = لحد ' + money(d.season.tiers[d.season.tiers.length - 1].bonus) + ' ج ليك</h3>' +
+      '<h3>كل طيار يشتغل من ترشيحك ممكن يكسّبك ' + money(d.season.tiers[d.season.tiers.length - 1].bonus) + ' ج</h3>' +
       '<p>فكّر في 3 أصحاب ممكن يشتغلوا، وابعتلهم لينكك النهارده.</p></div></div>' +
       '<button type="button" class="btn btn-primary btn-sm" data-go-view="profile">ابعت لينكك</button></section>';
   }
@@ -828,7 +834,7 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
     return '<section class="card hero" style="text-align:center">' +
         '<span class="eyebrow">ابدأ من هنا</span>' +
         '<div class="num total" style="justify-content:center"><span data-count="' + top.bonus + '">0</span><small>ج</small></div>' +
-        '<p style="margin:4px 0 0;font:700 16px var(--f-display)">تقدر تكسبهم على كل طيار ترشّحه</p>' +
+        '<p style="margin:4px 0 0;font:700 16px var(--f-display)">ممكن تكسبهم عن كل طيار ترشّحه ويشتغل</p>' +
       '</section>' +
       '<section class="card onboard"><h2 class="section">إزاي تكسب في 3 خطوات</h2><ol>' +
         '<li><span><b>ابعت لينكك</b> لأي حد عايز يشتغل طيار. من "حسابي" بضغطة واحدة على واتساب.</span></li>' +
@@ -1169,7 +1175,9 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
     // (Apps Script can take several seconds to wake up).
     var saved = null;
     try { saved = JSON.parse(store('fs_boot') || 'null'); } catch (e) { saved = null; }
-    S.boot = saved || { zones: [], tiers: [{ orders: 850, bonus: 3000 }], windowMonths: 2 };
+    // Default = the poster's tiers (250→600 … 850→3000) until the server answers.
+    var DEF_TIERS = []; for (var o = 250, m = 600; o <= 850; o += 50, m += 200) DEF_TIERS.push({ orders: o, bonus: m });
+    S.boot = saved || { zones: [], tiers: DEF_TIERS, windowMonths: 2 };
     var bootReady = Backend.call('bootstrap', { ref: S.ref }).then(function (b) {
       if (b && b.ok) {
         S.boot = b.data;
