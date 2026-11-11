@@ -21,7 +21,9 @@ function sheetToday() {
     'New Applicants': [
       ['Timestamp', 'Referral Code', 'الاسم الرباعي', 'الموبايل', 'الرقم القومي', 'العنوان', 'المنطقة', 'انتهاء الرخصة', 'انتهاء البطاقة', 'تاريخ الميلاد', 'اللوحة', 'الحالة', 'ملاحظات الإدارة', 'لينك الترشيح'],
       ['11/3/2026 10:00:00', 1144077041, 'بلال محمد احمد', 1220211045, 29902020100012, 'x', 'Nasr city', '', '', '', '', 'قيد التعيين', '', ''],
-      ['11/4/2026 10:00:00', 4722422, 'مرشح قديم', 1000000009, 29903030100013, 'x', 'Maadi', '', '', '', '', 'استلم ونزل', '', '']
+      ['11/4/2026 10:00:00', 4722422, 'مرشح قديم', 1000000009, 29903030100013, 'x', 'Maadi', '', '', '', '', 'استلم ونزل', '', ''],
+      ['11/5/2026 10:00:00', 4722422, 'مرشح استعلام', 1000000010, 29904040100014, 'x', 'Maadi', '', '', '', '', 'اترفع استعلام', '', ''],
+      ['11/6/2026 10:00:00', 4722422, 'مرشح شركة تانية', 1000000011, 29905050100015, 'x', 'Maadi', '', '', '', '', 'شغال مع ال 4pl', 'عنده عقد', '']
     ],
     Passwords: [['Referral Code', 'Password'], [2638129, sha('1234')]],
     'External Partners': [['Phone Code', 'Name', 'Password'], ['', '', ''], [1144077041, 'احمد مختار شحاته', sha('partner99')]],
@@ -42,7 +44,11 @@ test('setup creates the new tabs, upgrades New Applicants, migrates accounts', (
   assert.ok(apps.rows[0].includes('آخر تحديث للحالة'));
   assert.equal(apps.rows[2][11], 'اشتغل');                        // "استلم ونزل" mapped
   assert.deepEqual([...apps.validations[12].list], ['جديد', 'تم التواصل', 'قيد التعيين', 'تم حضور المحاضرة', 'اشتغل', 'مرفوض']);
-  assert.equal(apps.formats[4], '@');                            // phone column is text
+  assert.equal(apps.formats[4], '@');
+  assert.equal(apps.rows[3][11], 'جديد');                           // "اترفع استعلام"
+  assert.equal(apps.rows[4][11], 'مرفوض');                          // "شغال مع ال 4pl"
+  assert.equal(apps.rows[4][12], 'عنده عقد | الحالة القديمة: شغال مع ال 4pl');
+  for (const t of ['Sessions', 'Passwords', 'External Partners']) assert.equal(env.sheets[t], undefined, t + ' deleted');                            // phone column is text
   const users = env.sheets['FS Users'].rows.slice(1);
   assert.equal(users.length, 2);
   assert.equal(users[1][3], '01144077041');                       // leading zero restored
@@ -51,6 +57,7 @@ test('setup creates the new tabs, upgrades New Applicants, migrates accounts', (
   assert.ok(report.length >= 4);
   // Running it again changes nothing.
   env.ctx.setupFullSpeed();
+  assert.equal(env.sheets['New Applicants'].rows[4][12], 'عنده عقد | الحالة القديمة: شغال مع ال 4pl');
   assert.equal(env.sheets['FS Users'].rows.length, 3);
   assert.equal(env.triggers.length, 3);
 });
@@ -122,7 +129,7 @@ test('session restore, candidate submission, duplicate block, logout', () => {
   assert.equal(col('تاريخ الميلاد'), '1998-05-05');                 // read from the national ID
   assert.equal(col('العنوان'), '=HYPERLINK("x")');                   // stored as text, not a formula (apostrophe consumed)
   assert.match(col('لينك الترشيح'), /raf_4722422$/);
-  assert.equal(sub.data.dashboard.pipeline.length, 2);              // + the November one already in the sheet
+  assert.equal(sub.data.dashboard.pipeline.length, 4);              // + the three November ones already in the sheet
   assert.equal(sub.data.dashboard.pipeline[0].name, 'محمود علي حسن');
 
   const dupe = env.api('submitCandidate', { token, form });

@@ -248,6 +248,7 @@ function setupFullSpeed() {
 
     report = report.concat(upgradeApplicants_());
     report = report.concat(migrateLegacyUsers_());
+    report = report.concat(removeLegacyTabs_());
     report = report.concat(installTriggers_());
 
     log_('setup', report.join(' | '));
@@ -303,15 +304,28 @@ function upgradeApplicants_() {
   var last = sh.getLastRow();
   if (last >= 2) {
     var col = sh.getRange(2, map.status + 1, last - 1, 1);
-    var vals = col.getValues(), changed = 0, unknown = {};
-    vals.forEach(function (r) {
-      var n = normalizeStatus(r[0]);
-      if (!n) { unknown[r[0]] = true; return; }
-      if (n !== r[0]) { r[0] = n; changed++; }
+    var noteCol = sh.getRange(2, map.note + 1, last - 1, 1);
+    var vals = col.getValues(), notes = noteCol.getValues(), changed = 0, guessed = {};
+    vals.forEach(function (r, i) {
+      var raw = r[0];
+      var n = normalizeStatus(raw);
+      if (!n) {
+        // Unknown wording: pick the closest stage and keep the original text in the notes.
+        n = guessStatus(raw);
+        guessed[raw] = n;
+        var keep = 'الحالة القديمة: ' + cleanText(raw);
+        if (String(notes[i][0]).indexOf(keep) === -1) notes[i][0] = notes[i][0] ? notes[i][0] + ' | ' + keep : keep;
+      }
+      if (n !== raw) { r[0] = n; changed++; }
     });
-    if (changed) { col.setValues(vals); report.push('اتظبطت ' + changed + ' حالة قديمة على الحالات الجديدة'); }
-    var unk = Object.keys(unknown);
-    if (unk.length) report.push('حالات مش معروفة سبتها زي ما هي (راجعها بإيدك): ' + unk.join('، '));
+    if (changed) {
+      col.setValues(vals);
+      noteCol.setValues(notes);
+      report.push('اتظبطت ' + changed + ' حالة قديمة على الحالات الجديدة');
+    }
+    var g = Object.keys(guessed);
+    if (g.length) report.push('حالات قديمة اتحوّلت (والكلام الأصلي اتحفظ في ملاحظات الإدارة): ' +
+      g.map(function (k) { return k + ' ← ' + guessed[k]; }).join('، '));
   }
   sh.getRange(2, map.status + 1, sh.getMaxRows() - 1, 1).setDataValidation(
     SpreadsheetApp.newDataValidation().requireValueInList(STATUSES, true).setAllowInvalid(false)
@@ -363,6 +377,41 @@ function migrateLegacyUsers_() {
     sh.getRange(sh.getLastRow() + 1, 1, rows.length, USER_HEADERS_.length).setValues(rows);
   }
   return rows.length ? ['اتنقل ' + rows.length + ' حساب قديم لتاب ' + TABS.USERS + ' (بنفس كلمات المرور)'] : [];
+}
+
+/**
+ * Deletes the old program's tabs once they are no longer needed:
+ *  - Sessions: old login tokens in plain text — useless now and a risk.
+ *  - Passwords / External Partners: only after checking that every account
+ *    in them already exists in FS Users.
+ */
+function removeLegacyTabs_() {
+  var report = [];
+  var users = readUsers_();
+  var have = {};
+  users.forEach(function (u) { have[u.type + ':' + (u.type === 'external' ? u.phone : u.code)] = true; });
+
+  function drop(name, allMigrated) {
+    var sh = tab_(name);
+    if (!sh) return;
+    if (!allMigrated) { report.push('سبت تاب ' + name + ' لأن فيه حسابات لسه ما اتنقلتش'); return; }
+    ss_().deleteSheet(sh);
+    report.push('اتمسح التاب القديم ' + name);
+  }
+
+  var passOk = values_(TABS.LEGACY_PASSWORDS).slice(1).every(function (r) {
+    var code = cleanCode(r[0]);
+    return !code || !cleanText(r[1]) || have['internal:' + code];
+  });
+  var partnersOk = values_(TABS.LEGACY_PARTNERS).slice(1).every(function (r) {
+    var phone = canonicalPhone(r[0]);
+    return !phone || !cleanText(r[2]) || have['external:' + phone];
+  });
+
+  drop(TABS.LEGACY_SESSIONS, true);
+  drop(TABS.LEGACY_PASSWORDS, passOk);
+  drop(TABS.LEGACY_PARTNERS, partnersOk);
+  return report;
 }
 
 function installTriggers_() {

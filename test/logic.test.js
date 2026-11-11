@@ -58,6 +58,14 @@ test('status spellings and old values map onto the new pipeline', () => {
   assert.equal(L.normalizeStatus('حالة مش معروفة'), '');
 });
 
+test('unknown wording from the live sheet gets the closest stage', () => {
+  assert.equal(L.guessStatus('اترفع استعلام'), 'جديد');
+  assert.equal(L.guessStatus('شغال مع ال 4pl'), 'مرفوض');
+  assert.equal(L.guessStatus('شغال مع شركة تانية'), 'مرفوض');
+  assert.equal(L.guessStatus('كلمناه امبارح'), 'تم التواصل');
+  assert.equal(L.guessStatus('حاجة غريبة'), 'جديد');
+});
+
 test('formula injection is neutralised', () => {
   assert.equal(L.safeCell('=IMPORTXML("http://x")'), '\'=IMPORTXML("http://x")');
   assert.equal(L.safeCell('محمد'), 'محمد');

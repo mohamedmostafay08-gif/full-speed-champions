@@ -865,6 +865,23 @@ function normalizeStatus(raw) {
   return STATUS_KEYS_[key] || '';
 }
 
+/**
+ * Closest stage for wording that isn't in the list (typed by hand in the
+ * old sheet). Order matters: "شغال مع ال 4pl" is about another company,
+ * not about working with us.
+ */
+function guessStatus(raw) {
+  var k = headerKey(raw);
+  if (!k) return STATUSES[0];
+  if (/[34]pl|شركه(تانيه|اخري)|مكان(تاني|اخر)/.test(k)) return STATUS_REJECTED;
+  if (/رفض|مرفوض|معلق|ملغي|الغاء|مش(عايز|مهتم)/.test(k)) return STATUS_REJECTED;
+  if (/محاضر/.test(k)) return 'تم حضور المحاضرة';
+  if (/تعيين|تعين/.test(k)) return 'قيد التعيين';
+  if (/تواصل|كلمناه|اتكلم/.test(k)) return 'تم التواصل';
+  if (/شغال|اشتغل|استلم|نزل/.test(k)) return STATUS_HIRED;
+  return STATUSES[0];   // استعلام / استمارة / anything else → still at the start
+}
+
 /* ───────────────────────────── Config ─────────────────────────────── */
 
 /** Merges "FS Config" rows over CONFIG_DEFAULTS and parses the types. */
@@ -932,7 +949,7 @@ function buildWorld(raw, cfg, today) {
       nationalId: nid ? nid.id : cleanText(a.nationalId).replace(/\D/g, ''),
       zone: cleanText(a.zone),
       rawStatus: cleanText(a.status),
-      status: normalizeStatus(a.status),
+      status: normalizeStatus(a.status) || guessStatus(a.status),
       note: cleanText(a.note),
       statusUpdated: parseSheetDate(a.statusUpdated, opts),
       hiredCode: cleanCode(a.hiredCode)
@@ -1185,7 +1202,7 @@ function identityIndexFor(world) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
-    cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, resolveConfig: resolveConfig,
+    cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
     buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, buildDashboard: buildDashboard,
     findNewlyHired: findNewlyHired, validateCandidate: validateCandidate
   };
