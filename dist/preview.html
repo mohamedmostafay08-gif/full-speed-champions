@@ -2162,15 +2162,35 @@ if (typeof module !== 'undefined' && module.exports) {
 
   (async function start() {
     var token = store('fs_token');
-    if (token) skeleton(); else app.innerHTML = '<section class="auth">' + brand() + '<p class="muted" style="text-align:center">بنجهّز…</p></section>';
     S.ref = await Backend.ref();
-    var boot = await Backend.call('bootstrap', { ref: S.ref });
-    S.boot = boot && boot.ok ? boot.data : { zones: [], tiers: [{ orders: 850, bonus: 3000 }] };
-    if (S.ref) { renderPublicApply(); return; }
+
+    // Zones and tiers from the last visit, so nothing waits for the server
+    // (Apps Script can take several seconds to wake up).
+    var saved = null;
+    try { saved = JSON.parse(store('fs_boot') || 'null'); } catch (e) { saved = null; }
+    S.boot = saved || { zones: [], tiers: [{ orders: 850, bonus: 3000 }], windowMonths: 2 };
+    var bootReady = Backend.call('bootstrap', { ref: S.ref }).then(function (b) {
+      if (b && b.ok) {
+        S.boot = b.data;
+        store('fs_boot', JSON.stringify({ zones: b.data.zones, tiers: b.data.tiers, windowMonths: b.data.windowMonths, appUrl: b.data.appUrl, support: b.data.support }));
+        // Fill the zone list of a form that is already open.
+        document.querySelectorAll('select[name=zone]').forEach(function (sel) {
+          if (sel.options.length > 1) return;
+          (b.data.zones || []).forEach(function (z) { var o = document.createElement('option'); o.textContent = z; sel.appendChild(o); });
+        });
+      }
+      return b;
+    });
+
+    if (S.ref) {
+      app.innerHTML = '<section class="auth">' + brand() + '<p class="muted" style="text-align:center">بنجهّز الاستمارة…</p></section>';
+      await bootReady; renderPublicApply(); return;   // needs the referrer's name
+    }
     if (token) {
+      skeleton();
       var res = await Backend.call('session', { token: token });
       if (res && res.ok) { S.token = token; S.dash = res.data.dashboard; renderApp(); celebrateOnce(); return; }
-      store('fs_token', null);
+      if (res && res.error === 'SESSION_EXPIRED') store('fs_token', null);
     }
     renderAuth();
   })();
