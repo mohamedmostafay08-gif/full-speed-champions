@@ -52,7 +52,9 @@ test('status spellings and old values map onto the new pipeline', () => {
   assert.equal(L.normalizeStatus('شغال'), 'اشتغل');
   assert.equal(L.normalizeStatus('استلم ونزل'), 'اشتغل');
   assert.equal(L.normalizeStatus(''), 'جديد');
-  assert.equal(L.normalizeStatus('ارفع استمارة'), '');
+  assert.equal(L.normalizeStatus('ارفع استمارة'), 'جديد');
+  assert.equal(L.normalizeStatus('ارفع استماره'), 'جديد');
+  assert.equal(L.normalizeStatus('حالة مش معروفة'), '');
 });
 
 test('formula injection is neutralised', () => {
