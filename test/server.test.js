@@ -176,6 +176,22 @@ test('installable app: doPost speaks the same API as JSON', () => {
   assert.ok(env.sheets['FS Config'].rows.some((r) => r[0] === 'PUBLIC_APP_URL'));
 });
 
+test('Google link reads the interface from GitHub, falls back to the local copy', () => {
+  const { env } = ready();
+  const remote = '<title>Full Speed Champions</title>' + 'x'.repeat(150000) + 'google.script';
+  env.ctx.__remote = () => ({ getResponseCode: () => 200, getContentText: () => remote });
+  assert.equal(env.api('bootstrap', {}).ok, true);
+  env.ctx.SS_ = null; env.ctx.CFG_ = null;
+  assert.equal(env.ctx.doGet().html, remote);
+  assert.equal(env.ctx.doGet().html, remote);              // second load comes from the cache
+  assert.equal(env.ctx.__fetched, 1);
+  env.cache.clear();
+  env.ctx.__remote = () => ({ getResponseCode: () => 404, getContentText: () => 'Not Found' });
+  assert.match(env.ctx.doGet().html, /^LOCAL/);
+  env.ctx.__remote = () => { throw new Error('offline'); };
+  assert.match(env.ctx.doGet().html, /^LOCAL/);
+});
+
 test('errors never leak internals', () => {
   const { env } = ready();
   delete env.sheets['FS Sessions'];

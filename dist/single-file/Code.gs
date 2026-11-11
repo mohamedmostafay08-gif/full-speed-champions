@@ -30,7 +30,9 @@ var CONFIG_DEFAULTS = {
   PUBLIC_APPLY_PER_HOUR: 30,          // per referral link
   MIN_PASSWORD_LENGTH: 6,
   SUPPORT_WHATSAPP: '201097865980',
-  PUBLIC_APP_URL: 'https://mohamedmostafay08-gif.github.io/full-speed-champions/'  // the installable app (GitHub Pages)
+  PUBLIC_APP_URL: 'https://mohamedmostafay08-gif.github.io/full-speed-champions/',  // the installable app (GitHub Pages)
+  // Where the Google link reads its interface from. Empty = use the Index.html saved in Apps Script.
+  UI_SOURCE_URL: 'https://raw.githubusercontent.com/mohamedmostafay08-gif/full-speed-champions/main/dist/single-file/Index.html'
 };
 
 /** Tab names. Existing tabs keep their current names. */
@@ -1152,7 +1154,7 @@ function setupFullSpeed() {
     var missing = Object.keys(CONFIG_DEFAULTS).filter(function (k) { return haveKeys.indexOf(k) === -1; });
     if (missing.length) {
       cfgSheet.getRange(cfgSheet.getLastRow() + 1, 1, missing.length, 3)
-        .setValues(missing.map(function (k) { return [k, CONFIG_DEFAULTS[k], k === 'PUBLIC_APP_URL' ? 'لينك التطبيق على GitHub Pages — ده اللي بيتبعت للمرشحين' : '']; }));
+        .setValues(missing.map(function (k) { return [k, CONFIG_DEFAULTS[k], k === 'PUBLIC_APP_URL' ? 'لينك التطبيق على GitHub Pages — ده اللي بيتبعت للمرشحين' : k === 'UI_SOURCE_URL' ? 'لينك Google بياخد الواجهة من هنا (GitHub). فاضي = النسخة اللي في Apps Script' : '']; }));
       report.push('إعدادات جديدة اتضافت لـ ' + TABS.CONFIG + ': ' + missing.join('، '));
     }
 
@@ -1566,9 +1568,40 @@ function cleanupSessions() {
  */
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
+  return HtmlService.createHtmlOutput(pageHtml_())
     .setTitle('Full Speed Champions')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+}
+
+/**
+ * The interface is read from GitHub (UI_SOURCE_URL in FS Config), so a push
+ * to the repo updates the Google link too — no pasting. Cached 10 minutes.
+ * If GitHub can't be reached, or the file looks wrong, the Index.html saved
+ * in this project is used instead, so the app never goes down.
+ */
+var UI_MARKER_ = 'Full Speed Champions';
+
+function pageHtml_() {
+  var url = '';
+  try { url = String(loadConfig_().UI_SOURCE_URL || '').trim(); } catch (e) { /* config unreadable → local file */ }
+  if (url) {
+    var cache = CacheService.getScriptCache();
+    var parts = cache.getAll(['ui:0', 'ui:1', 'ui:2', 'ui:3']);
+    var cached = ['ui:0', 'ui:1', 'ui:2', 'ui:3'].map(function (k) { return parts[k] || ''; }).join('');
+    if (cached.indexOf(UI_MARKER_) !== -1) return cached;
+    try {
+      var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+      var html = res.getResponseCode() === 200 ? res.getContentText('UTF-8') : '';
+      if (html.indexOf(UI_MARKER_) !== -1 && html.indexOf('google.script') !== -1) {
+        // CacheService holds at most 100 KB per key: store the page in chunks.
+        var size = 90000, chunks = {};
+        for (var i = 0; i * size < html.length && i < 4; i++) chunks['ui:' + i] = html.slice(i * size, (i + 1) * size);
+        if (html.length <= size * 4) cache.putAll(chunks, 600);
+        return html;
+      }
+    } catch (e) { /* GitHub unreachable → local file */ }
+  }
+  return HtmlService.createHtmlOutputFromFile('Index').getContent();
 }
 
 /**

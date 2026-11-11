@@ -103,14 +103,20 @@ function makeEnv(tabs) {
       formatDate: (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
     },
     Session: { getScriptTimeZone: () => 'Africa/Cairo' },
-    CacheService: { getScriptCache: () => ({ get: (k) => cache.get(k) ?? null, put: (k, v) => cache.set(k, v), remove: (k) => cache.delete(k) }) },
+    CacheService: { getScriptCache: () => ({ get: (k) => cache.get(k) ?? null, put: (k, v) => cache.set(k, v), remove: (k) => cache.delete(k),
+      getAll: (ks) => Object.fromEntries(ks.filter((k) => cache.has(k)).map((k) => [k, cache.get(k)])),
+      putAll: (o) => Object.entries(o).forEach(([k, v]) => cache.set(k, v)) }) },
     LockService: { getScriptLock: () => ({ tryLock: () => true, waitLock() {}, releaseLock() {} }) },
     ScriptApp: {
       getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/TEST/exec' }),
       getProjectTriggers: () => triggers,
       newTrigger: (fn) => { const t = { getHandlerFunction: () => fn }; const chain = new Proxy({}, { get: (_, k) => k === 'create' ? () => triggers.push(t) : () => chain }); return chain; }
     },
-    HtmlService: {},
+    HtmlService: {
+      createHtmlOutputFromFile: () => ({ getContent: () => 'LOCAL Full Speed Champions google.script' }),
+      createHtmlOutput: (h) => { const o = { html: h, setTitle: () => o, addMetaTag: () => o }; return o; }
+    },
+    UrlFetchApp: { fetch: (url) => { g.__fetched = (g.__fetched || 0) + 1; return g.__remote(url); } },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (t) => ({ text: t, setMimeType() { return this; } }) }
   };
   const ctx = vm.createContext(g);

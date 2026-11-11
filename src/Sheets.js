@@ -225,7 +225,7 @@ function setupFullSpeed() {
     var missing = Object.keys(CONFIG_DEFAULTS).filter(function (k) { return haveKeys.indexOf(k) === -1; });
     if (missing.length) {
       cfgSheet.getRange(cfgSheet.getLastRow() + 1, 1, missing.length, 3)
-        .setValues(missing.map(function (k) { return [k, CONFIG_DEFAULTS[k], k === 'PUBLIC_APP_URL' ? 'لينك التطبيق على GitHub Pages — ده اللي بيتبعت للمرشحين' : '']; }));
+        .setValues(missing.map(function (k) { return [k, CONFIG_DEFAULTS[k], k === 'PUBLIC_APP_URL' ? 'لينك التطبيق على GitHub Pages — ده اللي بيتبعت للمرشحين' : k === 'UI_SOURCE_URL' ? 'لينك Google بياخد الواجهة من هنا (GitHub). فاضي = النسخة اللي في Apps Script' : '']; }));
       report.push('إعدادات جديدة اتضافت لـ ' + TABS.CONFIG + ': ' + missing.join('، '));
     }
 

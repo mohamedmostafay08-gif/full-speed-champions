@@ -6,9 +6,40 @@
  */
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
+  return HtmlService.createHtmlOutput(pageHtml_())
     .setTitle('Full Speed Champions')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+}
+
+/**
+ * The interface is read from GitHub (UI_SOURCE_URL in FS Config), so a push
+ * to the repo updates the Google link too — no pasting. Cached 10 minutes.
+ * If GitHub can't be reached, or the file looks wrong, the Index.html saved
+ * in this project is used instead, so the app never goes down.
+ */
+var UI_MARKER_ = 'Full Speed Champions';
+
+function pageHtml_() {
+  var url = '';
+  try { url = String(loadConfig_().UI_SOURCE_URL || '').trim(); } catch (e) { /* config unreadable → local file */ }
+  if (url) {
+    var cache = CacheService.getScriptCache();
+    var parts = cache.getAll(['ui:0', 'ui:1', 'ui:2', 'ui:3']);
+    var cached = ['ui:0', 'ui:1', 'ui:2', 'ui:3'].map(function (k) { return parts[k] || ''; }).join('');
+    if (cached.indexOf(UI_MARKER_) !== -1) return cached;
+    try {
+      var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+      var html = res.getResponseCode() === 200 ? res.getContentText('UTF-8') : '';
+      if (html.indexOf(UI_MARKER_) !== -1 && html.indexOf('google.script') !== -1) {
+        // CacheService holds at most 100 KB per key: store the page in chunks.
+        var size = 90000, chunks = {};
+        for (var i = 0; i * size < html.length && i < 4; i++) chunks['ui:' + i] = html.slice(i * size, (i + 1) * size);
+        if (html.length <= size * 4) cache.putAll(chunks, 600);
+        return html;
+      }
+    } catch (e) { /* GitHub unreachable → local file */ }
+  }
+  return HtmlService.createHtmlOutputFromFile('Index').getContent();
 }
 
 /**
