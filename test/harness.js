@@ -113,8 +113,13 @@ function makeEnv(tabs) {
   };
   const ctx = vm.createContext(g);
   const dir = path.join(__dirname, '..', 'src');
-  for (const f of ['Config.js', 'Core.js', 'Logic.js', 'Sheets.js', 'Auth.js', 'Code.js']) {
-    vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
+  if (process.env.FS_SINGLE) {
+    // Run the combined dist/single-file/Code.gs exactly as it will be pasted.
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'dist', 'single-file', 'Code.gs'), 'utf8'), ctx, { filename: 'Code.gs' });
+  } else {
+    for (const f of ['Config.js', 'Core.js', 'Logic.js', 'Sheets.js', 'Auth.js', 'Code.js']) {
+      vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
+    }
   }
   // Each api() call is a fresh Apps Script execution: per-request memo is reset.
   const api = (action, payload) => { vm.runInContext('SS_ = null; WORLD_ = null; CFG_ = null;', ctx); return ctx.api(action, payload); };
