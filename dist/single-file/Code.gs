@@ -32,6 +32,8 @@ var CONFIG_DEFAULTS = {
   SUPPORT_WHATSAPP: '201120339097',
   PUBLIC_APP_URL: 'https://mohamedmostafay08-gif.github.io/full-speed-champions/',  // the installable app (GitHub Pages)
   // Where the Google link reads its interface from. Empty = use the Index.html saved in Apps Script.
+  ANNOUNCEMENT: '',                   // banner shown to every rider in the app (empty = none)
+  REPORT_EMAILS: '',                  // comma-separated: who gets the daily report email
   UI_SOURCE_URL: 'https://raw.githubusercontent.com/mohamedmostafay08-gif/full-speed-champions/main/dist/single-file/Index.html'
 };
 
@@ -46,6 +48,10 @@ var TABS = {
   CONFIG: 'FS Config',
   TIERS: 'FS Bonus Tiers',
   LOG: 'FS Log',
+  ADMINS: 'FS Admins',                // the operations team (admin dashboard accounts)
+  PAYOUTS: 'FS Payouts',              // one row per bonus paid
+  AUDIT: 'FS Audit',                  // who changed what, from the admin dashboard
+  CAMPAIGNS: 'FS Campaigns',          // extra-bonus campaigns
   // Legacy tabs, read once by the migration and then left untouched.
   LEGACY_PASSWORDS: 'Passwords',
   LEGACY_PARTNERS: 'External Partners',
@@ -115,6 +121,18 @@ var COLUMNS = {
     created: ['Created'],
     lastLogin: ['Last Login']
   },
+  ADMINS: {
+    username: ['Username'], name: ['Name'], role: ['Role'], hash: ['Password Hash'],
+    status: ['Status'], mustChange: ['Must Change Password'], created: ['Created'], lastLogin: ['Last Login']
+  },
+  PAYOUTS: {
+    id: ['Payout ID'], riderCode: ['Rider Code'], riderName: ['Rider Name'], ownerKey: ['Referrer'],
+    ownerName: ['Referrer Name'], amount: ['Amount'], method: ['Method'], reference: ['Reference'],
+    note: ['Note'], paidBy: ['Paid By'], paidAt: ['Paid At']
+  },
+  CAMPAIGNS: {
+    id: ['Campaign ID'], name: ['Name'], start: ['Start'], end: ['End'], zone: ['Zone'], extra: ['Extra Bonus'], active: ['Active']
+  },
   SESSIONS: {
     tokenHash: ['Token Hash'],
     code: ['Code'],
@@ -133,6 +151,26 @@ var STATUSES = ['جديد', 'تم التواصل', 'قيد التعيين', 'ت�
 var STATUS_HIRED = 'اشتغل';
 var STATUS_REJECTED = 'مرفوض';
 
+/**
+ * Admin roles. Each permission lists the roles allowed to do it; every
+ * role can read the dashboard.
+ */
+var ROLES = {
+  owner: 'مدير',
+  recruiter: 'فريق التعيينات',
+  finance: 'الحسابات',
+  viewer: 'مشاهد'
+};
+var PERMISSIONS = {
+  'applicants.edit': ['owner', 'recruiter'],
+  'users.edit': ['owner', 'recruiter'],
+  'payouts.edit': ['owner', 'finance'],
+  'campaigns.edit': ['owner'],
+  'settings.edit': ['owner'],
+  'team.edit': ['owner']
+};
+var PAYOUT_METHODS = ['كاش', 'فودافون كاش', 'إنستاباي', 'تحويل بنكي', 'مع المرتب', 'أخرى'];
+
 /** Values found in the old sheet, mapped onto the new pipeline. */
 var LEGACY_STATUS_MAP = {
   'ارفع استمارة': 'جديد',            // candidate just recruited, form not processed yet
@@ -146,7 +184,7 @@ var LEGACY_STATUS_MAP = {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     APP: APP, CONFIG_DEFAULTS: CONFIG_DEFAULTS, TABS: TABS, COLUMNS: COLUMNS,
-    STATUSES: STATUSES, STATUS_HIRED: STATUS_HIRED, STATUS_REJECTED: STATUS_REJECTED,
+    STATUSES: STATUSES, ROLES: ROLES, PERMISSIONS: PERMISSIONS, PAYOUT_METHODS: PAYOUT_METHODS, STATUS_HIRED: STATUS_HIRED, STATUS_REJECTED: STATUS_REJECTED,
     LEGACY_STATUS_MAP: LEGACY_STATUS_MAP
   };
 }
@@ -691,11 +729,75 @@ function buildWorld(raw, cfg, today) {
   applicants.slice().sort(function (a, b) { return (a.timestamp || 0) - (b.timestamp || 0); })
     .forEach(function (a) { if (a.phone && !appsByPhone[a.phone]) appsByPhone[a.phone] = a; });
 
+  var campaigns = (raw.campaigns || []).map(function (c) {
+    return {
+      id: cleanText(c.id), name: cleanText(c.name), zone: cleanText(c.zone),
+      start: parseSheetDate(c.start, opts), end: parseSheetDate(c.end, opts),
+      extra: Math.max(0, parseInt(String(c.extra).replace(/[^\d]/g, ''), 10) || 0),
+      active: !/^(لا|no|false|0|off)$/i.test(cleanText(c.active))
+    };
+  }).filter(function (c) { return c.name && c.start && c.end && c.extra > 0; });
+
+  var payoutsByCode = {};
+  (raw.payouts || []).forEach(function (p) {
+    var code = cleanCode(p.riderCode);
+    if (!code) return;
+    (payoutsByCode[code] = payoutsByCode[code] || []).push({
+      id: cleanText(p.id), amount: Number(String(p.amount).replace(/[^\d.]/g, '')) || 0,
+      method: cleanText(p.method), reference: cleanText(p.reference), note: cleanText(p.note),
+      paidBy: cleanText(p.paidBy), paidAt: parseSheetDate(p.paidAt, opts), row: p._row
+    });
+  });
+
   return {
     cfg: cfg, today: dateOnly(today),
     riders: riders, headcount: headcount, applicants: applicants, dailyOrders: dailyOrders,
     ridersByPhone: ridersByPhone, ridersByCode: ridersByCode, headcountByCode: headcountByCode,
-    appsByPhone: appsByPhone
+    appsByPhone: appsByPhone, campaigns: campaigns, payoutsByCode: payoutsByCode
+  };
+}
+
+/** Extra bonus from active campaigns: hire date inside the campaign, zone matches (or campaign is for all zones). */
+function campaignExtra(rider, world) {
+  var extra = 0, names = [];
+  (world.campaigns || []).forEach(function (c) {
+    if (!c.active || !rider.hireDate || rider.hireDate < c.start || rider.hireDate > c.end) return;
+    if (c.zone && headerKey(c.zone) !== headerKey(rider.zone)) return;
+    extra += c.extra; names.push(c.name);
+  });
+  return { extra: extra, names: names };
+}
+
+/**
+ * One hired rider, fully evaluated: bonus (tiers + campaigns), window,
+ * and payout state. Used by both the rider app and the admin dashboard.
+ *
+ * payStatus: 'paid' | 'due' (window over or max reached, not paid yet) | 'pending' | 'none' (no bonus earned)
+ */
+function evaluateRider(r, world) {
+  var cfg = world.cfg;
+  var ev = evaluateReferral({
+    hireDate: r.hireDate,
+    dailyOrders: world.dailyOrders[r.code] || [],
+    totalOrders: r.orders,
+    today: world.today,
+    tiers: cfg.TIERS,
+    windowMonths: cfg.BONUS_WINDOW_MONTHS
+  });
+  var camp = ev.bonus > 0 ? campaignExtra(r, world) : { extra: 0, names: [] };
+  var payouts = (world.payoutsByCode && world.payoutsByCode[r.code]) || [];
+  var paid = payouts.reduce(function (s, p) { return s + p.amount; }, 0);
+  var total = ev.bonus + camp.extra;
+  var finished = ev.state === 'maxed' || ev.state === 'closed';
+  var payStatus = paid > 0 && paid >= total ? 'paid' : total <= 0 ? (finished ? 'none' : 'pending') : finished ? 'due' : 'pending';
+  return {
+    code: r.code, name: r.name, zone: r.zone, phone: r.phone, vehicle: r.vehicle,
+    hireDate: ev.hireDate, lastDay: ev.lastDay, payoutDate: ev.payoutDate,
+    orders: ev.orders, tierBonus: ev.bonus, extra: camp.extra, campaigns: camp.names, bonus: total,
+    state: ev.state, daysLeft: ev.daysLeft, ordersToNext: ev.ordersToNext, progress: ev.progress,
+    nextBonus: ev.nextTier ? ev.nextTier.bonus + camp.extra : null, nextOrders: ev.nextTier ? ev.nextTier.orders : null,
+    ordersSource: ev.ordersSource,
+    paid: paid, payStatus: payStatus, payouts: payouts
   };
 }
 
@@ -743,21 +845,9 @@ function buildDashboard(world, user) {
   var team = world.riders
     .filter(function (r) { return r.hireDate && r.hireDate >= start && r.code !== key && riderOwner(r, world) === key; })
     .map(function (r) {
-      var ev = evaluateReferral({
-        hireDate: r.hireDate,
-        dailyOrders: world.dailyOrders[r.code] || [],
-        totalOrders: r.orders,
-        today: today,
-        tiers: cfg.TIERS,
-        windowMonths: cfg.BONUS_WINDOW_MONTHS
-      });
-      return {
-        code: r.code, name: r.name, zone: r.zone, phone: r.phone, vehicle: r.vehicle,
-        hireDate: ev.hireDate, lastDay: ev.lastDay, payoutDate: ev.payoutDate,
-        orders: ev.orders, bonus: ev.bonus, state: ev.state, daysLeft: ev.daysLeft,
-        ordersToNext: ev.ordersToNext, progress: ev.progress,
-        nextBonus: ev.nextTier ? ev.nextTier.bonus : null, nextOrders: ev.nextTier ? ev.nextTier.orders : null
-      };
+      var e = evaluateRider(r, world);
+      delete e.payouts;
+      return e;
     })
     .sort(function (a, b) {
       var rank = { active: 0, upcoming: 1, maxed: 2, closed: 3 };
@@ -784,7 +874,7 @@ function buildDashboard(world, user) {
     .sort(function (a, b) { return b.submitted - a.submitted; });
 
   // ── Totals ──
-  var totals = { bonus: 0, payable: 0, pending: 0, orders: 0, riders: team.length, active: 0, maxed: 0, closed: 0 };
+  var totals = { bonus: 0, payable: 0, pending: 0, paid: 0, orders: 0, riders: team.length, active: 0, maxed: 0, closed: 0 };
   var nextPayout = null;
   team.forEach(function (t) {
     totals.bonus += t.bonus;
@@ -792,8 +882,9 @@ function buildDashboard(world, user) {
     if (t.state === 'active' || t.state === 'upcoming') { totals.active++; totals.pending += t.bonus; }
     if (t.state === 'maxed') totals.maxed++;
     if (t.state === 'closed') totals.closed++;
-    if (t.state === 'maxed' || t.state === 'closed') totals.payable += t.bonus;
-    if (t.bonus > 0 && t.payoutDate >= today && (!nextPayout || t.payoutDate < nextPayout)) nextPayout = t.payoutDate;
+    if (t.payStatus === 'due') totals.payable += t.bonus - t.paid;
+    totals.paid += t.paid;
+    if (t.bonus > 0 && t.payStatus !== 'paid' && t.payoutDate >= today && (!nextPayout || t.payoutDate < nextPayout)) nextPayout = t.payoutDate;
   });
   totals.nextPayout = nextPayout;
   totals.applicants = pipeline.length;
@@ -811,6 +902,7 @@ function buildDashboard(world, user) {
       nudgeAfterDays: cfg.NUDGE_AFTER_DAYS
     },
     statuses: STATUSES,
+    announcement: cleanText(cfg.ANNOUNCEMENT),
     today: today
   };
 }
@@ -837,6 +929,136 @@ function buildProfile(world, user) {
     vehicle: r.vehicle || h.vehicle || '',
     talabatLink: cfg.TALABAT_REF_BASE + code,
     refParam: code
+  };
+}
+
+/* ─────────────────────────── Admin data ───────────────────────────── */
+
+var FLAG_LABELS = {
+  self: 'رشّح نفسه',
+  burst: 'ترشيحات كتير في يوم واحد',
+  dupe: 'نفس الرقم أو الرقم القومي متكرر',
+  known: 'كان شغال عندنا قبل كده',
+  quiet: 'اتعين ومش بيشتغل'
+};
+
+/**
+ * Everything the admin dashboard needs, as flat lists. Analytics are
+ * computed in the browser from these, so date filters are instant.
+ *
+ * users: rows from FS Users (readUsers_ shape).
+ */
+function buildAdminData(world, users) {
+  var cfg = world.cfg, today = world.today;
+
+  // ── Who is who: registered users, plus Talabat referrers who never signed up ──
+  var people = {};
+  (users || []).forEach(function (u) {
+    var key = u.type === 'external' ? u.phone : u.code;
+    if (!key) return;
+    people[key] = {
+      key: key, type: u.type, code: u.code, name: u.name, phone: u.phone, refId: u.refId || '',
+      status: u.status || 'active', registered: true, created: u.created || null, lastLogin: u.lastLogin || null,
+      applicants: 0, hires: 0, active: 0, bonus: 0, paid: 0, due: 0, orders: 0
+    };
+  });
+  function person(key) {
+    if (!key) return null;
+    if (!people[key]) {
+      var r = world.ridersByCode[key] || world.headcountByCode[key] || {};
+      var phone = canonicalPhone(key);
+      people[key] = {
+        key: key, type: phone ? 'external' : 'internal', code: phone ? '' : key, name: r.name || '', phone: phone || r.phone || '',
+        refId: '', status: 'active', registered: false, created: null, lastLogin: null,
+        applicants: 0, hires: 0, active: 0, bonus: 0, paid: 0, due: 0, orders: 0
+      };
+    }
+    var p = people[key];
+    if (!p.name) { var rr = world.ridersByCode[key] || world.headcountByCode[key]; if (rr) p.name = rr.name; }
+    if (!p.phone && !canonicalPhone(key)) { var hh = world.headcountByCode[key] || world.ridersByCode[key]; if (hh) p.phone = hh.phone; }
+    return p;
+  }
+
+  // ── Hired riders since the program start ──
+  var riders = world.riders.filter(function (r) { return r.hireDate && r.hireDate >= cfg.PROGRAM_START_DATE; }).map(function (r) {
+    var owner = riderOwner(r, world);
+    if (owner === r.code) owner = '';
+    var e = evaluateRider(r, world);
+    var p = person(owner);
+    var app = r.phone && world.appsByPhone[r.phone];
+    e.ownerKey = owner;
+    e.ownerName = p ? p.name : '';
+    e.ownerType = p ? p.type : '';
+    e.source = !owner ? 'none' : (r.referralCode && r.referralCode !== cfg.COMPANY_REF_CODE ? 'talabat' : 'app');
+    e.appliedOn = app ? app.timestamp : null;
+    e.daysToHire = app && app.timestamp ? Math.max(0, diffDays(app.timestamp, r.hireDate)) : null;
+    if (!owner) { e.bonus = 0; e.payStatus = 'none'; }
+    e.flags = [];
+    if (e.state === 'active' && diffDays(r.hireDate, today) >= 14 && e.orders === 0) e.flags.push('quiet');
+    if (p) {
+      p.hires++; p.orders += e.orders; p.bonus += e.bonus; p.paid += e.paid;
+      if (e.state === 'active' || e.state === 'upcoming') p.active++;
+      if (e.payStatus === 'due') p.due += e.bonus - e.paid;
+    }
+    return e;
+  });
+
+  // ── Applications ──
+  var byNid = {}, byPhone = {}, perRefDay = {};
+  world.applicants.forEach(function (a) {
+    if (a.nationalId) byNid[a.nationalId] = (byNid[a.nationalId] || 0) + 1;
+    if (a.phone) byPhone[a.phone] = (byPhone[a.phone] || 0) + 1;
+    var k = appOwnerKey(a.refCode) + '|' + (a.timestamp ? a.timestamp.getTime() : '');
+    perRefDay[k] = (perRefDay[k] || 0) + 1;
+  });
+  var headPhones = {};
+  world.headcount.forEach(function (h) { if (h.phone) headPhones[h.phone] = true; });
+
+  var applicants = world.applicants.map(function (a) {
+    var key = appOwnerKey(a.refCode);
+    var p = person(key);
+    var hired = a.phone && world.ridersByPhone[a.phone];
+    var status = hired ? STATUS_HIRED : (a.status || STATUSES[0]);
+    var since = a.statusUpdated || a.timestamp;
+    var waiting = since ? diffDays(since, today) : 0;
+    var flags = [];
+    if (p && a.phone && p.phone === a.phone) flags.push('self');
+    if ((perRefDay[key + '|' + (a.timestamp ? a.timestamp.getTime() : '')] || 0) >= 5) flags.push('burst');
+    if ((a.nationalId && byNid[a.nationalId] > 1) || (a.phone && byPhone[a.phone] > 1)) flags.push('dupe');
+    if (a.phone && headPhones[a.phone] && !hired) flags.push('known');
+    if (p) p.applicants++;
+    return {
+      row: a.row, submitted: a.timestamp, refKey: key, refName: p ? p.name : '', refType: p ? p.type : '',
+      name: a.name, phone: a.phone, nationalId: a.nationalId, zone: a.zone,
+      status: status, sheetStatus: a.rawStatus, note: a.note, statusUpdated: a.statusUpdated,
+      daysWaiting: waiting, stage: stageIndex(status),
+      hiredCode: hired ? hired.code : '', hiredDate: hired ? hired.hireDate : null,
+      nudge: status !== STATUS_HIRED && status !== STATUS_REJECTED && waiting >= cfg.NUDGE_AFTER_DAYS,
+      flags: flags
+    };
+  });
+
+  var payouts = [];
+  Object.keys(world.payoutsByCode || {}).forEach(function (code) {
+    world.payoutsByCode[code].forEach(function (p) {
+      var r = world.ridersByCode[code] || {};
+      payouts.push({ id: p.id, riderCode: code, riderName: r.name || '', amount: p.amount, method: p.method,
+        reference: p.reference, note: p.note, paidBy: p.paidBy, paidAt: p.paidAt });
+    });
+  });
+  payouts.sort(function (a, b) { return (b.paidAt || 0) - (a.paidAt || 0); });
+
+  return {
+    today: today,
+    season: { start: cfg.PROGRAM_START_DATE, windowMonths: cfg.BONUS_WINDOW_MONTHS, tiers: cfg.TIERS, nudgeAfterDays: cfg.NUDGE_AFTER_DAYS },
+    statuses: STATUSES,
+    flagLabels: FLAG_LABELS,
+    applicants: applicants,
+    riders: riders,
+    users: Object.keys(people).map(function (k) { return people[k]; }),
+    payouts: payouts,
+    campaigns: world.campaigns || [],
+    zones: Object.keys(world.riders.concat(world.headcount).reduce(function (m, r) { if (r.zone) m[r.zone] = 1; return m; }, {})).sort()
   };
 }
 
@@ -920,7 +1142,7 @@ if (typeof module !== 'undefined' && module.exports) {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
     cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
     buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, buildDashboard: buildDashboard,
-    findNewlyHired: findNewlyHired, validateCandidate: validateCandidate
+    findNewlyHired: findNewlyHired, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
   };
 }
 
@@ -967,7 +1189,9 @@ function loadWorld_() {
     riders: rowsToRecords(values_(TABS.RIDERS), COLUMNS.RIDERS),
     headcount: rowsToRecords(values_(TABS.HEADCOUNT), COLUMNS.HEADCOUNT),
     applicants: rowsToRecords(values_(TABS.APPLICANTS), COLUMNS.APPLICANTS),
-    dailyOrders: rowsToRecords(values_(TABS.DAILY_ORDERS), COLUMNS.DAILY_ORDERS)
+    dailyOrders: rowsToRecords(values_(TABS.DAILY_ORDERS), COLUMNS.DAILY_ORDERS),
+    campaigns: rowsToRecords(values_(TABS.CAMPAIGNS), COLUMNS.CAMPAIGNS),
+    payouts: rowsToRecords(values_(TABS.PAYOUTS), COLUMNS.PAYOUTS)
   };
   WORLD_ = buildWorld(raw, loadConfig_(), new Date());
   return WORLD_;
@@ -995,7 +1219,8 @@ function readUsers_() {
     return {
       row: u._row, type: cleanText(u.type), code: cleanCode(u.code), name: cleanText(u.name),
       phone: canonicalPhone(u.phone), refId: cleanText(u.refId), hash: cleanText(u.hash),
-      status: cleanText(u.status) || 'active'
+      status: cleanText(u.status) || 'active',
+      created: u.created instanceof Date ? u.created : null, lastLogin: u.lastLogin instanceof Date ? u.lastLogin : null
     };
   });
 }
@@ -1184,6 +1409,7 @@ function setupFullSpeed() {
     });
 
     ensureTab_(TABS.LOG, ['الوقت', 'العملية', 'تفاصيل'], function () {});
+    report = report.concat(setupAdminTabs_());
 
     report = report.concat(upgradeApplicants_());
     report = report.concat(migrateLegacyUsers_());
@@ -1354,7 +1580,7 @@ function removeLegacyTabs_() {
 }
 
 function installTriggers_() {
-  var wanted = { syncApplicants: 'hourly', cleanupSessions: 'daily', onApplicantEdit: 'edit' };
+  var wanted = { syncApplicants: 'hourly', cleanupSessions: 'daily', onApplicantEdit: 'edit', dailyReport: 'morning' };
   var have = {};
   ScriptApp.getProjectTriggers().forEach(function (t) { have[t.getHandlerFunction()] = true; });
   var added = [];
@@ -1362,6 +1588,7 @@ function installTriggers_() {
     if (have[fn]) return;
     if (wanted[fn] === 'hourly') ScriptApp.newTrigger(fn).timeBased().everyHours(1).create();
     if (wanted[fn] === 'daily') ScriptApp.newTrigger(fn).timeBased().everyDays(1).atHour(4).create();
+    if (wanted[fn] === 'morning') ScriptApp.newTrigger(fn).timeBased().everyDays(1).atHour(9).create();
     if (wanted[fn] === 'edit') ScriptApp.newTrigger(fn).forSpreadsheet(ss_()).onEdit().create();
     added.push(fn);
   });
@@ -1632,7 +1859,7 @@ var ACTIONS_ = {
 
 function api(action, payload) {
   try {
-    var fn = ACTIONS_[action];
+    var fn = ACTIONS_[action] || (typeof ADMIN_ACTIONS_ !== 'undefined' && ADMIN_ACTIONS_[action]);
     if (!fn) return fail_('طلب غير معروف.');
     return toWire_(fn(payload || {}));
   } catch (err) {
@@ -1870,4 +2097,545 @@ function saveCandidate_(form, owner, after) {
     data.message = 'تم تسجيل ' + check.clean.name.split(' ')[0] + ' ✅ هنكلمه قريب.';
     return ok_(data);
   });
+}
+
+
+// ════════════════════════ Admin ════════════════════════
+
+/**
+ * Full Speed — admin dashboard API.
+ *
+ * Team members sign in with a username (FS Admins tab). Every change made
+ * from the dashboard is checked against the member's role (PERMISSIONS in
+ * Config.js) and written to FS Audit with the before/after values.
+ */
+
+var ADMIN_HEADERS_ = ['Username', 'Name', 'Role', 'Password Hash', 'Status', 'Must Change Password', 'Created', 'Last Login'];
+var PAYOUT_HEADERS_ = ['Payout ID', 'Rider Code', 'Rider Name', 'Referrer', 'Referrer Name', 'Amount', 'Method', 'Reference', 'Note', 'Paid By', 'Paid At'];
+var AUDIT_HEADERS_ = ['الوقت', 'المسؤول', 'العملية', 'على', 'قبل', 'بعد'];
+var CAMPAIGN_HEADERS_ = ['Campaign ID', 'Name', 'Start', 'End', 'Zone', 'Extra Bonus', 'Active'];
+
+var ADMIN_ACTIONS_ = {
+  adminLogin: adminLogin_,
+  adminSession: adminSession_,
+  adminLogout: adminLogout_,
+  adminChangePassword: adminChangePassword_,
+  adminData: adminData_,
+  adminUpdateApplicants: adminUpdateApplicants_,
+  adminEditApplicant: adminEditApplicant_,
+  adminRecordPayout: adminRecordPayout_,
+  adminDeletePayout: adminDeletePayout_,
+  adminUserAction: adminUserAction_,
+  adminSaveSettings: adminSaveSettings_,
+  adminSaveAnnouncement: adminSaveAnnouncement_,
+  adminSaveCampaign: adminSaveCampaign_,
+  adminDeleteCampaign: adminDeleteCampaign_,
+  adminTeam: adminTeam_
+};
+
+/* ───────────────────────────── Setup ──────────────────────────────── */
+
+/** Creates the admin tabs, and the first owner account if there is none. */
+function setupAdminTabs_() {
+  var report = [];
+  ensureTab_(TABS.ADMINS, ADMIN_HEADERS_, function (sh) {
+    sh.protect().setDescription('حسابات فريق الإدارة — ماتعدلش بإيدك').setWarningOnly(true);
+  });
+  ensureTab_(TABS.PAYOUTS, PAYOUT_HEADERS_, function (sh) {
+    sh.getRange('B2:B').setNumberFormat('@');
+    sh.getRange('D2:D').setNumberFormat('@');
+    sh.protect().setDescription('سجل صرف البونص — بيتعدل من لوحة الإدارة').setWarningOnly(true);
+  });
+  ensureTab_(TABS.AUDIT, AUDIT_HEADERS_, function (sh) {
+    sh.protect().setDescription('سجل التعديلات — ماينفعش يتعدل').setWarningOnly(true);
+  });
+  ensureTab_(TABS.CAMPAIGNS, CAMPAIGN_HEADERS_, function (sh) {
+    sh.getRange('C2:D').setNumberFormat('yyyy-mm-dd');
+  });
+  if (!readAdmins_().length) {
+    var temp = tempPassword_();
+    tab_(TABS.ADMINS).appendRow(['owner', 'المدير', 'owner', hashPassword_(temp), 'active', 'yes', new Date(), '']);
+    report.push('اتعمل حساب المدير: اسم المستخدم owner — كلمة السر المؤقتة ' + temp + ' (هتتغير أول ما تدخل)');
+  }
+  return report;
+}
+
+/* ──────────────────────────── Accounts ────────────────────────────── */
+
+function readAdmins_() {
+  return rowsToRecords(values_(TABS.ADMINS), COLUMNS.ADMINS).map(function (a) {
+    return {
+      row: a._row, username: cleanText(a.username).toLowerCase(), name: cleanText(a.name), role: cleanText(a.role) || 'viewer',
+      hash: cleanText(a.hash), status: cleanText(a.status) || 'active', mustChange: /^(yes|true|1)$/i.test(cleanText(a.mustChange)),
+      created: a.created instanceof Date ? a.created : null, lastLogin: a.lastLogin instanceof Date ? a.lastLogin : null
+    };
+  }).filter(function (a) { return a.username; });
+}
+
+function findAdmin_(username) {
+  var u = String(username || '').trim().toLowerCase();
+  return readAdmins_().filter(function (a) { return a.username === u; })[0] || null;
+}
+
+function setAdminCells_(row, fields) {
+  var sh = tab_(TABS.ADMINS);
+  Object.keys(fields).forEach(function (k) {
+    var col = ADMIN_HEADERS_.indexOf(k);
+    if (col !== -1) sh.getRange(row, col + 1).setValue(fields[k]);
+  });
+}
+
+/** 8 characters, easy to read out over the phone, never trivial. */
+function tempPassword_() {
+  var letters = 'abcdefghjkmnpqrstuvwxyz', out = '';
+  var raw = Utilities.getUuid().replace(/-/g, '');
+  for (var i = 0; i < 3; i++) out += letters.charAt(parseInt(raw.substr(i * 2, 2), 16) % letters.length);
+  return out + (10000 + parseInt(raw.substr(8, 6), 16) % 90000);
+}
+
+function can_(admin, perm) {
+  return admin.role === 'owner' || (PERMISSIONS[perm] || []).indexOf(admin.role) !== -1;
+}
+
+function currentAdmin_(token) {
+  var s = readSession_(token);
+  if (!s || s.type !== 'admin') return null;
+  var a = findAdmin_(s.code);
+  return a && a.status === 'active' ? a : null;
+}
+
+/** Runs fn(admin) if the token is valid and the role allows perm. */
+function asAdmin_(p, perm, fn) {
+  var admin = currentAdmin_(p.token);
+  if (!admin) return fail_('SESSION_EXPIRED');
+  if (perm && !can_(admin, perm)) return fail_('صلاحياتك مش بتسمح بالعملية دي. كلّم المدير.');
+  return fn(admin);
+}
+
+function meOf_(a) {
+  var perms = {};
+  Object.keys(PERMISSIONS).forEach(function (k) { perms[k] = can_(a, k); });
+  return { username: a.username, name: a.name, role: a.role, roleLabel: ROLES[a.role] || a.role, mustChange: a.mustChange, can: perms };
+}
+
+function audit_(admin, action, target, before, after) {
+  try {
+    var sh = tab_(TABS.AUDIT);
+    if (!sh) return;
+    var fmt = function (v) { return v === undefined || v === null ? '' : safeCell(typeof v === 'object' ? JSON.stringify(v) : String(v)); };
+    sh.appendRow([new Date(), admin.name + ' (' + admin.username + ')', action, fmt(target), fmt(before), fmt(after)]);
+  } catch (e) { /* never block the change itself */ }
+}
+
+/* ───────────────────────────── Session ────────────────────────────── */
+
+function adminLogin_(p) {
+  var cfg = loadConfig_();
+  var username = String(p.username || '').trim().toLowerCase();
+  if (!username || !p.password) return fail_('اكتب اسم المستخدم وكلمة المرور.');
+  var wait = lockedFor_('admin', username);
+  if (wait) return fail_('محاولات كتير غلط. الحساب مقفول ' + wait + ' دقيقة.');
+  var a = findAdmin_(username);
+  if (!a || a.status !== 'active') { recordFailure_('admin', username, cfg); return fail_('اسم المستخدم أو كلمة المرور غلط.'); }
+  var check = verifyPassword_(String(p.password), a.hash);
+  if (!check.ok) {
+    var left = recordFailure_('admin', username, cfg);
+    return fail_(left ? 'اسم المستخدم أو كلمة المرور غلط. باقي ' + left + ' محاولات.' : 'محاولات كتير غلط. الحساب اتقفل ' + cfg.LOCK_MINUTES + ' دقيقة.');
+  }
+  clearFailures_('admin', username);
+  return withLock_(function () {
+    setAdminCells_(a.row, { 'Last Login': new Date() });
+    var token = createSession_({ type: 'admin', code: a.username }, cfg);
+    audit_(a, 'دخول', '', '', '');
+    return ok_({ token: token, me: meOf_(a) });
+  });
+}
+
+function adminSession_(p) {
+  return asAdmin_(p, null, function (a) { return ok_({ me: meOf_(a) }); });
+}
+
+function adminLogout_(p) {
+  return withLock_(function () { endSession_(p.token); return ok_({}); });
+}
+
+function adminChangePassword_(p) {
+  var cfg = loadConfig_();
+  return asAdmin_(p, null, function (a) {
+    if (!verifyPassword_(String(p.current || ''), a.hash).ok) return fail_('كلمة المرور الحالية غلط.', { current: 'غلط.' });
+    var next = String(p.next || '');
+    if (next.length < 8) return fail_('كلمة مرور الإدارة لازم 8 حروف أو أرقام على الأقل.', { next: 'على الأقل 8.' });
+    return withLock_(function () {
+      setAdminCells_(a.row, { 'Password Hash': hashPassword_(next), 'Must Change Password': '' });
+      endAllSessions_('admin', a.username);
+      audit_(a, 'غيّر كلمة المرور', a.username, '', '');
+      a.mustChange = false;
+      return ok_({ token: createSession_({ type: 'admin', code: a.username }, cfg), me: meOf_(a) });
+    });
+  });
+}
+
+/* ────────────────────────────── Data ──────────────────────────────── */
+
+function adminData_(p) {
+  return asAdmin_(p, null, function (a) {
+    invalidate_();
+    var world = loadWorld_();
+    var data = buildAdminData(world, readUsers_());
+    var cfg = loadConfig_();
+    data.me = meOf_(a);
+    data.roles = ROLES;
+    data.payoutMethods = PAYOUT_METHODS;
+    data.config = {};
+    Object.keys(CONFIG_DEFAULTS).forEach(function (k) {
+      var v = cfg[k];
+      data.config[k] = v instanceof Date ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd') : v;
+    });
+    data.audit = values_(TABS.AUDIT).slice(1).slice(-400).reverse().map(function (r) {
+      return { at: r[0] instanceof Date ? r[0].toISOString() : String(r[0]), by: r[1], action: r[2], target: r[3], before: r[4], after: r[5] };
+    });
+    if (a.role === 'owner') {
+      data.team = readAdmins_().map(function (x) {
+        return { username: x.username, name: x.name, role: x.role, status: x.status, lastLogin: x.lastLogin, mustChange: x.mustChange };
+      });
+    }
+    return ok_(data);
+  });
+}
+
+/* ─────────────────────────── Applicants ───────────────────────────── */
+
+function applicantSheet_() {
+  var sh = tab_(TABS.APPLICANTS);
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  return { sh: sh, map: mapHeaders(headers, COLUMNS.APPLICANTS) };
+}
+
+/**
+ * Status and/or note for one or many applications.
+ * items: [{ row, phone }] — the phone guards against rows that moved since the page loaded.
+ */
+function adminUpdateApplicants_(p) {
+  return asAdmin_(p, 'applicants.edit', function (a) {
+    var items = (p.items || []).slice(0, 500);
+    if (!items.length) return fail_('اختار مرشح واحد على الأقل.');
+    if (p.status !== undefined && STATUSES.indexOf(p.status) === -1) return fail_('الحالة دي مش في القايمة.');
+    if (p.status === STATUS_REJECTED && !cleanText(p.note)) return fail_('اكتب سبب الرفض عشان يظهر للي رشّح.', { note: 'السبب مطلوب.' });
+    return withLock_(function () {
+      var t = applicantSheet_(), done = 0, skipped = 0;
+      items.forEach(function (it) {
+        var row = parseInt(it.row, 10);
+        if (!(row >= 2) || row > t.sh.getLastRow()) { skipped++; return; }
+        var current = t.sh.getRange(row, 1, 1, t.sh.getLastColumn()).getValues()[0];
+        if (it.phone && canonicalPhone(current[t.map.phone]) !== canonicalPhone(it.phone)) { skipped++; return; }
+        var name = cleanText(current[t.map.name]);
+        if (p.status !== undefined && t.map.status !== -1 && current[t.map.status] !== p.status) {
+          audit_(a, 'غيّر الحالة', name, current[t.map.status], p.status);
+          t.sh.getRange(row, t.map.status + 1).setValue(p.status);
+          if (t.map.statusUpdated !== -1) t.sh.getRange(row, t.map.statusUpdated + 1).setValue(new Date());
+        }
+        if (p.note !== undefined && t.map.note !== -1 && cleanText(current[t.map.note]) !== cleanText(p.note)) {
+          audit_(a, 'ملاحظة للمرشِّح', name, current[t.map.note], p.note);
+          t.sh.getRange(row, t.map.note + 1).setValue(safeCell(p.note));
+        }
+        done++;
+      });
+      invalidate_();
+      return ok_({ done: done, skipped: skipped });
+    });
+  });
+}
+
+function adminEditApplicant_(p) {
+  return asAdmin_(p, 'applicants.edit', function (a) {
+    var f = p.fields || {}, errors = {};
+    if (f.phone !== undefined && !canonicalPhone(f.phone)) errors.phone = 'رقم موبايل غير صحيح.';
+    if (f.nationalId !== undefined && !parseNationalId(f.nationalId)) errors.nationalId = 'رقم قومي غير صحيح.';
+    if (f.name !== undefined && cleanText(f.name).split(/\s+/).length < 3) errors.name = 'الاسم ثلاثي على الأقل.';
+    if (Object.keys(errors).length) return fail_(errors[Object.keys(errors)[0]], errors);
+    return withLock_(function () {
+      var t = applicantSheet_(), row = parseInt(p.row, 10);
+      if (!(row >= 2) || row > t.sh.getLastRow()) return fail_('المرشح ده مش موجود. حدّث الصفحة.');
+      var current = t.sh.getRange(row, 1, 1, t.sh.getLastColumn()).getValues()[0];
+      if (p.phone && canonicalPhone(current[t.map.phone]) !== canonicalPhone(p.phone)) return fail_('الشيت اتغير من ساعة ما فتحت. حدّث الصفحة.');
+      var write = {
+        name: f.name !== undefined ? safeCell(cleanText(f.name)) : undefined,
+        phone: f.phone !== undefined ? "'" + canonicalPhone(f.phone) : undefined,
+        nationalId: f.nationalId !== undefined ? "'" + parseNationalId(f.nationalId).id : undefined,
+        zone: f.zone !== undefined ? safeCell(f.zone) : undefined,
+        address: f.address !== undefined ? safeCell(f.address) : undefined
+      };
+      Object.keys(write).forEach(function (k) {
+        if (write[k] === undefined || t.map[k] === -1) return;
+        var before = current[t.map[k]], after = String(write[k]).replace(/^'/, '');
+        if (String(before) === after) return;
+        audit_(a, 'عدّل بيانات مرشح (' + k + ')', cleanText(current[t.map.name]), before, after);
+        t.sh.getRange(row, t.map[k] + 1).setValue(write[k]);
+      });
+      invalidate_();
+      return ok_({});
+    });
+  });
+}
+
+/* ──────────────────────────── Payouts ─────────────────────────────── */
+
+function adminRecordPayout_(p) {
+  return asAdmin_(p, 'payouts.edit', function (a) {
+    var amount = Math.round(Number(p.amount) || 0);
+    if (amount <= 0) return fail_('اكتب المبلغ.', { amount: 'المبلغ مطلوب.' });
+    if (PAYOUT_METHODS.indexOf(p.method) === -1) return fail_('اختار طريقة الصرف.', { method: 'مطلوب.' });
+    return withLock_(function () {
+      invalidate_();
+      var world = loadWorld_();
+      var code = cleanCode(p.code);
+      var r = world.ridersByCode[code];
+      if (!r) return fail_('الطيار ده مش موجود.');
+      var owner = riderOwner(r, world);
+      if (!owner || owner === code) return fail_('الطيار ده مش متسجل على حد، مالوش بونص ترشيح.');
+      var ev = evaluateRider(r, world);
+      if (ev.paid + amount > ev.bonus && !(p.allowOver && a.role === 'owner')) {
+        return fail_('المبلغ أكبر من المستحق. المستحق ' + ev.bonus + ' ج واتصرف قبل كده ' + ev.paid + ' ج.', { amount: 'أكبر من المستحق.' });
+      }
+      var data = buildAdminData(world, readUsers_());
+      var ownerRow = data.users.filter(function (u) { return u.key === owner; })[0] || {};
+      var id = 'PO-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyMMdd') + '-' + Utilities.getUuid().slice(0, 4).toUpperCase();
+      tab_(TABS.PAYOUTS).appendRow([id, "'" + code, safeCell(r.name), "'" + owner, safeCell(ownerRow.name || ''), amount, p.method,
+        safeCell(p.reference || ''), safeCell(p.note || ''), a.name, new Date()]);
+      audit_(a, 'سجّل صرف بونص', r.name + ' #' + code, '', amount + ' ج — ' + p.method);
+      invalidate_();
+      return ok_({ id: id });
+    });
+  });
+}
+
+function adminDeletePayout_(p) {
+  return asAdmin_(p, 'payouts.edit', function (a) {
+    return withLock_(function () {
+      var sh = tab_(TABS.PAYOUTS), vals = sh.getDataRange().getValues();
+      for (var i = vals.length - 1; i >= 1; i--) {
+        if (String(vals[i][0]) === String(p.id)) {
+          audit_(a, 'لغى صرف بونص', vals[i][2] + ' #' + vals[i][1], vals[i][5] + ' ج — ' + vals[i][6], '');
+          sh.deleteRow(i + 1);
+          invalidate_();
+          return ok_({});
+        }
+      }
+      return fail_('العملية دي مش موجودة.');
+    });
+  });
+}
+
+/* ───────────────────────────── Users ──────────────────────────────── */
+
+function adminUserAction_(p) {
+  return asAdmin_(p, 'users.edit', function (a) {
+    var type = p.type === 'external' ? 'external' : 'internal';
+    var u = findUser_(type, p.key);
+    if (!u) return fail_('الشخص ده لسه ما فعّلش حسابه في البرنامج.');
+    var label = (u.name || u.code) + ' (' + (type === 'external' ? u.phone : u.code) + ')';
+    var key = type === 'external' ? u.phone : u.code;
+    var sh = tab_(TABS.USERS);
+    var col = function (h) { return USER_HEADERS_.indexOf(h) + 1; };
+    return withLock_(function () {
+      switch (p.action) {
+        case 'reset':
+          var temp = tempPassword_();
+          sh.getRange(u.row, col('Password Hash')).setValue(hashPassword_(temp));
+          endAllSessions_(type, key);
+          audit_(a, 'عمل كلمة سر مؤقتة', label, '', '');
+          return ok_({ temp: temp, phone: u.phone });
+        case 'block':
+          sh.getRange(u.row, col('Status')).setValue('blocked');
+          endAllSessions_(type, key);
+          audit_(a, 'أوقف حساب', label, 'active', 'blocked');
+          return ok_({});
+        case 'unblock':
+          sh.getRange(u.row, col('Status')).setValue('active');
+          audit_(a, 'فعّل حساب', label, 'blocked', 'active');
+          return ok_({});
+        case 'logout':
+          endAllSessions_(type, key);
+          audit_(a, 'خرّج حساب من كل الأجهزة', label, '', '');
+          return ok_({});
+        case 'phone':
+          if (type !== 'internal') return fail_('رقم الشريك هو اسم الدخول بتاعه، مينفعش يتغير. اعمله حساب جديد.');
+          var phone = canonicalPhone(p.phone);
+          if (!phone) return fail_('رقم موبايل غير صحيح.', { phone: 'غير صحيح.' });
+          sh.getRange(u.row, col('Phone')).setValue("'" + phone);
+          audit_(a, 'غيّر رقم موبايل', label, u.phone, phone);
+          return ok_({});
+      }
+      return fail_('عملية غير معروفة.');
+    });
+  });
+}
+
+/* ──────────────────────── Settings & campaigns ────────────────────── */
+
+function setConfig_(key, value) {
+  var sh = tab_(TABS.CONFIG), vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (cleanText(vals[i][0]) === key) { sh.getRange(i + 1, 2).setValue(value); return vals[i][1]; }
+  }
+  sh.appendRow([key, value, '']);
+  return '';
+}
+
+var EDITABLE_SETTINGS_ = ['PROGRAM_START_DATE', 'BONUS_WINDOW_MONTHS', 'NUDGE_AFTER_DAYS', 'COMPANY_REF_CODE', 'SESSION_DAYS',
+  'MAX_LOGIN_FAILURES', 'LOCK_MINUTES', 'PUBLIC_APPLY_PER_HOUR', 'MIN_PASSWORD_LENGTH', 'SUPPORT_WHATSAPP', 'REPORT_EMAILS', 'PUBLIC_APP_URL'];
+
+function adminSaveSettings_(p) {
+  return asAdmin_(p, 'settings.edit', function (a) {
+    var cfg = p.config || {}, errors = {};
+    if (cfg.PROGRAM_START_DATE !== undefined && !parseSheetDate(cfg.PROGRAM_START_DATE)) errors.PROGRAM_START_DATE = 'تاريخ غير صحيح.';
+    ['BONUS_WINDOW_MONTHS', 'NUDGE_AFTER_DAYS', 'SESSION_DAYS', 'MAX_LOGIN_FAILURES', 'LOCK_MINUTES', 'PUBLIC_APPLY_PER_HOUR', 'MIN_PASSWORD_LENGTH'].forEach(function (k) {
+      if (cfg[k] !== undefined && !(parseInt(cfg[k], 10) > 0)) errors[k] = 'رقم أكبر من صفر.';
+    });
+    var tiers = p.tiers ? p.tiers.map(function (t) { return { orders: parseInt(t.orders, 10), bonus: parseInt(t.bonus, 10) }; }) : null;
+    if (tiers && (!tiers.length || tiers.some(function (t) { return !(t.orders > 0 && t.bonus > 0); }))) errors.tiers = 'كل شريحة محتاجة عدد أوردرات ومبلغ.';
+    if (Object.keys(errors).length) return fail_(errors[Object.keys(errors)[0]], errors);
+    return withLock_(function () {
+      Object.keys(cfg).forEach(function (k) {
+        if (EDITABLE_SETTINGS_.indexOf(k) === -1) return;
+        var before = setConfig_(k, String(cfg[k]).trim());
+        if (String(before) !== String(cfg[k]).trim()) audit_(a, 'غيّر إعداد', k, before, cfg[k]);
+      });
+      if (tiers) {
+        tiers.sort(function (x, y) { return x.orders - y.orders; });
+        var sh = tab_(TABS.TIERS), before = values_(TABS.TIERS).slice(1).map(function (r) { return r[0] + '→' + r[1]; }).join('، ');
+        if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 2).clearContent();
+        sh.getRange(2, 1, tiers.length, 2).setValues(tiers.map(function (t) { return [t.orders, t.bonus]; }));
+        audit_(a, 'غيّر شرايح البونص', '', before, tiers.map(function (t) { return t.orders + '→' + t.bonus; }).join('، '));
+      }
+      CFG_ = null; invalidate_();
+      return ok_({});
+    });
+  });
+}
+
+function adminSaveAnnouncement_(p) {
+  return asAdmin_(p, 'campaigns.edit', function (a) {
+    return withLock_(function () {
+      var text = cleanText(p.text).slice(0, 200);
+      var before = setConfig_('ANNOUNCEMENT', text);
+      audit_(a, text ? 'نشر إعلان للطيارين' : 'شال الإعلان', '', before, text);
+      CFG_ = null;
+      return ok_({});
+    });
+  });
+}
+
+function adminSaveCampaign_(p) {
+  return asAdmin_(p, 'campaigns.edit', function (a) {
+    var c = p.campaign || {}, errors = {};
+    var start = parseSheetDate(c.start), end = parseSheetDate(c.end);
+    if (!cleanText(c.name)) errors.name = 'اسم الحملة مطلوب.';
+    if (!start) errors.start = 'تاريخ البداية مطلوب.';
+    if (!end || (start && end < start)) errors.end = 'تاريخ النهاية لازم يكون بعد البداية.';
+    if (!(parseInt(c.extra, 10) > 0)) errors.extra = 'المبلغ الإضافي مطلوب.';
+    if (Object.keys(errors).length) return fail_(errors[Object.keys(errors)[0]], errors);
+    return withLock_(function () {
+      var sh = tab_(TABS.CAMPAIGNS), vals = sh.getDataRange().getValues();
+      var row = [c.id || ('C-' + Utilities.getUuid().slice(0, 6).toUpperCase()), safeCell(c.name), start, end, safeCell(c.zone || ''), parseInt(c.extra, 10), c.active === false ? 'لا' : 'نعم'];
+      for (var i = 1; i < vals.length; i++) {
+        if (c.id && String(vals[i][0]) === String(c.id)) {
+          sh.getRange(i + 1, 1, 1, row.length).setValues([row]);
+          audit_(a, 'عدّل حملة', c.name, vals[i].slice(1, 7).join(' | '), row.slice(1).join(' | '));
+          invalidate_();
+          return ok_({ id: row[0] });
+        }
+      }
+      sh.appendRow(row);
+      audit_(a, 'عمل حملة', c.name, '', row.slice(1).join(' | '));
+      invalidate_();
+      return ok_({ id: row[0] });
+    });
+  });
+}
+
+function adminDeleteCampaign_(p) {
+  return asAdmin_(p, 'campaigns.edit', function (a) {
+    return withLock_(function () {
+      var sh = tab_(TABS.CAMPAIGNS), vals = sh.getDataRange().getValues();
+      for (var i = vals.length - 1; i >= 1; i--) {
+        if (String(vals[i][0]) === String(p.id)) {
+          audit_(a, 'مسح حملة', vals[i][1], vals[i].slice(1, 7).join(' | '), '');
+          sh.deleteRow(i + 1);
+          invalidate_();
+          return ok_({});
+        }
+      }
+      return fail_('الحملة دي مش موجودة.');
+    });
+  });
+}
+
+/* ────────────────────────────── Team ──────────────────────────────── */
+
+function adminTeam_(p) {
+  return asAdmin_(p, 'team.edit', function (a) {
+    var username = String(p.username || '').trim().toLowerCase();
+    if (!/^[a-z0-9._-]{3,30}$/.test(username)) return fail_('اسم المستخدم: حروف إنجليزي صغيرة أو أرقام، من 3 لـ 30.', { username: 'غير صحيح.' });
+    if (p.role !== undefined && !ROLES[p.role]) return fail_('اختار الدور.', { role: 'مطلوب.' });
+    return withLock_(function () {
+      var existing = findAdmin_(username);
+      if (p.action === 'add') {
+        if (existing) return fail_('اسم المستخدم ده موجود بالفعل.', { username: 'موجود.' });
+        if (!cleanText(p.name)) return fail_('اكتب الاسم.', { name: 'مطلوب.' });
+        var temp = tempPassword_();
+        tab_(TABS.ADMINS).appendRow([username, safeCell(p.name), p.role || 'viewer', hashPassword_(temp), 'active', 'yes', new Date(), '']);
+        audit_(a, 'ضاف عضو للفريق', username, '', ROLES[p.role || 'viewer']);
+        return ok_({ temp: temp });
+      }
+      if (!existing) return fail_('العضو ده مش موجود.');
+      if (existing.username === a.username && p.action !== 'reset') return fail_('مينفعش تغيّر دورك أو توقف حسابك بنفسك.');
+      if (p.action === 'role') {
+        setAdminCells_(existing.row, { Role: p.role });
+        audit_(a, 'غيّر دور', username, ROLES[existing.role], ROLES[p.role]);
+        return ok_({});
+      }
+      if (p.action === 'disable' || p.action === 'enable') {
+        setAdminCells_(existing.row, { Status: p.action === 'disable' ? 'disabled' : 'active' });
+        if (p.action === 'disable') endAllSessions_('admin', username);
+        audit_(a, p.action === 'disable' ? 'أوقف عضو' : 'فعّل عضو', username, existing.status, p.action === 'disable' ? 'disabled' : 'active');
+        return ok_({});
+      }
+      if (p.action === 'reset') {
+        var t2 = tempPassword_();
+        setAdminCells_(existing.row, { 'Password Hash': hashPassword_(t2), 'Must Change Password': 'yes' });
+        endAllSessions_('admin', username);
+        audit_(a, 'عمل كلمة سر مؤقتة لعضو', username, '', '');
+        return ok_({ temp: t2 });
+      }
+      return fail_('عملية غير معروفة.');
+    });
+  });
+}
+
+/* ────────────────────────── Daily report ──────────────────────────── */
+
+/** Morning email with yesterday's numbers to the addresses in REPORT_EMAILS. */
+function dailyReport() {
+  var cfg = loadConfig_();
+  var to = String(cfg.REPORT_EMAILS || '').split(/[,\s]+/).filter(function (e) { return /@/.test(e); });
+  if (!to.length) return;
+  var data = buildAdminData(loadWorld_(), readUsers_());
+  var yesterday = addDays(data.today, -1);
+  var same = function (d) { return d && diffDays(d, yesterday) === 0; };
+  var newApps = data.applicants.filter(function (x) { return same(x.submitted); }).length;
+  var hires = data.riders.filter(function (r) { return same(r.hireDate) && r.ownerKey; }).length;
+  var due = data.riders.filter(function (r) { return r.payStatus === 'due'; });
+  var dueSum = due.reduce(function (s, r) { return s + r.bonus - r.paid; }, 0);
+  var stuck = data.applicants.filter(function (x) { return x.nudge; }).length;
+  var flagged = data.applicants.filter(function (x) { return x.flags.length; }).length + data.riders.filter(function (r) { return r.flags.length; }).length;
+  var row = function (k, v) { return '<tr><td style="padding:6px 12px;color:#46594B">' + k + '</td><td style="padding:6px 12px;font-weight:700">' + v + '</td></tr>'; };
+  var html = '<div dir="rtl" style="font-family:Tahoma,Arial;font-size:14px">' +
+    '<h2 style="color:#187A31;margin:0 0 8px">Full Speed Champions — تقرير ' + Utilities.formatDate(yesterday, Session.getScriptTimeZone(), 'yyyy-MM-dd') + '</h2>' +
+    '<table style="border-collapse:collapse;background:#F2F8F3;border-radius:8px">' +
+    row('ترشيحات جديدة امبارح', newApps) + row('اتعيّنوا امبارح من ترشيحات', hires) +
+    row('بونص مستحق ومستني الصرف', dueSum.toLocaleString('en-US') + ' ج (' + due.length + ' طيار)') +
+    row('مرشحين محتاجين متابعة', stuck) + row('تنبيهات محتاجة مراجعة', flagged) +
+    '</table>' + (cfg.PUBLIC_APP_URL ? '<p><a href="' + cfg.PUBLIC_APP_URL + 'admin/">افتح لوحة الإدارة</a></p>' : '') + '</div>';
+  MailApp.sendEmail({ to: to.join(','), subject: 'Full Speed Champions — تقرير يومي', htmlBody: html });
 }

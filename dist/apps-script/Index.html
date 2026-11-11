@@ -1,5 +1,5 @@
 <title>Full Speed Champions</title>
-<script>window.FS_BUILD="a0119d381e";</script>
+<script>window.FS_BUILD="e91c32f39e";</script>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="theme-color" content="#070A08">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -808,7 +808,8 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
       '<div class="empty">' + icon('people').replace('<svg', '<svg width="34" height="34"') + '<span>لسه مافيش حد من مرشحينك اتعين.<br>تابعهم من "المرشحين" لحد ما يشتغلوا.</span>' +
       '<button type="button" class="btn btn-ghost btn-sm" data-go-view="pipeline">تابع المرشحين</button></div>';
 
-    return '<section class="card hero">' +
+    return (d.announcement ? '<section class="card coach warn" role="note"><div class="coach-head"><span class="coach-ico">' + icon('bell') + '</span><div><h3>' + esc(d.announcement) + '</h3></div></div></section>' : '') +
+      '<section class="card hero">' +
         '<span class="eyebrow">إجمالي البونص بتاعك</span>' +
         '<div class="num total"><span data-count="' + t.bonus + '">0</span><small>جنيه</small></div>' +
         '<div class="split">' +
@@ -817,6 +818,7 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
         '</div>' +
         (potential ? '<div class="potential">' + icon('up') + '<span>لو كل طيار وصل الشريحة الجاية: <b>+' + money(potential) + '</b> ج زيادة</span></div>' : '') +
         (t.nextPayout ? '<div class="payout">' + icon('cal') + 'أقرب صرف: <b>' + fmtDay(t.nextPayout) + '</b></div>' : '') +
+        (t.paid ? '<div class="payout">' + icon('check') + 'اتصرفلك لحد دلوقتي: <b>' + money(t.paid) + ' ج</b></div>' : '') +
       '</section>' +
       coachCard(d) +
       '<div class="stats">' +
@@ -850,10 +852,11 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
     var tiers = S.dash.season.tiers, top = tiers[tiers.length - 1], max = top.orders;
     var pct = Math.min(100, r.orders / max * 100);
     var ticks = tiers.map(function (x) { return '<b style="inset-inline-start:' + (x.orders / max * 100) + '%"></b>'; }).join('');
-    var st = STATE[r.state] || STATE.active;
+    var st = r.payStatus === 'paid' ? ['✓ اتصرف', 'green'] : (STATE[r.state] || STATE.active);
     var urgent = r.state === 'active' && r.daysLeft <= 7;
     var goal;
-    if (r.state === 'maxed') goal = '<span class="gold">🏆 قفل ' + money(top.bonus) + ' ج — الصرف ' + fmtDay(r.payoutDate) + '</span>';
+    if (r.payStatus === 'paid') goal = '<span>اتصرفلك <b class="gold">' + money(r.paid) + ' ج</b> عن ' + esc(first(r.name)) + ' 🎉</span>';
+    else if (r.state === 'maxed') goal = '<span class="gold">🏆 قفل ' + money(top.bonus) + ' ج — الصرف ' + fmtDay(r.payoutDate) + '</span>';
     else if (r.state === 'closed') goal = '<span>البونص اتثبت على <b class="gold">' + money(r.bonus) + ' ج</b> · الصرف ' + fmtDay(r.payoutDate) + '</span>';
     else if (r.nextOrders) goal = '<span>باقي <strong>' + r.ordersToNext + '</strong> أوردر ويفتح <b class="gold">' + money(r.nextBonus) + ' ج</b></span>';
     else goal = '';
@@ -870,7 +873,8 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
         '<div><span class="num' + (urgent ? ' red' : '') + '">' + (r.state === 'active' ? r.daysLeft : '—') + '</span><span>' + (r.state === 'active' ? 'يوم باقي' : 'لحد ' + fmtDay(r.lastDay)) + '</span></div>' +
       '</div>' +
       '<div class="track" role="img" aria-label="' + r.orders + ' من ' + max + ' أوردر"><i data-w="' + pct.toFixed(1) + '"></i>' + ticks + '</div>' +
-      (goal ? '<div class="goal">' + goal + '</div>' : '') + actions +
+      (goal ? '<div class="goal">' + goal + '</div>' : '') +
+      (r.extra ? '<div class="goal" style="font-size:13px"><span class="pill gold">+' + money(r.extra) + ' ج حملة</span><span class="muted">' + esc((r.campaigns || []).join('، ')) + '</span></div>' : '') + actions +
     '</article>';
   }
 

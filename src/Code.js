@@ -70,7 +70,7 @@ var ACTIONS_ = {
 
 function api(action, payload) {
   try {
-    var fn = ACTIONS_[action];
+    var fn = ACTIONS_[action] || (typeof ADMIN_ACTIONS_ !== 'undefined' && ADMIN_ACTIONS_[action]);
     if (!fn) return fail_('طلب غير معروف.');
     return toWire_(fn(payload || {}));
   } catch (err) {

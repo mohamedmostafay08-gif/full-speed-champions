@@ -38,7 +38,9 @@ function loadWorld_() {
     riders: rowsToRecords(values_(TABS.RIDERS), COLUMNS.RIDERS),
     headcount: rowsToRecords(values_(TABS.HEADCOUNT), COLUMNS.HEADCOUNT),
     applicants: rowsToRecords(values_(TABS.APPLICANTS), COLUMNS.APPLICANTS),
-    dailyOrders: rowsToRecords(values_(TABS.DAILY_ORDERS), COLUMNS.DAILY_ORDERS)
+    dailyOrders: rowsToRecords(values_(TABS.DAILY_ORDERS), COLUMNS.DAILY_ORDERS),
+    campaigns: rowsToRecords(values_(TABS.CAMPAIGNS), COLUMNS.CAMPAIGNS),
+    payouts: rowsToRecords(values_(TABS.PAYOUTS), COLUMNS.PAYOUTS)
   };
   WORLD_ = buildWorld(raw, loadConfig_(), new Date());
   return WORLD_;
@@ -66,7 +68,8 @@ function readUsers_() {
     return {
       row: u._row, type: cleanText(u.type), code: cleanCode(u.code), name: cleanText(u.name),
       phone: canonicalPhone(u.phone), refId: cleanText(u.refId), hash: cleanText(u.hash),
-      status: cleanText(u.status) || 'active'
+      status: cleanText(u.status) || 'active',
+      created: u.created instanceof Date ? u.created : null, lastLogin: u.lastLogin instanceof Date ? u.lastLogin : null
     };
   });
 }
@@ -255,6 +258,7 @@ function setupFullSpeed() {
     });
 
     ensureTab_(TABS.LOG, ['الوقت', 'العملية', 'تفاصيل'], function () {});
+    report = report.concat(setupAdminTabs_());
 
     report = report.concat(upgradeApplicants_());
     report = report.concat(migrateLegacyUsers_());
@@ -425,7 +429,7 @@ function removeLegacyTabs_() {
 }
 
 function installTriggers_() {
-  var wanted = { syncApplicants: 'hourly', cleanupSessions: 'daily', onApplicantEdit: 'edit' };
+  var wanted = { syncApplicants: 'hourly', cleanupSessions: 'daily', onApplicantEdit: 'edit', dailyReport: 'morning' };
   var have = {};
   ScriptApp.getProjectTriggers().forEach(function (t) { have[t.getHandlerFunction()] = true; });
   var added = [];
@@ -433,6 +437,7 @@ function installTriggers_() {
     if (have[fn]) return;
     if (wanted[fn] === 'hourly') ScriptApp.newTrigger(fn).timeBased().everyHours(1).create();
     if (wanted[fn] === 'daily') ScriptApp.newTrigger(fn).timeBased().everyDays(1).atHour(4).create();
+    if (wanted[fn] === 'morning') ScriptApp.newTrigger(fn).timeBased().everyDays(1).atHour(9).create();
     if (wanted[fn] === 'edit') ScriptApp.newTrigger(fn).forSpreadsheet(ss_()).onEdit().create();
     added.push(fn);
   });

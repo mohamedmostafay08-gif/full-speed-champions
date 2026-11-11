@@ -30,6 +30,8 @@ var CONFIG_DEFAULTS = {
   SUPPORT_WHATSAPP: '201120339097',
   PUBLIC_APP_URL: 'https://mohamedmostafay08-gif.github.io/full-speed-champions/',  // the installable app (GitHub Pages)
   // Where the Google link reads its interface from. Empty = use the Index.html saved in Apps Script.
+  ANNOUNCEMENT: '',                   // banner shown to every rider in the app (empty = none)
+  REPORT_EMAILS: '',                  // comma-separated: who gets the daily report email
   UI_SOURCE_URL: 'https://raw.githubusercontent.com/mohamedmostafay08-gif/full-speed-champions/main/dist/single-file/Index.html'
 };
 
@@ -44,6 +46,10 @@ var TABS = {
   CONFIG: 'FS Config',
   TIERS: 'FS Bonus Tiers',
   LOG: 'FS Log',
+  ADMINS: 'FS Admins',                // the operations team (admin dashboard accounts)
+  PAYOUTS: 'FS Payouts',              // one row per bonus paid
+  AUDIT: 'FS Audit',                  // who changed what, from the admin dashboard
+  CAMPAIGNS: 'FS Campaigns',          // extra-bonus campaigns
   // Legacy tabs, read once by the migration and then left untouched.
   LEGACY_PASSWORDS: 'Passwords',
   LEGACY_PARTNERS: 'External Partners',
@@ -113,6 +119,18 @@ var COLUMNS = {
     created: ['Created'],
     lastLogin: ['Last Login']
   },
+  ADMINS: {
+    username: ['Username'], name: ['Name'], role: ['Role'], hash: ['Password Hash'],
+    status: ['Status'], mustChange: ['Must Change Password'], created: ['Created'], lastLogin: ['Last Login']
+  },
+  PAYOUTS: {
+    id: ['Payout ID'], riderCode: ['Rider Code'], riderName: ['Rider Name'], ownerKey: ['Referrer'],
+    ownerName: ['Referrer Name'], amount: ['Amount'], method: ['Method'], reference: ['Reference'],
+    note: ['Note'], paidBy: ['Paid By'], paidAt: ['Paid At']
+  },
+  CAMPAIGNS: {
+    id: ['Campaign ID'], name: ['Name'], start: ['Start'], end: ['End'], zone: ['Zone'], extra: ['Extra Bonus'], active: ['Active']
+  },
   SESSIONS: {
     tokenHash: ['Token Hash'],
     code: ['Code'],
@@ -131,6 +149,26 @@ var STATUSES = ['جديد', 'تم التواصل', 'قيد التعيين', 'ت�
 var STATUS_HIRED = 'اشتغل';
 var STATUS_REJECTED = 'مرفوض';
 
+/**
+ * Admin roles. Each permission lists the roles allowed to do it; every
+ * role can read the dashboard.
+ */
+var ROLES = {
+  owner: 'مدير',
+  recruiter: 'فريق التعيينات',
+  finance: 'الحسابات',
+  viewer: 'مشاهد'
+};
+var PERMISSIONS = {
+  'applicants.edit': ['owner', 'recruiter'],
+  'users.edit': ['owner', 'recruiter'],
+  'payouts.edit': ['owner', 'finance'],
+  'campaigns.edit': ['owner'],
+  'settings.edit': ['owner'],
+  'team.edit': ['owner']
+};
+var PAYOUT_METHODS = ['كاش', 'فودافون كاش', 'إنستاباي', 'تحويل بنكي', 'مع المرتب', 'أخرى'];
+
 /** Values found in the old sheet, mapped onto the new pipeline. */
 var LEGACY_STATUS_MAP = {
   'ارفع استمارة': 'جديد',            // candidate just recruited, form not processed yet
@@ -144,7 +182,7 @@ var LEGACY_STATUS_MAP = {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     APP: APP, CONFIG_DEFAULTS: CONFIG_DEFAULTS, TABS: TABS, COLUMNS: COLUMNS,
-    STATUSES: STATUSES, STATUS_HIRED: STATUS_HIRED, STATUS_REJECTED: STATUS_REJECTED,
+    STATUSES: STATUSES, ROLES: ROLES, PERMISSIONS: PERMISSIONS, PAYOUT_METHODS: PAYOUT_METHODS, STATUS_HIRED: STATUS_HIRED, STATUS_REJECTED: STATUS_REJECTED,
     LEGACY_STATUS_MAP: LEGACY_STATUS_MAP
   };
 }

@@ -22,7 +22,7 @@ const viewport = '<meta name="viewport" content="width=device-width, initial-sca
 
 if (page.includes('<?')) throw new Error('Index.html must not contain "<?" (HtmlService scriptlets)');
 
-const server = ['Config', 'Core', 'Logic', 'Sheets', 'Auth', 'Code'];
+const server = ['Config', 'Core', 'Logic', 'Sheets', 'Auth', 'Code', 'Admin'];
 for (const f of server) out(`dist/apps-script/${f}.gs`, read(`src/${f}.js`));
 out('dist/apps-script/Index.html', page.replace('<!--DEMO-->', ''));
 out('dist/apps-script/appsscript.json', read('src/appsscript.json'));
@@ -72,7 +72,14 @@ for (const f of fs.readdirSync(path.join(root, 'web/icons'))) {
   fs.copyFileSync(path.join(root, 'web/icons', f), path.join(root, 'docs/icons', f));
 }
 
+// Admin dashboard: docs/admin/ (live, talks to /exec) and dist/admin-preview.html (demo data).
+const adminRaw = read('ui/Admin.html').replace('__LOGO__', logo);
+const adminHead = viewport + '\n<link rel="icon" href="../icons/icon-192.png">\n<meta name="robots" content="noindex">\n<script src="../config.js"></script>';
+out('docs/admin/index.html', adminRaw.replace('<!--WEB_HEAD-->', adminHead).replace('<!--DEMO-->', ''));
+out('dist/admin-preview.html', adminRaw.replace('<!--WEB_HEAD-->', viewport).replace('<!--DEMO-->', `<script>\n${shared}\n${read('ui/admin-demo.js')}\n</script>`));
+
 const kb = (p) => (fs.statSync(path.join(root, p)).size / 1024).toFixed(0) + ' KB';
 console.log('dist/apps-script/  →', server.length, 'server files + Index.html (' + kb('dist/apps-script/Index.html') + ')');
 console.log('dist/preview.html  →', kb('dist/preview.html'));
 console.log('docs/ (GitHub Pages) → version', version);
+console.log('docs/admin + dist/admin-preview.html →', kb('dist/admin-preview.html'));

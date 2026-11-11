@@ -117,6 +117,7 @@ function makeEnv(tabs) {
       createHtmlOutput: (h) => { const o = { html: h, setTitle: () => o, addMetaTag: () => o }; return o; }
     },
     UrlFetchApp: { fetch: (url) => { g.__fetched = (g.__fetched || 0) + 1; return g.__remote(url); } },
+    MailApp: { sendEmail: (o) => { (g.__mails = g.__mails || []).push(o); } },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (t) => ({ text: t, setMimeType() { return this; } }) }
   };
   const ctx = vm.createContext(g);
@@ -125,7 +126,7 @@ function makeEnv(tabs) {
     // Run the combined dist/single-file/Code.gs exactly as it will be pasted.
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'dist', 'single-file', 'Code.gs'), 'utf8'), ctx, { filename: 'Code.gs' });
   } else {
-    for (const f of ['Config.js', 'Core.js', 'Logic.js', 'Sheets.js', 'Auth.js', 'Code.js']) {
+    for (const f of ['Config.js', 'Core.js', 'Logic.js', 'Sheets.js', 'Auth.js', 'Code.js', 'Admin.js']) {
       vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
     }
   }

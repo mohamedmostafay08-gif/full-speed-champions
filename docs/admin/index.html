@@ -1,0 +1,1095 @@
+<title>Full Speed Champions — الإدارة</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="../icons/icon-192.png">
+<meta name="robots" content="noindex">
+<script src="../config.js"></script>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Cairo:wght@600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* Layout: an operations console. Sidebar on the right (RTL), a filter bar on
+   top of every analytic view, KPI strip first, charts, then the tables that
+   back them. Same palette and type as the rider app; money in gold. */
+:root {
+  --bg: #070A08; --bg-2: #0B120D; --surface: #0F1912; --surface-2: #13201A;
+  --line: #1D2C21; --line-2: #2A3E2F;
+  --ink: #DCF0E0; --muted: #94AC99; --dim: #5F7265;
+  --green: #34B24C; --green-hi: #5BD06F; --on-green: #04140A; --green-soft: rgba(52,178,76,.13);
+  --gold: #E2A838; --gold-soft: rgba(226,168,56,.13); --on-gold: #1A1204;
+  --danger: #FF7A6E; --danger-soft: rgba(255,122,110,.12);
+  --info: #7DB8FF; --info-soft: rgba(125,184,255,.12);
+  --s1: #3987e5; --s2: #199e70; --s3: #d95926;   /* validated chart series (dark) */
+  --shadow: 0 18px 40px -22px rgba(0,0,0,.85);
+  --f-display: "Cairo", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-num: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --bg: #F4F6F3; --bg-2: #EBF1EA; --surface: #FFFFFF; --surface-2: #F2F8F3; --line: #DCE5DB; --line-2: #C4D2C4;
+  --ink: #0C150E; --muted: #46594B; --dim: #7A9180; --green: #187A31; --green-hi: #136B2A; --on-green: #FFFFFF; --green-soft: rgba(24,122,49,.09);
+  --gold: #946609; --gold-soft: rgba(148,102,9,.1); --on-gold: #FFFFFF; --danger: #C2362B; --danger-soft: rgba(194,54,43,.08);
+  --info: #1F5FAD; --info-soft: rgba(31,95,173,.08); --s1: #2a78d6; --s2: #1baf7a; --s3: #eb6834;
+  --shadow: 0 14px 32px -20px rgba(12,40,20,.28); color-scheme: light;
+} }
+:root[data-theme="light"] {
+  --bg: #F4F6F3; --bg-2: #EBF1EA; --surface: #FFFFFF; --surface-2: #F2F8F3; --line: #DCE5DB; --line-2: #C4D2C4;
+  --ink: #0C150E; --muted: #46594B; --dim: #7A9180; --green: #187A31; --green-hi: #136B2A; --on-green: #FFFFFF; --green-soft: rgba(24,122,49,.09);
+  --gold: #946609; --gold-soft: rgba(148,102,9,.1); --on-gold: #FFFFFF; --danger: #C2362B; --danger-soft: rgba(194,54,43,.08);
+  --info: #1F5FAD; --info-soft: rgba(31,95,173,.08); --s1: #2a78d6; --s2: #1baf7a; --s3: #eb6834;
+  --shadow: 0 14px 32px -20px rgba(12,40,20,.28); color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { direction: rtl; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 14px/1.55 var(--f-body); -webkit-font-smoothing: antialiased;
+  padding-left: max(0px, env(safe-area-inset-left, 0px)); padding-right: max(0px, env(safe-area-inset-right, 0px)); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--green-hi); outline-offset: 2px; }
+.num { font-family: var(--f-num); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.ltr { direction: ltr; unicode-bidi: isolate; }
+.muted { color: var(--muted); }
+.mk { width: 34px; height: 34px; flex: none; background: url("data:image/webp;base64,UklGRjBMAABXRUJQVlA4WAoAAAAQAAAAvwAAvwAAQUxQSMMlAAABGYVt27YxKLu1I/ofAFWZqCosoZBll0xmgSdVXNj/fzdJtnOdc84555xzzjnnnHNWzjnnnLNyzjnnnHPOOecMnlBPV/cstN+LnEbjhFY/qXWR06rBc5DTashBi2aRc4M6yGk1yBHNIqdRgZIjmkGOaBY5P6Cd0Tb4OKPRjWi/oHUjmgaPMxoNdxrdiK5aKh2+GicURyeio5JaRnHUTny0yOnoAbXIadXgd5DTaJDT6gP68FWDcjxoBjmiWeRcoOSIZpAjGt2ItkA7Ltrmi0Y3LdoHtBzRqqW/DnIa3Yic2hmtSipd5DQacpBTa5FzgVrktBpykNNokHOBXuS0anT4LHI6+oNe5HTU4M8umuYXtW5EU6Cc0QxyOqh1IzoFSoevhhzkNBq+BVo3otWAiAmYgDeW71/wHxCBWvL9wfgBHoFZowI/4CLJ3y/QB+tD8MH4IHzQPlB8wD4QWZLAEd+374eUvjffg+/W9+L7AhnsB0CUHcCH6GP0YfpIfTSu/zCMTGUGXn5PviPfqm/Nt+70b9P3AZDsByiUHTD0kfmofbQ+Jtd/aLYD2GDANUKABGnsu/Zt+OZ9S97Et+97BpL9AIJyGD5UH6tPyCfgo7AdwCFAtNAgAek7c/M37hv2DneCZJ/yZSXY9HH4ZHz8PnIfGAgjxBq1IQsWrv6GfN2+Cd8FyMQpmmTzwXvUJ+vjdW+FA4nBaawM37uLvj5fp2/EMpJ9SqWc4KP3yTn7rgIHEoPapoCFb9rX6Kvz7YBsnxJJQfHx+Ax8Cj4UOJBYC20K+Ha97FfmmwTZPqWRgpVP3KfjmSMkJNZaW5nvxtfuy/f1S+Q4ZcnB9k/RZ+LjUpAk1nK7YOzr8mV530mKUw7h6lPxWbmsckisA+2Cha/Fl+Tdk+1TBil45mfrk/ZBckisI+2C795X5EvxbSGfIuTgw/Y5+Yx9yByZdald8O350n2ZvkdonSfF0Kfps/ExI0msY+2Cr9cXjNA6Lgd3fZ7ObgdiHWzy5CfpwwJahwmmHvWxaQdiMBpwA4EGgUgjI5+I8wmtu4KP0sdtPRZr2hiUGWAYkNYI5Eicd84QWkcJfXQ+Bm2LNWujTG2ns9BZ/V51lNWeHR2dnaU2DFLrkOCDc+o46+oPyXnjhFiDjsgCpr9ze79DVx/9jn2XVhe+T73l/EGh+MANbTm058P1kRj/CHw4RgAnSa0CFHxUPmJY6xzBlltHEa13uCjk3Vff9q04tmN/SUu16cCp591+40eoDQmpVcgc2YLXObDr0iJofURRsO3NfRG+Wce+bT0AZQy4ngA5qPuhu/ET9KI7TkIpqTW1Uwew1i1mZQTUKqdcMfwXfX4+R5+/rxqQZWNaKiTHhsdR3frUx3+i9kGSWiRmN3VZl8rFvi6mxY5KfMu+OJ+XL9W3oE+WbdawyJSnf9m45lP2711WYKslYB1ZWpegkxMWrXVUlF+9p/yb35ygyE6AQIDrqMb1XMckJPk78MXjjr/2yZtyklqCmW+vK2T2jFamtY6Kzlfpi/E1maTIEQaJoOWqgwA74Iar+t+Vg+UKSWoFZkLrCPMR+fC0abELel+NL9FbQUWEUS4waP7QvqWJPUtFTv3+5Fy/7HRW51IK9+sFQCyd8YTPwi489znb8tk5QsqtkFk3WtW+AwVqiS1/zd7sy5GVDFmRzJZTbzxx1vr52bYknMqy7Pc7C9Njw2PTC5PDYwv9TipJ2498+D4W5x9IY54YfnPXXfp7fIb2BBpY7erw2idSt02Lo+K2r8A3ikyACgfdex/6ebvw4JQKTFDfKEvYgPu9su+gKiZmh4rUM+TJuXzJ//px+gI9i5Rbwv6OvHZZnknhlliMfW2+HogA5WTOe9or/9CfvpuiH2QkAJlay4AAJCGB3JOy+2KsE4Xf67/3mfl8bUrSwCyWQ2sXjJVBS515xJ86TQ5QTkz8s5+rz94Fx4tOTwKQQQDCQD0jwEhCGUxknTtGOC88/VlfrGeS8oBA3g1eq7ZOVm6J1X8r3yKKAHJi+xPe7afqBL2kLMA0KeoaYeoblGVTq3xd5CCUH/sG/+vnZr4sBoamj7EWm/500ArDd+ob08OGbIY+Ja9/2dBqKUnYNDSIWgsMNkaAIJMziFz1dlLrlKe/EB+fpz8kaWDW/lvWIhYWS1oqTruawgDBo57wsZvoW0jUukGtwIDBGAOCQKFIEq60urcOhPK7/2ef/qoxMOC674S8dliT13XUksyZO8AgOHj2Te2+srAlMBgEGIEaGDCNbUe2TdZCI5yKzZ+WV/4RslvAI5fltUJx5YxopWJDiQEFNz13JbKkLGxJMjaAACFwI7DAYAy2KHK1+X5cD1Lufw5eY5qBW6tvjrXSXHKd3QLT2UY2IGbvOgsVOWeEaWgwolYABjBgANmAZUdRWcc202xIX4IdCwPD+dyr1wp2n7ZKC0U5hqi75d4hsgAhAUL1mhS4kakNgxxkIufwbc7RBHbBXDkw4LHnZg82a/ibsSG7BW4DrnPi+spSpm4dtcIGYxphy7IcVddavYUBOoFaYNKfGniQ4dtOCzNwd/dgUbtnn7IgCxCSkLIwbkLUGIzBGEytlIuhXObJvQOpWw4MF3e/OQ0y655nT6sVeQQBGHIgAZKQsjJCgA1GNcjUGGNjMMgYqqXCFLfcgltAldEAgNfcLA8q+U+9O5sBmwJTt3IIJCnnLCGpATamVoAxxtg2FiYKk9uz2YHf4XdHrRBTSx6I8/4HMqhDF30NOgxIZh8GEIulAJSzVCMASXIdMFhgwNgmjCVk7PbERMZo8i9HtHZ8KgaA9RtflGMQKV7zBYUZEMenEGB2LyYEIAlRK4GUEWAC2xIYYxPYBDhLxcRsgQnronePWyJzI2gg0382Gjyhq78OHVp4zZSpOzkcNJSUsyRAtSDAxkGtwbg+QNFtV4UNIvTV2pCjJShGb2Cgzs97K0qDRv7K3VzEQOTjt6I6kzMCCVGr2ly0u3UBI2NsAgsb1ctFLopMKp1zgdv3faVkWu1d16MBaOHpKQ+W0LE/e0EeiPc8hFrnybs7qZFQUVTdiXYhYUcCGYnGGSwD2OBYCCgKsPO2H/r+HC0TDzkSzeH8Mt8ApUECb/SkbJqX9aJZC6zy9BQAdXLOVZGxy9qI5AwCSSaMcjamNhwue4mqIhcY/XFfqxy0zjx1whrAti+MNVj0jLusAURx5ediFUPun/pJWLWpm4UdhLIKyE42INkhsEMqswwWES6hHREWttpfsv9UZg1mb3rcjSk3QxSv/GflGBTylk/NyECs/hduZxGgmPp89JKpW7hWQjImgIwJwBiHyWQi58B24NJYTqk30f8ifQE6a4Yive7rZNSMtePx9+QYFDz3KjNA59f8KuREze/RK6kjGYxAYRlkZQsZS8i2KSVchY1yUZYmRCR1z/yifXmQWbNZX6GHptwMUXwe/onMIFTwzO2h5pxn/s0EkOP6l/RlAJkahY1AwgIZsAGcMDbKIWUMOVJhqrYO/zQvfbUwaypOfdwRq6n8pE/KsrzmYPy5DNT6Ix6ZA0A/QllSB0xYlpGRci6KbMBhY6dkY2E7sg2RyBOV+luvfvdveDM5WPM5ftTfJJpy3vv8c8WaF5fd7txcFHe/a2pzfGLGUzb1wwbIVrtSOba8bcPRuW2dMoUj5+5oe2hkfjS3Z7tD7YkqZ6fO2Njew5tvvu3uEikYFAfe3PUpNxHFq3/y5jwIoniDoaB58do7coA89c8Tpn5gEC4mVs+9+aJ7Di/0VdC0iu7E6ENuuvzElnYBEY5035+1HyATwaDM8c//E6EmnH/lp+dYc5mLL2OAkS96bWrl131J2W5gKSy3q/tf+MKjBQ0zAteEy2le/zN3/USRBTgXS91t+ymwg8Gavf7Vb025gfPOZ16dGYznn2E1cI144OEcIM//w+1k6gsc1dD9r/a8DGRkjIMmc1RfqL92FgeukYqJoW4vzGDO8Zv8qKEGkV/zb8KDwHr8aDQwgPP9/4Og5lXuKruNjDSx+moPBAo7YQaq6P6o79alAIyU8eyezCDPPuuNnxGqk6g+I392kdacPH4ZoqFqeN9XYlCMfKZGs2ko0ug9f+8yUiRaKU/8HD97mTGusQh7auToICPHv/n3JQk7i7/8oUflQcBV95qmXQz/waEaLrgw1MjyxCP/OJSTaamovihP62cCG7AKpWBigsF32XNGQi7wI/7s11mWGYxXbQ/Vcx3uezYGuXjxCo2taL+5l6ZIQYvFf/VZ6kMYY6ywbY4uDjp59H94cL/LzF/+2i9cRWYQurhBNBaQ44UzqnPVJyxyAyvap/2nFD1aneMHfA3kMMa2LEWZxn6aYXmQkeOf/ye45Bd/tTcBRZhBcehemrfu/2kQtQ9eT9MLr0zVodU5Xu+/6toOwNSKKHn3vxyDXz7wGltf5zDKYQbpiTNQA9XwpCsxKGYvk5pI1S/ezn1ardjyBTmZFAY3ErH1y7GcY9DVzwSD9/JDpukcb2VVNZx6RWoi8tZ3Q3arpPwzPqZU2BgDOIt+56d5cwrWQgmCFgpUz3Xc6IwJqxlr8Z0hal+yxzRZ3NdW0LJ48d8UotY0VMT+l4rMulGIMES9+kJgUxzENL/jTGrdfng3NxPHkFuVve+vnRKBDWAhRPTf4TG89klgE2hlopqaD2l4oeyVJdNBAOT5s9AAzpzBkL3+hqwmit421qCfcDmyDMbUN5Nvbk5rSAjcSDV2UxI2wND2ay6+ddf4/FKXQhH9hdWF1bmZrXsnFzdsjaVDNK903VgNnBjPNOmJ7RvkFuU479MwVOFaTMNIu48hWi6ETTDwjHGNFADdLddcc+ulu9bPFyJLAiFJVup3ludm7rllfrQ5a/UWBIhbR2haj555XpXcEnjGvRMKBiinHXtxiySCgKH5LSfX7xsZqgrKslwd3rb38I5pQIIAxg9ec/6l12waattRKtvkQpmyDBE5F8V2UjV7cqI5GL6njjk4oWYUB57ylXgrytGCHNf8WFVlXNtIVtyyTEslO2hvv/e8a05smZ+ayELKVial/vCZT3rs1Rt7QD5+1VPvWD/apUyd0kW7KHsLoWxTFIWTUVXYuZj1bB7I4n5qzR7TtNLtv/PLvlpkYkDmzkNtMDZgkJGUy6tX5QFJ4WDfpXdccfGBkcqpdIqUECqK3K5yQf/o4b1v4v7q5HnnnzWSU5mSyzK1u2n3biZGi35Ev9MpozO3MHtyZGp2oh3uDmj3flxnXmqKnO79Rdvv4Day3Zw8//g9XWyDMWAhXExewoAzETpy41UXnhgqitRTKsMYp4BcFFWR2+3sMnXGNDpbFRmnsr+aomDu6MLK6MK21M/V7FKxMO2FY/vb20fOuvTkyeFcDGTrKvW7mQHmNPTzPuFNfMVOR26Oq65ZUoSxMfUNzM2g5kRw5I7nX35gKqIXOYcDBXZKiXCu2llFOxemauduUanf6U0vrNptL3e2XzO2d/MwUWr77NTxM4Y33PhWdk7ExF1XHB9tVwOIvWO4jjUQcsQ1r3/Ofa91rtyMOWdiybYx4BoLS2N9BmjOeuLz14+2cwnhSLIxdpnKRLI8MRFlMTo1O9Eu5P7G3RtXy7LbLopirHdg6tjeZUdF2T3amzhyxq4Dtx/4pvTKauviqrrNWeWOJAAxnD0QpPC9n7bxpyzLjRRbLp1qJ8AYg4UBNNzBzci7Pmtn7yKl1O91kiWMIihTmaJMQWErTx1aWWrnvLrh8Mzu5bwUaSkvzXeWT/p979wzlHtlXlGiPfbYG2/fd7xKkcpiRe3cFOrcTx0Yo5VSWZxzeG9TvnHLHgDbGIPBkrUwnJUaieL/vrN/dKo72yb1FsY6CTkSLst+D0XpqJZO7hlqk8vpw+/wkrE83x0dXVXVKzvjzm977/iIekPCuduvZo4e63X3Lc3RPjKu/oibY2GGuplbrBZA9vZdx5qx7ugOBTZgbBo6Te+maS/FTzPWXhoaGT+0Z2qK3tjcQuFkhXsd0evN7jl0cqnozM1t3Xz48GJ0R3Neai9Pbz137M5rJxbG9s1G9MlotlJvUlv3nnFyfOuhg6dOFROZAU4P14PTluVWKM0+/nElDRV7towuBQhsDBjZVjp5zvb9j2yCrOWZ6U54dOT4xeMHjpxMGzYiXKVeZ9VL28eHKsX0zCXXDQ8vu+iU7f7wxumtG1c565mjQxsZnSpXZ0OKTjWUutXumWpqfffSTSuz1eyyBrC6Wi94E/e0Bnji6XtzNPDxak/Rt2loENiFH/MTjt/2hI1yg5XK7nTsbXno5MiWGy4/eWJxZz8X6nfc3rNCLsqtV+9YjEj9qvLcWG9573Ul5OIv6EyNjrE9gn7hfhFjSzNe7Cz1hu7qbp/tpqrTjwGkVM958RegtYozrv2qiMabFucjWxayZVnUhlaO9C8vHqGoIw5NjWyaK/v95BieueXZj7l8z6aD93cqik174uhilBsX+ycPjLjsh4qF7evz0vHjOx+3mo6cvvXaals1VxZt9XLhdrfszPSvnZuM9Vrol93hF/bTAMqFeuCfcG92K3B1Km5g5guXhalvhKUATOjkZc8xdc3h973v+MVtbzg6W3S29RZvvfPCTSvHD0fKq0f3jJSLm3vjx7fMpmJkouyPbGp3HGPTnRfAys5NqTiwdbGdHJEKKHK+59Qz9pap2wuYuXJxoTOQsQaRj72RaA0Fjd3e002lEVgAloxsZInLbj4q11t8HnsO7TlrezE5t3PzcKe4/dc7e9fKymIsjK1u2z4xuv5ILiMVXi7m86rSWGd6LJ2J6BZbWbq4um6oWKaI1C76Cz7vyNbp5V70+50d9yzOLvQG0AtcB/gJz8wekA1pB6onD60fo5QAhSyDhQzGuX/F8ceJ+sIbL1k6Obs8twDIb+Jt/gefnpX5qpM689MzS0PFkqpUFp2J0XYx3Fk9fG57Ki3gaiXfE4d0vLqkN1EWmX6qfPD6xf1Hx4oirrtkWwmrAwkaR77upYOB2ri452G4HpzcZ2QEzgYMloXBeOhZzwkZkM3UnvltG3qAkIP2ZIfZolMWsdTp4U5RLA3NTjGdyrkzz9x2xvihuZzx7EJvbFO0T66oXB2z3O2Oql/sngyXR49t6yLvH8YtwnqtZ+fIzTiMrMedTtQTU+MRhQXIYGQAC9vkdM7GmzPCLqaGusNXJ0RtcODxr3LTyurk3EZmM+1iYijntNDphWLbsavL9VeNp851QAof2lnMFhoaWRrqyu3VTsda7mlh93u9eQgULI/RpA1uatvvvJ+yUB3bQrh9929HbgBHdnUChDCAjGywMHL/xMG3IkxxqLu6uw+yheHAs86+6+TwPTsWiomp0aHCdDq96X7Zy9Xu009fuv3WLVPubb54X9WeOpqndp6m7vZup+pOmJKiKJfT8s2X3FyBbOhvbAboDqEGRH7hP7HcbRcCwhYi2sNPeWcK6pvxqZQkg8CAZGzIwqFc3PRyoT1H0uFpECCb4prn3/mi8ZjZnc5YmSiKXme110sp5RxOW2dmz793pFtIaftz233339mGjZO7V1PqVMp9iqpdeHrmHb77wxmyA6BzFDUSdKdo1nrpd/PoXlcCW0KpPfb3vVQO6ssTR7JKIbAsTF1bVq6wffH+hfFXTadPA6Z26uAzLzh/vBtpz/ltp9R3WVoKKMOF9xw/OdQru3m1V62MTUfZY3W6U0aYFNXsUk6drfecduUkkJ2ou7rBND3UbY6Fpzz9yU45G0mO9t6/75fLQZOzJ7s0tIwEOMDOOaCfxrs7Dw7vv5vcnVrtzcPxc15y+aGJ5V6mHC7HhzbPpCgmJtpLS1VRLLXbxeyInDtjfcpez9lhUxRWVVTZnt624+ZH7G+DcNB4pqempqaawtr/ezzljz2UArAL/vL/9bQi0ezSoZUGwgDGgKyyL2h79qx3eMmT2sN7Ni0pRTvHyORLzawqIvXnpqsf6/9ORzcuqagmqmJ2tCtSKZHLThmJ7FJW1a5EUZE70zOnX7lzm4HsoOkNPVzPiKGTzeG89e978u/x3HmA8rG/7pdrOieazN508YpVB9XYgmwy7W7F3OZ3/862T1ZTxeU4wnlh68IqTb/he71d093cw0q5kGRsKUsSLnFR5CgrxcLuMy/aulgWgOTEAPcui4aGifW4KUJ+mU/dUx98cD7teN9/+SI5aCyFdx2YTdkSBjDCkopCKtO2M1/uNqB9vGirj5RjeCNINQLCvf2uRpctBTmyQIBtZIvy6PxSb255YffWw3u3TlArOcyA926mWc9uYqAmb3sO5ACyg4ZSRPfBTzvSLgVGIAtAWTn6Y2M73uv05dc+pjNW7qEqyjK53L8xU2sMsP3kRJlDEJJzEQ4bbBBZ0V6+e/8th4e3ibpCOEwrj+5sRs4Xz1rNQSiHA+UIGkoR7Yc86M5dozloqGy7kFz2+1F2du654t5No/OPfMT+dpZ7w/0FE3UgL7VHNL7SndXCwoRzJeEIasACVC28s/4jJ6mbZQemxVrd0YQwu5YYuBMCJxpKEd3nP/qcTVNdrAaCrIJIkZ1VMXtydSz69+Tx3nLf9pLGQu35dlftFdJst+2Y3Xdqjh6VqLANlrGxlHPv2PISZMAOsyaVTh+T6wjgwCE0IMA0KUUsXfCgx6yfFQjXs8giBVI4pe7E+LxicWNx7Ww1OtJ16vdK53abmJ4ulxdWg2J29siRIDuXzpAQMpalcDF9+Nz1QyIxKN/Eomgs1l/PmpUipp71N71oe1XZiFojUypCWEa5WGpr00qhFCuFnSaWUqmFVEnlwsLEoezOtoWYym63J3OROgXGQhmMAeno3M5qiEFqjl1Csz50obwGpIihCx56zslcYEStkZ0hSSCEinZVFrkovDTf7vX6W3emfqQFchTq93O3aM+fTGkZVo8urqbERNkvkCwHdpVj7Gh/b7UHeXCgmbeSmlC0H77HalUmYuqCR5+zvVuIxhYWRlimrlTmruxMLrqh3VfudL/stWcrO0+0c26XVXuo+4L9975g/fREEe5EO0upb3LVpjO5YePmXQdRMDid/eobsxsAN91BayQH42/rGXdtzwUDN1hYEhiMrSzkQMXJg++wzAv9olsEykU7DS/H6uEzr7/x6uPuVtn9KFNFVELZuZzevLV38b7FwgjCa47gvtNoUnHgie1oRY7g3mc9+SEjlkCuY0CAAVFbJ2wkZCTJ1aHZRRVdkBYmJ6cnhxc3zx0940G3v8M9s306DNk5irYSfZWrGw9fMnrjkcmjAGZwWovPjmZcXXUcDShHtG988p986ywqDBjXNGsBMrJlbAlMOCPyytxPvpAlHAvDpQGGHv16+x93ZKI/OtFdml2qvLpxbrhXprltM7tXbrp+tp22V6ra3YmVF7wzeY0hHrZfboC4+JoBZYce8/NecOuQJSMwDY3qAZLBgLCNAIOMJ05sXqXJHMU5Lz40M/43jWxfaSvG5jauji1Pr87sXlY5fuLyg8OdC269YaUTkNj9XjYMBvOkdyia3bSH5rODG57xKidGKzII07yFBQKDCFkCG5AzBuXeTc/6U4vUwHrJg65Y2rOn6KX+2PBwZ3nMRVVMTVRD23Vynzc87rT/4NBY5YKIkne4jBkEmnvf000oDl2YowkR3P7iN7h8NIu6pmmBGaCzAuUcBgFGaOpskutlXvLHLVWzeWO/P9ZZGOtXhwp3OlW7vf1Qjv5FDzuNE3dtbIeRLD+HnAYB4k+9MrsBLp66D9XLMre++E8+daQQgKkvI9eAGgnXCKxCCCEjsJyeefnpOeqYBx9a7qecu2kl+mXq9Zcmun08NnZ06853thn05KMb24Ewef9tDM7gujccUyP5pguoK4V3vfgZt4+0wcI0KSwLDHIdCxlAQBuEMWAMsevOn4O68vgVnXakwpHKjKqlrJTaG9/E3fcvV0Dh7Q8/OhHI4PzupTQoyDzvXNwoVj5d4xZgn/cab3TXlERduUY1IINcFoACWchgyWRWg4wjRQI7+lHcm0Ou4d7rp9TPuUzVbJnmNm6d2bxz22JFreTw2Ye3tpMA1HkpihgcwWN/gZ4aIF/7RECc9Zv84j/q64Wob8AygGuRVssRgwVgBMiy1Ds6Vkw79cuyTH36Xsr7qx7185ntueVeb3V669z08s7JGepnTFjedMFMDgxE9XLbCAZp7v22l8iNYuQZmyw456+9sSoFbuD6EBHJucrTlahrgYwFoOgf3l1WVamqS/RUDE0NLZe4JngrP5nnbJpVNnZQq/iTL1rsBnX9P5DTYLGufPdB4+xH/bwAb/y+KAPVs3E4bDC2saO3AhYIwCA7h4jVmdn+qNNQt5+r9sTQ1NDSXOSogdhIrZAMxg4a5/Ksc3bgQCaqm98hg1h+7p+cG2Gd/r5BnHdqCiQhEEZSBnKBDTn1MrVyHYEUjlzOTA/36bXpYVx021XcfLdcD4FpceiW95pXqZvj3qfhQYSrV9kVagBj73uHcL5riiAi7DJFJJdlv9MvpxfKslxdjRuuqVwDwsgCA6lzyS0lfUgMdvkbNFMa1YhnnHAeTNnnv0FBY+vw40L2xLE/rlOm4cko+6UjlWXqT0aUZTiI6id/UB1ZRlgYiLY33jJLNs0KezBYL7h7ui8DKF36qgxuOf97J0INoHy5d4Zh4Tm0XD506nwGGVlYAHbkKl29DSUGv7X7HZZjNCyeMe48qJC3vF5FY7P8csPZyrlG4EZukOPg8UoGGUBWgHDB7ptHWSvF2x7uWXUUtz/KZtA/9cJoBPno6QkcNa21z9ou6suABRa5t2NGeC0w1y1Gn7qK+ddto8EmT/1NU1YDu7x6P2YNurhpqFF9YaIqhm+p0FpgNu6nj+vkePgVFoNefviLaARaOHMza1Aev4NswGqAZJQXLyoUDP48fH8/IWoVB57K2ijrzpOhRtbGc6eFW8atu7KMEQ1lcJGuG0YMetPZu7BKQxVP3G6tBeAjdxQ0686GnuQWmWsPtWleFlFpx8utsBaKjSrdQHHxGRZrpTjjhmZstt5DprXy+IuWKjewAAsX1djDCvDgo5yaSKon9j2ctfim9W4EStvSfTlaAs+/vC0aytSazN5b1qO1YIwhmfrF0oVL1toiJu6orEaA/6vbcrRAnnrUvjZyvbpyFDr67BPzmEGfu13RMHT9Lou1N07eWrgJE//VX3OfPDC44fkr2YDcQJiq/7bHzmKwy0xQ0FjTXM9aLY5voVnxxP/qR32vyAPSGxzMqkEYkJ2jnXaee+oq8qDKwfyS1CjPzhVau4D1+1AjKO58L+/rec7RXI7LnzibARmQkVGIDQ+74QCYwZxj4kAb03hIk3gtEzpr1M0ov+Qt/xwvO5yjGVE96Lw2TQosnFef1L9qksFdpF3ndS0a5/meWftj9kTXakLc9KO+9v+2I9tNxGUvHsr1BGBkF/Em7n/+PQxqFeX1ryXTZLQr0NonDl1fuBEirvn73vAnf6Tkejn2/TKXVtQVtTLgHY+9az7kQZSDx/8R11sNrM6qwKwDzfEDNJ1j9Blfmn/iZSJHjVw97cFLuV7TO/6OK+49l0GsnEZ/5c/dSkmT6lWsK8X60aaQde3TvwzvejHbSH53v8poBtxIVhR73/eJmzYjD5oice37egkpN5AVy3mdAdhNoZyO/wcv+w7eNhLx5F9mVxtAjaworv6LTn3R3SgYpNle+V9fY6TMor7VjeFgHWomU1OQY+LRr/Zab3Q4uOxXvndIpnnzzt73FS/ai4LBmQnOfssPIWUaO/cX0LqETGe4OeR04i0/7Ge67dR/5fx5IQOqZ6++3Mud//DTUTAosxIv+nFelSTRWP1tq6xrzdhccygHj3oH140cWRIgGjsPv9zNp95xCZhBKNnc8X//eqPhTLPTu8dY94qNy8hqBMqxcmGI5i02v9zw+edfgsyaz0pw4c/+6EOUBY0ths/ts27uT5NTbgLkEM2bsXd22+iLTpyOgjWtHIbH/+xPHiVJNKm0f7HE6yTTeWcb9ySpCcQA1dtwz/2X31XegoI1KikM17yt131JRZlFk0Fn824y6+xtj3ybd9hqYqCeedvHdl247+qjKGi9JAdw/K4XP/gAJIkmTR6+8lzMOtvi7J/xX5lIuUUuV7vjZXqviYyM8QAEEg6A6y+74FFnQEKiSbvgtNOPsi7D2vt7vLv3cjBJLSHvO2e1vXXz8rZVUys15QAb2sfPv/a5d2yCiCyajqyZP/j37bGuz36dsz/Az9tOUgtUwMj2859xcPfVN+/edniyN+2mYH50y6Unzrv33vEMyVk0H8rlq/9Qz1vQOg+K1P1VfsZbw3lgDQXQW964cePi3PJYr1e6aHeXpuZH9u3btB3ACVWym4pc8HJvNAnilDAH5/2ir9sts1pkgzItDoNUYNOsnYu474HngohTBJSTHvrjPMQpo1bUNbiealxHCDCmabvInPbA0yE7OMXMwfq/7/WPJEtq0aC1qVS+7V/8XMhOnJJKwVOfdud4hPJaY6xCrN73wM0gEqe0wsXjf7I7x1Moa20wymLh8LH3ehQyiVPiHBSX/WQPPpATkgaZyWLs/mOnLS+1yU6cQksBD3nQs86bcilJg8QIibT5oov2bzp/vkCJU3Ap4PgzX+/5xyciIeXBkKG3vHj08GL38mtiGBScwmeC/JBH3XnFvopkJFCrZNtpYXnbtrlg08H5bcsgm1N+KWDl1JtuuuKskUxEgCQEamSISGW5OtbveGj79u70zt1zIJsHDCUC2HPFtY+5dMtUOxsHqC5gR7/XW13tdXqlihjbvGGmAFDwAKSEDXnfNQfPOuOMPSMjo11JmHBK/Z6Xl1fHJrfuXF7ethrUCpsHNCWC2qWh0eN7ppZGPDSEo99fWJxbXejMTfa2mdqMbR4wFQKb1gsZBw/oCiEwuJ5kwBjMD8BFAFZQOCBGJgAAkHMAnQEqwADAAD49GIlDIiGhGKrGACADxLYiISgA/gA0QvsfwHYnV+7d+ZHsY1j+uf2H9Wf2z3HdXvVXlo87f9j/D/l78t/9B/2PYZ+hv12+AD9Uf2D9dH1afut6iP6X/rP2393n/merf+1f7n2Bf6F/qv//67HsU/5L/w+wl+2/ptfuv8HH9S/4X7m/AX+wX/3/3XuAf/D1APQA7D7+R/g3+w/xv7y/t/46ecvic9ce3P+B9uXIf1p/2Xku+/37T+7+g3/O8H/iH/j/372CPyP+ff6n0Yfjv+N3Reyf3P/mf5T2CPar6H/qP73+RnxY/E/8X+9eqn13/1nuAfzz+nf7r+8fu/8j/6f/l+Ml94/0X+99wH+Uf1P/Uf3j8o/pt/of+1/m/9d+1vtr/RP8P/2v8X/pP2R+wf+T/0b/Y/3j/If+3/Tf///2/dR6+f2u9jL9UlWRjutuQQBApt7bZHdXxXr+qngs/ZsfkMe75rlNSDZ38B+VdMthMTs5Pr4TBbBs97uo4I8xEm1pxbaAkPzK+ePo7l0rzuFQgWPFbdUgELfIf6yXwzBL7vS/jUf5DLbsCFS/uiFMNRWDGWvDOTs3q1iDKgFisUjpvjARPGG5vc20gBfouty0IiKFiqRh0rAagQnSo/Zk8Vfdf7vZKaKgCaH4D93kO/8RRxRF4L1kifHu3n0kxhRM4e7TYNWtuveAasa4BxQynPYh+5b00EW1xTqZ2KMD5t5X4rTJ8poG5lvEw/6F8++uGpy+AaVI9ii+dDHfmv33F0qlkPgG9WcEsj0hx7xwrlVdOk/U+dgXHAdjP23uRytf97fu037keBj+nQ3ZwrUNdPz4KfFrXv9JtP41LrekjQ/AKRex6O9j5TUW8q+1U9LUGdbsXmyIRBuzGpcoUh18rNhPy+SRm1NVWXPF93AaJQ1dytmZdzjCYe30SNFhirOIRgeSnEqTZzHy0G3jKeLp7IbgFRGuRTElf//dpOzniTMuIisuexY9YKjAFQszT/zexnT/nFElxqWkm7VcUGky3OdfDyXuZ9cJIwH3b4L9bcKaSP3U1PKgzK3Opp5Vko80T6Axhd3rwkJAUR8sVOsX55OZauucwsXUdjjjCWdc6D3hfcyK3al1AWLw80Wp8arffAbHjbNG+6PD9itfH7j1OhkvtJH67bBAOmJH6/2G2rnrZWZBWf+MXdVHdJiTfKbwEWTuF/E3J6IWRDv4YUEEur4oGneDcCNH2NYAAP6JGIrkfIobbgyIsfu8C0mscoPpe9ncli8A/5xb0oiZ4MDHmICLDkTCRT5QVi4PDRbNAZj1PR+9USHsXG38PbkCqH7/f5bPIAKADUQgMyuNltRdOVTSi0OnxOhZJH58fJH4lPl/wDc/5hcgGH8jJizB6D6dUWYPyLnQXt94hrE6qNFukI0lv5jisswMHSuW2/rv+5/9JMyMrb44XhTkt9L4LevtHkHEX9xM21r8aG934iK4RsPg6dcZRY6ZOKv4KDS5FBLn4ZFJcOO3YzgYH8/FI9X16yj8lzOfDUVF1XB5NWyA1r5qwU4s0T/ICwpCLXwKhJvcV3a4j5FpcIsQZ/LWgafcYWP0xdM55CGnp0E7cz2KUphmFkOosH1Zy4PJmbaLcy0dfKeln8cfkrs89MV+cFBcCPU6CI8iFbVYR8frhi5CRf0Eeb9UWldpq+uxZV1VGna7CJp6Se51mTaBAfSuHBAvS9LDzFjRYkvTQ9s4VCXMctx9y6xdnFlwAGCcoAwf0kFqnWITyk8wJ1V+q82HC6qbqeWZ3mqxJnyyebYCmLon66c8/hECg+sGqA79HsSOhwX3DoafIg2Gfvy1KjiNq9L+YoE8N9Y9nJnj39dscQN/wmz4efbRJS9uyzbhj1VaoAP5oMmnASQqdH2TsZSkahV5GTEqIModNFwHUgsJIRHF34CbH5U66O04882AzJcqdbPdOZP9FDxrArJKUMnaIOjmfuQQt8ANV9pAwdFb/ImbRrYyMvzWrwT1yicNJ5UXD1jbBeN4DlwdehIsXuhGA4Xif377baOFF0vgYNgQmS3UXwWejpcmI5WRujGRATZbGJ+CVsbVdBhRMx4fCVP7Kqy9ksUNvHtXWx4sLFRR5QPfgHLAx3Ue+/8LQlpfcaZdOemIJHxCKfNbN9JB3jEq4yTtwYQKRkaW8ca8s9NVf+21WZz5leVexnjgZXWgJ8BOO4wn6oxFQT04LcmwRi22JqRW9HvvS4+v9tD63g6yuJ9A5D14skT/F3+INLA9t2Sx+Imrb1mT+24BVxWz5acxdcyjxgTfUoFRXQphLQ9dq6DGZj05VRfEJR/25pN//lq4H+cCJhk/9k9mhuDK0vzjhTev874Eo512ZbCgF5fTDJv69nYPgrU+pd0UCwpTCtcNFliU0dTij2beIZRaO3lRmzfEn08z7LCO2uQcPHaebyx7iZgn5v/m/OVs8c9wLoQi4fZVYfNcJRdfd+gg4FryvHVX8HKsuHn8t9z5+no35VICQTD5H5+jC6wfuW9WaCK2nBw+m6/aoNeqiokPP6/a53so5XE8+7koxR+KCfblA5R04G3/LyIY850hTCvxnYUenI/y81F0HtRtY8Ijn7k8alm2f2fiZgVBnprn6NpJgqp8+pGrdtHkFeHqpaEmxz76vcTYDadaHkLvU5oKU8VVvT+HJ5JraKriJWKAWVFvF9NTBYjbET5dLTdLDzyhQVvj1HBtoMTe3GYW2g9lmg/mHDKQMQfRpkYv+KcCeRgUEmjZzot058W0rgknSjDjHd1TUGuwygCoDNC8g9PjU06ATEbSWvsx250SdCjFwZjgwqTZ7JZ3R40ET4kB9Gy/04dUPoF385lQxTAZuX9mvBk0eJANzVqLMZ5gGM2J/VHcwpKUGrcrh6MUuTbWYb/W2TSirGg0o32MipRALYkk/+ROc3oMg1LDlZReAO+5wWQUH6CKLQJ4kxZTEQZRf7Z24WjHssfkRAmx11WPZgBgQGHGdbES5ibai+J5s/H8QvjeAEBR6YK4aRhok2V6w85GhvQNKCXqadgz/jiIYBogmsHET8fSZwOALksykEUO6G8VZq3iY4dOkUQ+QVh0Mh33dY+xQsNS1v6ANExxU6gAaDnly0KhwyiqeQwPiDapK3IiTBT6elkZ2E+6oSZymDVaiSUbtfEe7yll+VvAXZSfsWJlcGmt/2Gf/5XQiQ7ZpeAmenUYi03709RoCSCDpdt6B6q+oBYGdqx6gjUJubQLaf0VTMooMKW549G+hOlP+uTIpwgmT7hDV24xjmPALn1EJ+RdpeNBCHiIwZCFL/YftNI4nZCfbLCpqFXfsRo9q/CO+oadMa3lmCRsOZl4OxeO8qk27sTIwVWvp8j/liP0Iwl1bi7HPyZYlX9Wy38x4C3XspdNSo+nMPSeMa34kMLxWHaEPWcdIR382M1oa19Gh9Ht5FCiZwM2mmuqFHKO0XzKea+LzE8Lh+8g87uO1teQgU3aQzbAchqE4A3t+wHAVS5x9m6YTl+r8WyfHSmgE1M5cB2whjt++OvKVfRxJbhnG1W+HjU1BZRetIvbPGKeAoFKWuhjkVfg8ALcNoY3CYmnvQG6LHFxhJzHcR/d+89Uu1slR1SXgZrnvXCS5AgLy794sJ+B0cR0Ghzpnp9qVkpFiJNXEaMKEvWw9Tuv/ZBVW21hYisWVpEJN/sOImF+Uu9VQNXatXui91SCD4d5ZJByBhPwil99nrbCIXjaZRvsAB0JAH9SIUNEB4YEUKffusJCv1lWatZ/g1zWZyzOQkdlt0HRbway/SCSez1ttQflTL5FmB14b9b4RE+WbA6pxWCI95XI9P45D12rWmZm4KBbjnQLYiyY+XLy11lRU/BewgRLnrRr20cCOD7EyYn/VaO4qA0bvWujJlSioSHOaeoQJcXkeG5IBIXy+oIwIHEAdNSmc7rO613UZoFgNdqemHJycLMtHoMBcOQsSZRli7OJF6166t8fTJM9qPDdJSmIcaUa98YzRVWaNe+GAqLCgWnZNm97+4jHpWitolenrKSXTsgOT/qRHseAtEjbXq5noMf809auYwHw3W7TfayzBTXceVvF1bsEAXmBcGJg3bHFzYyRSSV+mK00FMQQCZgBXq71TYhQd3NkRB3Z7djMgAI9g0FSqglOj/YcfBsA3oRl21hvQzhbbGh8LFeFsJxFBotb5qgQl7wOwmbnrfbwbB3uoUZ/x5vCPpU0mzMYgj1+23elIP8pyDyKrudE3i/eOkyY9Be/anpahcB1pR8Fc/CWBJve3uVOWr6bMJkcUjfXuWr1w6Oydm0HyfcsBHuYFZkbz8uTkSRMGmkAJHIytiX8L/KP2pRttAYib7wUqU6IKjV4iHrPWJHwMYGgTJ1TGvSZs9VGovJCl+5MFyi5G7II7Ya+o0CQ47/yQfWzKL1L9FqVQa50WsO25ihk6oXQawsgO4yc+jA+KfGum3t5uJdskhoGptGdTxTg2nwuiVSkibnvEIyGcv4fnBrHeSdjW5GeeK7Fsg0qw9HoRCYWqpPHketDmiHbD2LhlEtGTGc2lvQDg0FD5hO7/FJjqklqPCMkhAox8U3uxq4DruopYmJO48RuN9PrNgNgI8k8Robui8CJcehv3oiCPN7l0ALNFPKHpvPs+HdRVDwYTt5eGlCukRMzmqN7pQepUg9V+MDKUtj44CmoEx4jQoKeV2fK0QRxT6jcZM8NJ1/4bjnu63iQl1ldWb9tWbxM+v9KZ3cYoB/Evcbr8Wjz5F9b6itmzJcgxpMN1iRpgRbbirXXY+Y/V+ytXzhcBhi2VnnXwWboG6ut7BwX/0xOdhQjW8OjKPevkBBdT1VJmfl8xYCjsoKtPGOZD7/BYJupfMa1Y2GojRG7f1hqageiZ93jQ7F92IVbISmHySJYs3KT4sMPtiS+QGqtSPxn9XRfIKnJl5P0xfcDUzyUi82FAT7Ir/BLzrnP5jVFFysLB4pVCvPmK4Mgby2Fj1FmEoLwoHv8iX6n4/LMHHFuI8eiXFZUzFHemqMxzYq6bTz7LPOay0aw9h3HXlTMb81++eTO2BHmV6qCvImeV70T+zPBBKoNLLxlH6mmiveujcL2tAm4y0pTrWH/MDP7NbCDIZV74xO0I4KtKGPs5N7mraT0+tV4FxR+6broVz1Wep28+Hryw5czaJpm2aSMl7tIquKGbMaJV6x4zFc0ZXNctkrH0tgl5mqThIEF4EgJoRXK8ebkZDN53EOv1D1F/j0bZ7E6m0K6zpSt7r/MYW6V571BzDd+EEK22sK/XxK1IhCQnvxtWlfRRwGXvUbVcQt4BPpEDNEC/BoWTmtLQiha3LhmBKC3V4L9QZr+8OqbubsJr0jeN2yYOAQR0kZhyJ7z9uO8bKaHitbdsr1BuriWHENf7l89pUb4U68hWKhiSwKh3ns35mS6pib7MVPF9pyRzqoA14kSpCjq0qOyP6yAIG5Ks2gOQ5LwxQQArjxLb9JqBCDuQ8/cHQAB8AtluovUi/vMG5xpqNtF61K8IyfjZJ1hUwCZLKsFl7sRKNxkEt1Y1EWCR58G/XzE2EXtv8/FugNSjWTj/2Xcy4T97ohhTtYtSObY70NM92FSWmKBMa3dAil+2zRHdhJhYmS8EJa/qwhhkrBHHEooSog8IJFgCQxpmdNwGaxyEqRg6pgNZYMYYHQZXrT2iVpai0/agoRyAfaEWdZrQXP3LENkW4w+T92mCXZ8wNKYQ5afEjR52lNverM2oZAUpX2lCI4nWH1vt2HYD0VZB1ahqXiy1OnrGMGWahs572GhePbeeJENyJoG7QaHuWyBQLaweum1CQAXpjeLHwZlnEF5xGb+A4ZjV3I18eRjWWK2qRFgTd+7rTyVq+pIh6/9ZMtGk3rsCb2ZXWeKr05tmLhmxI14081EV3cBwtKpDXqrY36BmsnUcSANSMXfC8QDFKkehVVbNcuMVV1FXMjzBssqHeH3bll15SefY4KaS6rwD+dBy8MCwV60gLIRVv+u02Aek87TNXEFBfejaex6yMfBGp8aEkuqjyC4qAlv7zsxZ3PGxPC+bh45ABu4W4U85SAi1jaKcNC98ZqIamj31pUlsNk0RPp+irNtKycJPtAfM5Iv9dUSnHiIYlq1VwREPjnXM3zM+cwam3JrrBvoRdfqFOPlzVfzXTrr1J4lJ/uWnVK0AVl/QmkbmbMqDDzwJdYkzpMXd74JfqFfNmflje1vQMGG4CANAIWwkp77XaOFx19DcH9+gv/Bo1pGyKsRxulgg/gWVsCHDD5yn7QZ7fTFr/hSBraFWzN5phENqoLMwiyNQtkXGh1nk2J3HNkXseAvxCL8GkbV4baKM4NzkTVJ9XaHuqijw5OwC+eUSEC4FSX19r274EEHlqRNO53LawXZ+m1w/uAjPwVuIxrFJoIM28jPvL1XnD9BER+y8aZn13o3k7G9fT36FBOSLBJymXUcZo/itttEBxaWQbm2g/NrQuD15J1uq2YERZx72ikzwZaezmulCMBV91eNVmSJl+qtzRSqpQ4+hWDqrAQGwijBU34mLTHeU9HgRnc8Za5a5hCFujqvtm/o4hZM+/g/gLy2upwEYpZUenE81e8jogiNVjVAGXi8OmI8/3jrrSbVgEkc55+odCaGccBSOEA7EobfYNWh9KuuZfZ0FMSXbbr0HFViaqZPWLyjrQxuNlrDimeLYLt62/lrdpmTHP23+P9jdDGE/2/HjLExI9jQGlEbLtel60Dsvtl/+XxGyye3CBYJW6N04F60n2iYY98md2qHhfctN0JYFvtIIBZdRfsLW3o7EdZsD9lHFQrLxwhAvVwsocPuGuDavF29jBm7AuZ6iuMw+TmlWYST+69/7g17I1xanHqPFkFOwT75JYqT2+2zWvBf7ihN0MMPJ4umvtANcWjRQYvDJg/bfbsyTBP1dPzk4DPAafyfJQZrX/1+B0H2efkSJoV4P1lZ/lcRWVV7keg0+eZDvGl5ENJ2JE5vw8DTHy8zBIeTfc8yAETqFmRksVSIAb2GWqQLh371Q/H9qGJ0wMHeNS1iIAo80FTDor4YstlO8CzeD8cW/Wa2XpC/Jv5ceYqPg9MLXA1nO190VJsVHIBKIMy9LGQMVK8/nNSU9w0eP80E3076TbLYcmTdzcGwrRk5DJk7/PjmSalEb1eBhBIh8kodCOzE3bH2XhDa5qaHuT4cBOQkjsXqp9yyVHMXQjQB86j2qMmBb0kqVSvrgN3I0mPMzQzZb/FUbqBQi+cHfmQwhtttb3H5uV71YooYfxmUO4Kbf055RV52mw93LDXMChlXK3t2UTotnKTAMlXUivDXZFT7TIwXrO4tom0SuTSRyDrzJShEQMumOvvnm/gIBR5YK8LUy2hOCgw8lKYe+RyLLJqPSm+WBxiyAV+XZc5kA/nvP0+srQguf6s8XovclHypERCCasmNy+tH4Ksuhr5YAXRRSQwz3HHnS5/BKPm8n8vHJoepiRRfWlyVgFL3dvurPrr2Tdts8Tq6AygW5ZhpigsEaA0445ULzsC3CgurH/000ZBQAvlP/dI30W2HMWZWhb9+b7B3iFSzRWcv4p1okCt6WGF1p48Ew3NOLk/LatBZKnuqkXmwNDGW1G1eONYpUE9hL51/r6kP7GSF0lpzAYVe698dnPPO0lcz8x1ev1vW9+U/rnskMAxAQ8P0sA1TvjLmjObE9CIzqqHGmAGBs6t/COYx4DJ+8B2/zX0EogBb84XegnAp/mw3knIet4PDzkLaylVX9Bn8XlZE7GuoIBBbI4ubhxXV44tr0BM6juIIjcFZi2v47K57u+K89r8i3jiOiC7E4KCJnTklI0j6H+cL2mcvwR7bXXBvrW6TYgJQLMkL7pOo8lDj8SP+sdFh2VbZBQrQ/xxAfCjT0mlL58ueLIgjRb0zs+PhjRT1YgKGZfV890DBvtlHBYXR8tg7A1dzVxcDXvZtFPPWEgK+dQE3PnYC9h1HarhWCNbtjUTLF2+4riuX6GEB+RIHcXdGMHdAv8Lw7kXesR9qQmjRSagusIR+TWHVXEPZ15a52pu4S0GS8ybF5hlEXaYqQoC2jKuyx9e3fV48EjUPaRsUa1EjdzU/8b676m8yE6Fuz578PjAFdO6iaqR1ndQSypkHTw9F1l6HdqC3c/f4VtGAR/44zdjh/pr6/yK5/t8whEfsqKAGeo5/ylpIrNpUzZb9glj9iAEy9V8v8eCDjN+jaAAlxq9yVFqim964ACk5QEf/AKGfb8eIrkbmexjvxHQJbGRJ+QMIm2boF8G2MGDEzqGrvVoKIoA7G/3j9BWF3oUgRnHLCfdD/CydiYBOmCpqRyOMP9M0ogwK7B24nOH9fLdDYuqNzw2rAwfiTXl0rnHcwk7vKJUAl8AXd/gy6d4Ztde4YmMZupPU/BGn7uT6AGKNAsti71Sp3ACZhC/hnGS1dlAgCQca53HsXfQpeZWfAIj0R8+NPvzIKt+mbTPI5LPerm+T67se9tRrSJ5DcSLPruA8jOMSF5AoLTpG6tG4eGDAHmyVk6g1ckw4yfKnDDE7Sh2T7tMXyBoGf0HUYnUL+CI+Rdoc68zriw5UnMnJuc4n3i/s7qVeDVvWWvMbgu5EbOjSb2SNhww+LmABUd23szTgS2zK/5C1ddZv/4Y4+L3a9ke7i4k4BeUBz4EyyfLYULqWAqaqgwhQNjng9LCPVkUHfMBY7lqp2RT4pkfhCfBmJzulAll6nWJks843oWvzGsvWHpJ+iXZX7j87WcvBEPOqYLQ/Nd/OIWxUaef2UirA1PZ4aPA6RQTxf4JOFl75+Bs9FxOz8diQYEyAlX5gIr6x8DN+t70BpIF0u4VPz0CmUbCNLEJTuPLvVR9WykFKLxNp+GewGgIPywascZuJkt1gkkzsh/zLvxbtFvDnoNVp5aoNg7DAnRfyTamaUmpfuSoOiQ50QoMGis4QTdzOrF4NZKGQED+PRXKWXQdgkL8/J3vvGfxam3CqLVIXy6MQ9tSTu58Uxhl21G9yaxn/pwIO3MviSJS3/s4e3U1/648/X3LE48K1ZfR1NT9rCNgB3D2d8Yzv69x02gAft+5XYljuZs0xZarG3slpzSyZoSktriAVZflY8gQD9bR+RNi7K+F4c4BNoXJcoAouITcnhLkqfj3zAlSvYdf5esegrBwAcqtlxvTPRhNwLAuhb+ZvY6/R4p0qSGpdpL5gRTekjJe7SUc/nykyLxstnHB6CuXT6Z+AVjsYDcJyRWMq02kYf9jyY5Gy/CidNPsk7LTA9jHO6z5VxFrSxpOHTtUeXhh0vgEHmcpvvmEX8E5E9KfRfiwtz3q0ILv7RFulmkenZF3wBY3WzmTaIusVoNBrqWez4MX6RvBpmRZDnhDjMA8tFynAg4tcSEEkgc855w1fJWlIeC5l1utZRUmNMOG/tVO38kJ6tB2+hKgFJZDWAbis8KTfsFF2NW31TPvVORddBuyvBszsd5Pb8FYmm11TAcyQglmp1mjtekILRf5XOoeMv+aL99prwr3iOwrd7Zzp6RQLP9o/S+rPpeFw5wFqJ/dfsjS+rVP7TyBrC5O7Z4ueuFoeknAvWK8X4bY2nDLu/wJXCXsYWAvuZW17W+lz8zMRYqEQ0pGI26q37JOuezoayAUtdn/qOR1Ic2IUl5+uheJxn6fn9RjlePyQGdQCSZWxQfGx70EUFHqkjl3Pb84+yIZu3grr2JyLGWW9hOwhavuhPTGBQLBmY2NPFVNaabPYJbQUQd8iZoj9P7dZDGYiroLPjFulAB+1AkEe2K+adIOQ8zxao7M0CoA2I/+JnnaXAzn7snzh0Quxhh62xYWkmDMFBptxSdfgAFXsAmdeVEg9NfwmdPf8XFt+FiryFz5OkIO/YsA6CMe8q4W+FIeoY2Ozhmp/YRdk2nezMMh+jQQ653IxDNPm2LXnrmTlnfsVxId6gJdK/FDBmaWmYlauXJcJAqkrOe1UmAqyXCDrYuJPNs6VFOjjq1koOKA9b1XHGz8EaK61QN6xjUZOfKaLEvr95aZRGsVLz2f3jkRwlaDxsjTxBvXoFh6P6Y1Tn6sZfwjhJEHfBYxEedbR0i5m5Nm9crU8lpm3PfNrj+kgv3qoSmQ6tjnLB164Sp+ihl2vZzTagM1I2UgXUyLXOSLfDFcyd/zZpV8N0v6d/wJew4DZ6C9ZdC6WWYL/ERrO9ZiWb7cIaJYb+dGcXrJ5lxHAp/Efq3PPnh+kH16arWiSdnOKaaKJ8h+aJ/wSPeF/+fp/TdSXMk+uoNyFHMzbU/g95HDVrOUDL3+sf//99pf/vqj//3zer+drJvaZSSF81X3Do753qnl6nwgsgABY4v4mkWGi17z4BT6fEQ4o4tOiYc/jVbgvOIK8ZVs2km27oFf9RhkLFgVQ2P7ppWNG7VoVGrVavwie6lN1CBlV0TVLzmWxW5nWv8p4Tsm9LVd31F/k+K9V4ybI4PAk4Gcrptj2WPALBdc1mlY7XtIe9H58EeVgg4yhFujXLz3mO+vQfaOjMMYdYoQmZxwQ/3xoCIKfebc0GEnJARSocp4p3AgADV31poXQeOkNroz9ainrkrU6qtYqS1Whl3fTt1mar3rQTBQsvSY45g8vNCuEtzmfcCuEH4A4sW7cE7UPqnSFjx6+vzknFWEN2wVN+5O0gT+fpi2vub8dDNITKz3raACV9xeFoxv/pg7oud/Qz/qTKsPbmJkxUIzaWH+l5Ij0uVxjeTkNI1sjnU7BjNA+QHM9alxvD6iJJdOqr15jULdkG4TX4DMSgeHh3uV97Ymv6bLCFLO0cmRiXxuOpgnpayzz3Xsoy1GWyAC+73sqr8q/LWhwam8L8ukC6qsDXPKJP/aoW3jeHKAVSbM3u29eKasz/y4ZKdZi+glXAqkFTMiSyAk2AC/8UYy/g5rVzP5iGko6dVjdsZHZaxahgv2PN44DPk+J4170X6ruzoAmW7jYrDQeRtRouTvk5aylMvnFMBazP62m3cCgHA/t/otAljG3HgVaW6AyiDHEPSlnRI+F+qI4F/4BOfuGBjHJYrSfyWMaDM5Uk0KjcPRC0RUtdYVDsxcgBCm5QmXCQjcUZgU5P9sAXm/GVmvuIo8t094r1CHu4XWg6KPr/73i1A+kWPBXOUT0SojufVGEdP9rLymdgq7faOtrJ0cKmZ6Mj6tTcOGv8TgLanSvf3w96OnxMZjXN14ju+7BTfSx1ycnFqiMM9eO7R45pHSFGtDx0M91FSrTZdMPhT1MjQd+H8q1NI8n5aEeDTadjaJ0hh0ByEkll74IuYP/D41n4v1JYpsSzJP4jluZwR1C904kcxeswJoYA1kceljgOm4BLjBHCmkptZLNxXGSL4GGHFjZOUWMbBTJRjzE6LmV/BAt/WLoyXBEAABPjzs03DaiO/xkS2NbwwSl/NRqq9S+ECYWC/Y6yyAYsH+EihOuPvkXcc6NTk7A3RjLlSr0y7bH9yJBLAm4z85tJ5ESi6+HT3Ee63T62UFE18iUziqlhrBk+onKBawwp9mdxhS9s+3h+QojNf5BeNzW6HZcSiDzT6vOU6cPdiYpIdPkLKj8W02KURzAXdhCcNvSzosY+KLWhtWBrUPG+kmBl6u3AE8tA+EY44emId/JdeEuI444JJM+AV1W5j9GKYjbZ18dScPTOMdv9UFkSAbYfi4uBlqhsql4Z6SVYu+zHowQdACjd/4Qn29LL6T0midnPuuaFKdDBKw/07xmo2g5wNSPFi8mw/7eRw+CX20c1udpuXduUUVSAClAdsVAZ2dKoOVzZs+VzyH27Kt6fVlG7kYLlZSKuok3/um0Oa5LZEOf0rlXUdTJ5ve42dn54416AHO+iHnj9Y/b2euyIPRMZFc5EE9ozoMOubgv6Od39QU8Y5QyWigYOw4Q+Kp205jm8YiQny8XsPz2kgKvsGDP4nSnlvn49PEcrmPuBk/U6TXKPTJ6DYELoFXG+Ozv7/HDT/iXDgUZp/wHKzUEG5YFg08fdjXwGPZ2iZK96Pq+fWvnuSB+JYpiDnqBuJthC5ymjLQxzvl4aBNAJ0MD2pue1plBGd05R/HIRX4VXUwgSh2xCWeBi9dpiUZGCnLxd98FnPMC4E+c/GChkvw3qAtiRXXBgQNyWiKcpY2YZ9Z85x/8NJVst2uNrCyXlAmzIP4Uus5xsXCzlGvWEG6pXrPHEhdJxcDAfisWXVb4OEzMoCnSfB2MvvIAf4KDkw8Ub/k0eypdKFTF1T4iVX27QqS1XjveeQiwqpyueQOZQ2yw3c6okmNgWJr9IULKJQR27pZQyBKrpIj3s97uQeWr28ZA1NYWgJQQf+ASvgz26gjjGzfgld2QY/wecjWoBYuKuChMw5GPf/QIbtplneiXAACv91ziBoWioBQaEufYp6SHZkt+KgPbpNIanwU2xvOQW3f27+8vmiuP0l/GPYJYOrB+k+TleJO906pilnepOqMLuRP283CHZxXQH4QZ/iLfzQEKzsVb4cGy6dmIXuMKO1XhUR30FxqkyKAtGNZt/yDN5N/7GavymFU/z1IRfjtON3es5XO+Vc9cjmw8brQxlJQMqGn7pX4G3y7AbvXS772sBfHeGiUiJVXTbk8U7Q2qCPf3zClH9SuWN7tw8bCbUaLTSkm+DTgKSkiz71Xg7U7SEIApt1zbixV3EUwP9rdaTejZGXHflGNmmAIgEZILbXraQoF5S2sb6eNVxBjdqPJqJZ1zBeZb7VUvQBN7WBNH/az4csL539wKIKQQfxcJvmKEvQnIl5TF2BlQonhbl5K+sKfzK7AktGys9bx/1jzblA7jH8fMz/67zg08Xj4mCCKDFhaXTZe9W8QMiQe6Rd9U1PJ4XFbN2ilxwDrGDVWik3NAFScLRTaX2C8wK74hWGpcEZINz1EV9paxXNVgyU9/H65c8xmuXqI1zYnJAHGtI3VadpCXRuRB4Llzmch4LxCOUH36hhc3wtI+TGLC/u0jHkFATzMKlTC5UA9fbUP5jU5P/P4Tg5LwbRV4nAzNN1oBpS5TjFG110bTx3ELAiNdWLLuV8mQrj2+QU3x00AWrp5DN2ZeO/EndAAAAAAAAAAAAAAA") center/contain no-repeat; }
+
+/* ── Shell ── */
+.layout { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 100vh; }
+.side { position: sticky; top: 0; height: 100vh; overflow-y: auto; background: var(--bg-2); border-inline-end: 1px solid var(--line); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+.side .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 14px; }
+.side .wm { font: 800 19px/1 var(--f-num); letter-spacing: .03em; text-transform: uppercase; }
+.side .wm b { color: var(--green); }
+.side .wm small { display: block; font: 600 10px var(--f-body); letter-spacing: .16em; color: var(--muted); margin-top: 3px; }
+.nav-group { font: 600 11px var(--f-body); color: var(--dim); letter-spacing: .08em; padding: 12px 10px 4px; }
+.nav { display: flex; align-items: center; gap: 10px; border: 0; background: none; text-align: start; padding: 9px 10px; border-radius: 10px; color: var(--muted); font: 600 14px var(--f-body); width: 100%; }
+.nav svg { width: 18px; height: 18px; flex: none; }
+.nav:hover { background: var(--surface); color: var(--ink); }
+.nav[aria-current="page"] { background: var(--green-soft); color: var(--green-hi); }
+.nav .count { margin-inline-start: auto; min-width: 22px; height: 20px; border-radius: 10px; background: var(--gold); color: var(--on-gold); font: 800 12px/20px var(--f-num); text-align: center; padding: 0 6px; }
+.side .me { margin-top: auto; border-top: 1px solid var(--line); padding: 12px 8px 0; font-size: 13px; }
+.side .me b { display: block; font: 700 14px var(--f-display); }
+.main { min-width: 0; padding: 20px 24px 60px; display: grid; gap: 16px; align-content: start; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.page-head h1 { margin: 0; font: 800 22px var(--f-display); }
+.page-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.mobile-top { display: none; }
+.mobile-top .brand { display: flex; align-items: center; gap: 8px; }
+.mobile-top .wm { font: 800 18px/1 var(--f-num); text-transform: uppercase; letter-spacing: .03em; }
+.mobile-top .wm b { color: var(--green); }
+
+/* ── Controls ── */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; border-radius: 10px; padding: 7px 14px; border: 1px solid transparent; font: 700 13px var(--f-display); text-decoration: none; white-space: nowrap; }
+.btn svg { width: 16px; height: 16px; }
+.btn-primary { background: var(--green); color: var(--on-green); }
+.btn-gold { background: var(--gold); color: var(--on-gold); }
+.btn-ghost { background: var(--surface); border-color: var(--line-2); color: var(--ink); }
+.btn-danger { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); }
+.btn-wa { background: #25D366; color: #052E16; }
+.btn[disabled] { opacity: .5; pointer-events: none; }
+.btn-sm { min-height: 32px; padding: 4px 10px; font-size: 12px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.filters label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.filters select, .filters input, .field input, .field select, .field textarea {
+  min-height: 36px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--bg-2); padding: 6px 10px; font-size: 14px; }
+.filters input[type=search] { min-width: 220px; }
+.seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; }
+.seg button { border: 0; background: none; border-radius: 8px; padding: 5px 11px; font: 600 13px var(--f-body); color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.field { display: grid; gap: 4px; }
+.field label { font: 600 12px var(--f-body); color: var(--muted); }
+.field input, .field select, .field textarea { width: 100%; min-width: 0; }
+.field textarea { min-height: 70px; resize: vertical; }
+.field .err { font-size: 12px; color: var(--danger); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid2 > * { min-width: 0; }
+
+/* ── Cards & KPIs ── */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; min-width: 0; }
+.card h2 { margin: 0 0 4px; font: 700 15px var(--f-display); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.card h2 small { font: 500 12px var(--f-body); color: var(--muted); }
+.card .sub { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.kpis.k3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .kpis, .kpis.k3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 4px; }
+.kpi .lbl { font-size: 12px; color: var(--muted); }
+.kpi .num { font-size: 32px; }
+.kpi .num.gold { color: var(--gold); }
+.kpi .delta { font-size: 12px; color: var(--muted); }
+.kpi .delta b.up { color: var(--green-hi); } .kpi .delta b.down { color: var(--danger); }
+.charts { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+.charts > .card { grid-column: span 6; }
+.charts > .card.wide { grid-column: span 12; }
+.charts > .card.third { grid-column: span 4; }
+.chart-box { position: relative; height: 260px; }
+.chart-box.tall { height: 320px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-inline-end: 5px; vertical-align: -1px; }
+
+/* Funnel */
+.funnel { display: grid; gap: 6px; }
+.funnel-row { display: grid; grid-template-columns: 120px 1fr 92px; align-items: center; gap: 10px; font-size: 13px; }
+.funnel-row .bar { height: 26px; border-radius: 4px; background: var(--s2); min-width: 2px; max-width: 100%; justify-self: start; }
+.funnel-row .n { text-align: end; font-variant-numeric: tabular-nums; }
+.funnel-row .n b { font: 800 17px var(--f-num); }
+.funnel-row .n small { color: var(--muted); margin-inline-start: 4px; }
+
+/* ── Tables ── */
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: start; font: 600 12px var(--f-body); color: var(--muted); background: var(--surface-2); padding: 9px 10px; position: sticky; top: 0; white-space: nowrap; cursor: pointer; user-select: none; }
+th[aria-sort="ascending"]::after { content: " ▲"; } th[aria-sort="descending"]::after { content: " ▼"; }
+td { padding: 8px 10px; border-top: 1px solid var(--line); vertical-align: middle; }
+tr.clickable { cursor: pointer; } tr.clickable:hover td { background: var(--surface-2); }
+td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
+td .gold { color: var(--gold); font-weight: 700; }
+.pager { display: flex; justify-content: space-between; align-items: center; padding: 8px 2px 0; font-size: 12px; color: var(--muted); }
+.pill { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 2px 9px; font: 600 12px/1.5 var(--f-body); white-space: nowrap; border: 1px solid transparent; }
+.pill.green { background: var(--green-soft); color: var(--green-hi); }
+.pill.gold { background: var(--gold-soft); color: var(--gold); }
+.pill.red { background: var(--danger-soft); color: var(--danger); }
+.pill.blue { background: var(--info-soft); color: var(--info); }
+.pill.dim { background: var(--surface-2); color: var(--muted); border-color: var(--line-2); }
+.flag { color: var(--danger); font-size: 12px; font-weight: 600; }
+.bulk { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--gold-soft); border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); border-radius: 12px; padding: 8px 12px; }
+
+/* ── Drawer & modal ── */
+.overlay { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.55); display: flex; justify-content: flex-start; }
+.drawer { width: min(460px, 100%); height: 100%; overflow-y: auto; background: var(--bg); border-inline-end: 1px solid var(--line-2); padding: 18px; display: grid; gap: 14px; align-content: start; }
+.overlay.center { justify-content: center; align-items: center; padding: 16px; }
+.overlay.center .drawer { height: auto; max-height: 92vh; border: 1px solid var(--line-2); border-radius: 18px; }
+.drawer-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.drawer-head h3 { margin: 0; font: 800 18px var(--f-display); }
+.x { width: 34px; height: 34px; flex: none; border-radius: 50%; border: 1px solid var(--line-2); background: var(--surface); display: grid; place-items: center; padding: 0; }
+.x svg { width: 16px; height: 16px; }
+.kv { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.kv span:first-child { color: var(--muted); }
+.kv span:last-child { font-weight: 600; text-align: end; overflow-wrap: anywhere; }
+.steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.steps div { font-size: 11px; text-align: center; color: var(--dim); display: grid; gap: 4px; }
+.steps div::before { content: ""; height: 5px; border-radius: 3px; background: var(--line-2); }
+.steps .done::before { background: var(--green); } .steps .done { color: var(--green-hi); }
+.secret { font: 800 26px var(--f-num); letter-spacing: .08em; text-align: center; background: var(--gold-soft); color: var(--gold); border-radius: 12px; padding: 10px; user-select: all; direction: ltr; }
+.toast { position: fixed; z-index: 60; bottom: 20px; left: 50%; transform: translate(-50%, 150%); opacity: 0; visibility: hidden; transition: transform .35s, opacity .35s, visibility .35s; background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-weight: 600; box-shadow: var(--shadow); max-width: calc(100% - 32px); text-align: center; }
+.toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; } .toast.bad { background: var(--danger); color: #fff; }
+.empty { text-align: center; color: var(--muted); padding: 28px; border: 1px dashed var(--line-2); border-radius: 14px; }
+.demo-flag { font-size: 12px; color: var(--gold); border: 1px dashed color-mix(in srgb, var(--gold) 50%, transparent); border-radius: 10px; padding: 6px 10px; text-align: center; }
+.login { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+.login .card { width: min(380px, 100%); display: grid; gap: 14px; padding: 24px; }
+.login .brand { display: flex; align-items: center; gap: 10px; justify-content: center; }
+.login .brand .wm { font: 800 24px/1 var(--f-num); text-transform: uppercase; }
+.login .brand .wm b { color: var(--green); }
+.sk { border-radius: 14px; background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%); background-size: 200% 100%; animation: sk 1.2s linear infinite; }
+@keyframes sk { to { background-position: -200% 0; } }
+.insight { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.insight:last-child { border-bottom: 0; }
+.insight b.tag { flex: none; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--info-soft); color: var(--info); }
+.insight b.tag.warn { background: var(--gold-soft); color: var(--gold); }
+.insight b.tag.bad { background: var(--danger-soft); color: var(--danger); }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .side { position: fixed; inset: 0 0 0 auto; width: 260px; z-index: 45; transform: translateX(110%); transition: transform .25s; height: 100%; }
+  .side.open { transform: none; box-shadow: var(--shadow); }
+  .mobile-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; position: sticky; top: 0; z-index: 30; background: var(--bg); padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .main { padding: 14px 16px 40px; }
+  .charts > .card, .charts > .card.third { grid-column: span 12; }
+  .grid2 { grid-template-columns: 1fr; }
+  .filters input[type=search] { min-width: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20V4M4 20h16"/><path d="m7 15 4-5 3 3 5-7"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.3 5 2.6 5 5.8"/></symbol>
+  <symbol id="i-bike" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l4-7h5l3 7M10 10 8 6H5M15 10l1-3h3"/></symbol>
+  <symbol id="i-money" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></symbol>
+  <symbol id="i-mega" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 10v4h3l7 4V6L6 10zM16 9a4 4 0 0 1 0 6"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 21V4h11l-2 4 2 4H5"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-team" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-log" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></symbol>
+  <symbol id="i-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-wa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9.5c.5 2 2.5 4 4.5 4.5l1-1.2 2 .9c-.3 1.3-1.4 2-2.7 1.8A7 7 0 0 1 8 9.7C7.8 8.4 8.6 7.3 9.8 7l.9 2z"/></symbol>
+</svg>
+
+<div id="root"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="overlay"></div>
+
+
+
+<script>
+(function () {
+  'use strict';
+  document.documentElement.setAttribute('dir', 'rtl');
+  document.documentElement.setAttribute('lang', 'ar');
+
+  /* ─────────────── Backend: the /exec link, or the demo ─────────────── */
+  var API_URL = window.FS_API_URL || '';
+  var live = !!API_URL && !window.FS_ADMIN_DEMO;
+  var OFFLINE = { ok: false, error: 'مافيش اتصال بالسيرفر. اتأكد من النت وجرّب تاني.' };
+  var Backend = live ? {
+    call: function (action, payload) {
+      return fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: action, payload: payload }), redirect: 'follow' })
+        .then(function (r) { return r.json(); }).catch(function () { return OFFLINE; });
+    }
+  } : window.FS_ADMIN_DEMO;
+
+  var S = { token: null, me: null, data: null, view: 'overview', range: 'season', source: 'all', zone: '', drafts: {} };
+  var root = document.getElementById('root');
+  var charts = [];
+
+  /* ─────────────── Helpers ─────────────── */
+  function esc(v) { return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
+  function money(n) { return Number(n || 0).toLocaleString('en-US'); }
+  function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
+  function day(s) { if (!s) return null; if (s instanceof Date) return s; var p = String(s).slice(0, 10).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  var DF = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { day: 'numeric', month: 'short' });
+  var DFY = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { day: 'numeric', month: 'short', year: 'numeric' });
+  function fmt(s, y) { var d = day(s); return d ? (y ? DFY : DF).format(d) : '—'; }
+  function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+  function diff(a, b) { return Math.round((day(b) - day(a)) / 864e5); }
+  function icon(id) { return '<svg aria-hidden="true"><use href="#i-' + id + '"/></svg>'; }
+  function intl(p) { var d = String(p || '').replace(/\D/g, ''); return d.length === 11 && d[0] === '0' ? '20' + d.slice(1) : d; }
+  function wa(p, t) { return 'https://wa.me/' + intl(p) + (t ? '?text=' + encodeURIComponent(t) : ''); }
+  function cleanName(n) { return String(n || '').replace(/\s*_?FULL\s*SPEED(_BC)?\s*$/i, '').trim(); }
+  function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  var tt;
+  function toast(m, bad) { var t = document.getElementById('toast'); t.textContent = m; t.className = 'toast show' + (bad ? ' bad' : ''); clearTimeout(tt); tt = setTimeout(function () { t.className = 'toast'; }, 3200); }
+
+  async function call(action, payload) {
+    payload = payload || {}; payload.token = S.token;
+    var res = await Backend.call(action, payload);
+    if (!res || typeof res !== 'object') res = OFFLINE;
+    if (!res.ok && res.error === 'SESSION_EXPIRED') { signOut(); toast('انتهت الجلسة، ادخل تاني.', true); }
+    else if (!res.ok) toast(res.error, true);
+    return res;
+  }
+  function busy(btn, on) { if (!btn) return; btn.disabled = on; if (on) { btn.dataset.l = btn.innerHTML; btn.textContent = 'لحظة…'; } else if (btn.dataset.l) btn.innerHTML = btn.dataset.l; }
+  function formData(f) { var o = {}; new FormData(f).forEach(function (v, k) { o[k] = String(v).trim(); }); return o; }
+  function showErrors(f, fields) {
+    f.querySelectorAll('.err').forEach(function (e) { e.remove(); });
+    Object.keys(fields || {}).forEach(function (k) { var i = f.querySelector('[name="' + k + '"]'); if (!i) return; var e = document.createElement('div'); e.className = 'err'; e.textContent = fields[k]; i.closest('.field').appendChild(e); });
+  }
+  function can(p) { return S.me && S.me.can && S.me.can[p]; }
+  function csv(name, rows) {
+    var text = '﻿' + rows.map(function (r) { return r.map(function (c) { c = String(c === null || c === undefined ? '' : c); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(','); }).join('\n');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' })); a.download = name + '-' + iso(new Date()) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  /* ─────────────── Theme ─────────────── */
+  if (store('fs_theme')) document.documentElement.setAttribute('data-theme', store('fs_theme'));
+  function toggleTheme() {
+    var cur = document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next); store('fs_theme', next); render();
+  }
+
+  /* ─────────────── Login ─────────────── */
+  function brand() { return '<div class="brand"><i class="mk"></i><span class="wm">Full<b>speed</b></span></div>'; }
+  function renderLogin() {
+    root.innerHTML = '<div class="login"><form class="card" id="loginForm" novalidate>' + brand() +
+      '<p class="muted" style="text-align:center;margin:0">لوحة إدارة برنامج الترشيحات</p>' +
+      (live ? '' : '<div class="demo-flag">نسخة تجريبية — اكتب أي اسم مستخدم وكلمة مرور</div>') +
+      '<div class="field"><label for="l-u">اسم المستخدم</label><input id="l-u" name="username" class="ltr" autocomplete="username" required></div>' +
+      '<div class="field"><label for="l-p">كلمة المرور</label><input id="l-p" name="password" type="password" autocomplete="current-password" required></div>' +
+      '<button class="btn btn-primary" type="submit" style="min-height:44px">دخول</button></form></div>';
+    document.getElementById('loginForm').onsubmit = async function (e) {
+      e.preventDefault();
+      var btn = e.target.querySelector('[type=submit]'); busy(btn, true);
+      var res = await Backend.call('adminLogin', formData(e.target));
+      busy(btn, false);
+      if (!res.ok) { toast(res.error, true); return; }
+      S.token = res.data.token; S.me = res.data.me; store('fs_admin_token', S.token);
+      if (S.me.mustChange) renderForceChange(); else load();
+    };
+  }
+  function renderForceChange() {
+    root.innerHTML = '<div class="login"><form class="card" id="pwF" novalidate>' + brand() +
+      '<h2 style="margin:0;text-align:center;font:800 18px var(--f-display)">اختار كلمة مرور جديدة</h2><p class="muted" style="margin:0;text-align:center">دي أول مرة تدخل بكلمة السر المؤقتة.</p>' +
+      '<div class="field"><label>كلمة السر المؤقتة</label><input name="current" type="password" required></div>' +
+      '<div class="field"><label>كلمة السر الجديدة (8 على الأقل)</label><input name="next" type="password" autocomplete="new-password" required></div>' +
+      '<button class="btn btn-primary" type="submit" style="min-height:44px">حفظ ودخول</button></form></div>';
+    document.getElementById('pwF').onsubmit = async function (e) {
+      e.preventDefault(); var btn = e.target.querySelector('[type=submit]'); busy(btn, true);
+      var res = await call('adminChangePassword', formData(e.target)); busy(btn, false);
+      if (!res.ok) { showErrors(e.target, res.fields); return; }
+      S.token = res.data.token; S.me = res.data.me; store('fs_admin_token', S.token); load();
+    };
+  }
+  function signOut() { S.token = null; S.data = null; store('fs_admin_token', null); renderLogin(); }
+
+  async function load(quiet) {
+    if (!quiet) root.innerHTML = '<div class="layout"><aside class="side"></aside><main class="main"><div class="sk" style="height:60px"></div><div class="kpis">' +
+      '<div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div></div><div class="sk" style="height:300px"></div></main></div>';
+    var res = await call('adminData');
+    if (!res.ok) return;
+    S.data = res.data; S.me = res.data.me;
+    prepare(S.data);
+    render();
+  }
+
+  /* Dates from the server arrive as yyyy-MM-dd strings: turn them into Date once. */
+  function prepare(d) {
+    d.today = day(d.today);
+    d.season.start = day(d.season.start);
+    d.applicants.forEach(function (a) { a.submitted = day(a.submitted); a.hiredDate = day(a.hiredDate); a.statusUpdated = day(a.statusUpdated); });
+    d.riders.forEach(function (r) { ['hireDate', 'lastDay', 'payoutDate', 'appliedOn'].forEach(function (k) { r[k] = day(r[k]); }); });
+    d.payouts.forEach(function (p) { p.paidAt = day(p.paidAt); });
+    d.usersByKey = {}; d.users.forEach(function (u) { d.usersByKey[u.key] = u; });
+  }
+
+  /* ─────────────── Shell ─────────────── */
+  var NAV = [
+    ['', [['overview', 'لوحة القيادة', 'dash'], ['analytics', 'التحليلات', 'chart']]],
+    ['التشغيل', [['applicants', 'المرشحين', 'people'], ['riders', 'الطيارين والبونص', 'bike'], ['payouts', 'سجل الصرف', 'money'], ['users', 'المرشِّحين', 'user']]],
+    ['التحكم', [['alerts', 'التنبيهات', 'flag'], ['campaigns', 'الحملات والإعلانات', 'mega'], ['settings', 'الإعدادات', 'gear'], ['team', 'الفريق', 'team'], ['audit', 'سجل التعديلات', 'log']]]
+  ];
+
+  function counts() {
+    var d = S.data;
+    return {
+      applicants: d.applicants.filter(function (a) { return a.nudge; }).length,
+      riders: d.riders.filter(function (r) { return r.payStatus === 'due'; }).length,
+      alerts: d.applicants.filter(function (a) { return a.flags.length; }).length + d.riders.filter(function (r) { return r.flags.length; }).length
+    };
+  }
+
+  function render() {
+    charts.forEach(function (c) { c.destroy(); }); charts = [];
+    var c = counts();
+    var nav = NAV.map(function (g) {
+      return (g[0] ? '<div class="nav-group">' + g[0] + '</div>' : '') + g[1].filter(function (n) { return n[0] !== 'team' || S.data.team; }).map(function (n) {
+        return '<button class="nav" data-go="' + n[0] + '" aria-current="' + (S.view === n[0] ? 'page' : 'false') + '">' + icon(n[2]) + n[1] + (c[n[0]] ? '<span class="count">' + c[n[0]] + '</span>' : '') + '</button>';
+      }).join('');
+    }).join('');
+    var body = (VIEWS[S.view] || VIEWS.overview)();
+    root.innerHTML = '<div class="mobile-top"><button class="btn btn-ghost" id="menuBtn" aria-label="القائمة">' + icon('menu') + '</button>' + brand() + '<span></span></div>' +
+      '<div class="layout"><aside class="side" id="side">' +
+      '<div class="brand"><i class="mk"></i><span class="wm">Full<b>speed</b><small>لوحة الإدارة</small></span></div>' + nav +
+      '<div class="me"><b>' + esc(S.me.name) + '</b><span class="muted">' + esc(S.me.roleLabel) + '</span>' +
+      '<div style="display:flex;gap:6px;margin-top:10px"><button class="btn btn-ghost btn-sm" id="themeBtn" aria-label="الوضع الفاتح والداكن">' + icon('theme') + '</button>' +
+      '<button class="btn btn-ghost btn-sm" id="pwBtn">كلمة المرور</button><button class="btn btn-ghost btn-sm" id="outBtn">خروج</button></div></div></aside>' +
+      '<main class="main">' + (live ? '' : '<div class="demo-flag">نسخة تجريبية — كل الأسماء والأرقام وهمية</div>') + body + '</main></div>';
+    root.querySelectorAll('[data-go]').forEach(function (b) { b.onclick = function () { S.view = b.dataset.go; document.getElementById('side').classList.remove('open'); render(); scrollTo(0, 0); }; });
+    document.getElementById('menuBtn').onclick = function () { document.getElementById('side').classList.toggle('open'); };
+    document.getElementById('themeBtn').onclick = toggleTheme;
+    document.getElementById('outBtn').onclick = function () { call('adminLogout'); signOut(); };
+    document.getElementById('pwBtn').onclick = openPassword;
+    var r = root.querySelector('[data-refresh]'); if (r) r.onclick = function () { load(true).then(function () { toast('البيانات اتحدّثت ✓'); }); };
+    (BINDERS[S.view] || function () {})();
+  }
+
+  function head(title, sub, actions) {
+    return '<div class="page-head"><div><h1>' + title + '</h1>' + (sub ? '<p>' + sub + '</p>' : '') + '</div><div style="display:flex;gap:8px;flex-wrap:wrap">' + (actions || '') +
+      '<button class="btn btn-ghost" data-refresh>' + icon('refresh') + 'تحديث</button></div></div>';
+  }
+
+  /* ─────────────── Filters for analytic views ─────────────── */
+  var RANGES = [['7', '7 أيام'], ['30', '30 يوم'], ['month', 'الشهر ده'], ['season', 'من بداية البرنامج']];
+  function rangeStart() {
+    var t = S.data.today;
+    if (S.range === '7') return addDays(t, -6);
+    if (S.range === '30') return addDays(t, -29);
+    if (S.range === 'month') return new Date(t.getFullYear(), t.getMonth(), 1);
+    return S.data.season.start;
+  }
+  function inRange(d) { return d && d >= rangeStart() && d <= S.data.today; }
+  function srcOk(t) { return S.source === 'all' || t === S.source; }
+  function zoneOk(z) { return !S.zone || z === S.zone; }
+  function filterBar() {
+    return '<div class="filters"><div class="seg" role="group" aria-label="الفترة">' + RANGES.map(function (r) {
+      return '<button data-range="' + r[0] + '" aria-pressed="' + (S.range === r[0]) + '">' + r[1] + '</button>';
+    }).join('') + '</div>' +
+    '<label>المصدر <select id="fSource"><option value="all">الكل</option><option value="internal"' + (S.source === 'internal' ? ' selected' : '') + '>طيارين داخليين</option><option value="external"' + (S.source === 'external' ? ' selected' : '') + '>شركاء خارجيين</option></select></label>' +
+    '<label>المنطقة <select id="fZone"><option value="">كل المناطق</option>' + S.data.zones.map(function (z) { return '<option' + (S.zone === z ? ' selected' : '') + '>' + esc(z) + '</option>'; }).join('') + '</select></label>' +
+    '<span class="muted" style="margin-inline-start:auto;font-size:12px">' + fmt(rangeStart(), true) + ' ← ' + fmt(S.data.today, true) + '</span></div>';
+  }
+  function bindFilters() {
+    root.querySelectorAll('[data-range]').forEach(function (b) { b.onclick = function () { S.range = b.dataset.range; render(); }; });
+    var s = document.getElementById('fSource'); if (s) s.onchange = function () { S.source = s.value; render(); };
+    var z = document.getElementById('fZone'); if (z) z.onchange = function () { S.zone = z.value; render(); };
+  }
+  function scoped() {
+    var d = S.data;
+    var apps = d.applicants.filter(function (a) { return inRange(a.submitted) && srcOk(a.refType) && zoneOk(a.zone); });
+    var hires = d.riders.filter(function (r) { return r.ownerKey && inRange(r.hireDate) && srcOk(r.ownerType) && zoneOk(r.zone); });
+    var allHires = d.riders.filter(function (r) { return inRange(r.hireDate) && zoneOk(r.zone); });
+    return { apps: apps, hires: hires, allHires: allHires };
+  }
+  function prevScoped() {
+    var start = rangeStart(), len = diff(start, S.data.today) + 1, pStart = addDays(start, -len), pEnd = addDays(start, -1);
+    var inP = function (d) { return d && d >= pStart && d <= pEnd; };
+    return {
+      apps: S.data.applicants.filter(function (a) { return inP(a.submitted) && srcOk(a.refType) && zoneOk(a.zone); }).length,
+      hires: S.data.riders.filter(function (r) { return r.ownerKey && inP(r.hireDate) && srcOk(r.ownerType) && zoneOk(r.zone); }).length
+    };
+  }
+  function delta(now, before) {
+    if (S.range === 'season') return '';
+    if (!before) return now ? '<span class="delta">جديد في الفترة دي</span>' : '';
+    var p = Math.round((now - before) / before * 100);
+    return '<span class="delta"><b class="' + (p >= 0 ? 'up' : 'down') + '">' + (p >= 0 ? '▲ ' : '▼ ') + Math.abs(p) + '%</b> عن الفترة اللي قبلها</span>';
+  }
+
+  /* ─────────────── Charts ─────────────── */
+  function weekStart(d) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return addDays(x, -((x.getDay() + 1) % 7)); } // weeks start Saturday
+  function chart(id, cfg) {
+    var el = document.getElementById(id); if (!el || !window.Chart) return;
+    var ink = css('--muted'), grid = css('--line');
+    Chart.defaults.font.family = css('--f-body').split(',')[0].replace(/"/g, '') || 'sans-serif';
+    Chart.defaults.color = ink;
+    cfg.options = Object.assign({
+      responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { rtl: true, textDirection: 'rtl', backgroundColor: css('--surface-2'), titleColor: css('--ink'), bodyColor: css('--ink'), borderColor: css('--line-2'), borderWidth: 1, padding: 10 } },
+      scales: { x: { grid: { display: false }, ticks: { color: ink }, reverse: true }, y: { beginAtZero: true, grid: { color: grid }, ticks: { color: ink, precision: 0 }, position: 'right' } }
+    }, cfg.options || {});
+    charts.push(new Chart(el, cfg));
+  }
+  function legend(items) { return '<div class="legend">' + items.map(function (i) { return '<span><i style="background:' + i[1] + '"></i>' + i[0] + '</span>'; }).join('') + '</div>'; }
+
+  /* ─────────────── Overview ─────────────── */
+  function viewOverview() {
+    var d = S.data, sc = scoped(), prev = prevScoped();
+    var conv = sc.apps.length ? pct(sc.apps.filter(function (a) { return a.status === 'اشتغل'; }).length, sc.apps.length) : 0;
+    var due = d.riders.filter(function (r) { return r.payStatus === 'due' && srcOk(r.ownerType) && zoneOk(r.zone); });
+    var dueSum = due.reduce(function (s, r) { return s + r.bonus - r.paid; }, 0);
+    var pending = d.riders.filter(function (r) { return r.payStatus === 'pending' && r.ownerKey && srcOk(r.ownerType) && zoneOk(r.zone); });
+    var pendingSum = pending.reduce(function (s, r) { return s + r.bonus; }, 0);
+    var paidSum = d.payouts.filter(function (p) { return inRange(p.paidAt); }).reduce(function (s, p) { return s + p.amount; }, 0);
+    var ttH = sc.hires.filter(function (r) { return r.daysToHire !== null && r.daysToHire !== undefined; });
+    var avgDays = ttH.length ? Math.round(ttH.reduce(function (s, r) { return s + r.daysToHire; }, 0) / ttH.length) : null;
+    var share = sc.allHires.length ? pct(sc.allHires.filter(function (r) { return r.ownerKey; }).length, sc.allHires.length) : 0;
+
+    // Funnel: where each application in the period is now
+    var stages = d.statuses.slice(0, 5);
+    var funnel = stages.map(function (s, i) { return { s: s, n: sc.apps.filter(function (a) { return a.stage >= i && a.status !== 'مرفوض'; }).length }; });
+    var rejected = sc.apps.filter(function (a) { return a.status === 'مرفوض'; }).length;
+
+    // Top referrers in the period
+    var by = {};
+    sc.apps.forEach(function (a) { if (!a.refKey) return; (by[a.refKey] = by[a.refKey] || { k: a.refKey, apps: 0, hires: 0, bonus: 0 }).apps++; });
+    sc.hires.forEach(function (r) { (by[r.ownerKey] = by[r.ownerKey] || { k: r.ownerKey, apps: 0, hires: 0, bonus: 0 }); by[r.ownerKey].hires++; by[r.ownerKey].bonus += r.bonus; });
+    var top = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return (b.hires - a.hires) || (b.apps - a.apps); }).slice(0, 8);
+
+    return head('لوحة القيادة', 'صورة البرنامج كله في شاشة واحدة') + filterBar() +
+      '<div class="kpis">' +
+        kpi('ترشيحات جديدة', sc.apps.length, '', delta(sc.apps.length, prev.apps)) +
+        kpi('اتعيّنوا من ترشيحات', sc.hires.length, '', delta(sc.hires.length, prev.hires)) +
+        kpi('نسبة التحويل', conv + '%', '', '<span class="delta">من الترشيح لحد ما اشتغل</span>') +
+        kpi('متوسط أيام التعيين', avgDays === null ? '—' : avgDays, '', '<span class="delta">من التقديم لحد التعيين</span>') +
+        kpi('من الترشيحات', share + '%', '', '<span class="delta">من كل اللي اتعيّنوا في الفترة جم من ترشيح</span>') +
+        kpi('مستحق ومستني الصرف', money(dueSum), 'gold', '<span class="delta">' + due.length + ' طيار · ج</span>') +
+        kpi('بيتحسب ولسه هيزيد', money(pendingSum), '', '<span class="delta">' + pending.length + ' طيار في مدة الشهرين · ج</span>') +
+        kpi('اتصرف في الفترة', money(paidSum), '', '<span class="delta">جنيه</span>') +
+      '</div>' +
+      '<div class="charts">' +
+        '<section class="card wide"><h2>الترشيحات والتعيينات أسبوع بأسبوع<small>الأسبوع بيبدأ السبت</small></h2>' +
+          legend([['ترشيحات', css('--s1')], ['تعيينات من ترشيحات', css('--s2')]]) + '<div class="chart-box"><canvas id="cTrend" aria-label="ترشيحات وتعيينات أسبوعية" role="img"></canvas></div></section>' +
+        '<section class="card"><h2>رحلة المرشح<small>' + sc.apps.length + ' ترشيح في الفترة</small></h2><p class="sub">كام واحد وصل لكل خطوة — والفرق بين الخطوات هو اللي بيقع</p><div class="funnel">' +
+          funnel.map(function (f, i) {
+            return '<div class="funnel-row"><span>' + f.s + '</span><span class="bar" style="width:' + (funnel[0].n ? f.n / funnel[0].n * 100 : 0) + '%"></span><span class="n"><b>' + f.n + '</b><small>' + (i ? pct(f.n, funnel[0].n) + '%' : '') + '</small></span></div>';
+          }).join('') +
+          '<div class="funnel-row"><span style="color:var(--danger)">مرفوض</span><span class="bar" style="background:var(--danger);width:' + (funnel[0].n + rejected ? rejected / (funnel[0].n + rejected) * 100 : 0) + '%"></span><span class="n"><b>' + rejected + '</b></span></div>' +
+        '</div></section>' +
+        '<section class="card"><h2>أكتر المناطق ترشيحات<small>أعلى 8</small></h2><div class="chart-box"><canvas id="cZones" role="img" aria-label="الترشيحات حسب المنطقة"></canvas></div></section>' +
+        '<section class="card"><h2>أحسن المرشِّحين في الفترة</h2>' + table(
+          [['الاسم'], ['النوع'], ['ترشيحات', 'n'], ['اتعيّنوا', 'n'], ['تحويل', 'n'], ['بونصهم (ج)', 'n']],
+          top.map(function (t) { var u = d.usersByKey[t.k] || {}; return [esc(cleanName(u.name) || t.k), u.type === 'external' ? 'شريك' : 'طيار', t.apps, t.hires, pct(t.hires, t.apps || t.hires) + '%', '<span class="gold">' + money(t.bonus) + '</span>']; }), { empty: 'مفيش ترشيحات في الفترة دي.' }) + '</section>' +
+        '<section class="card"><h2>محتاج انتباهك</h2>' + attention() + '</section>' +
+      '</div>';
+  }
+  function kpi(lbl, val, cls, extra) { return '<div class="kpi"><span class="lbl">' + lbl + '</span><span class="num ' + (cls || '') + '">' + (typeof val === 'number' ? money(val) : val) + '</span>' + (extra || '') + '</div>'; }
+  function attention() {
+    var d = S.data, out = [];
+    var stuck = d.applicants.filter(function (a) { return a.nudge; });
+    var due = d.riders.filter(function (r) { return r.payStatus === 'due'; });
+    var flags = d.applicants.filter(function (a) { return a.flags.length; }).length + d.riders.filter(function (r) { return r.flags.length; }).length;
+    var ending = d.riders.filter(function (r) { return r.state === 'active' && r.daysLeft <= 7 && r.ownerKey; });
+    if (stuck.length) out.push(['warn', stuck.length + ' مرشح واقفين على نفس الحالة ' + d.season.nudgeAfterDays + ' أيام أو أكتر', 'applicants']);
+    if (due.length) out.push(['warn', due.length + ' طيار بونصهم مستحق ومستني الصرف (' + money(due.reduce(function (s, r) { return s + r.bonus - r.paid; }, 0)) + ' ج)', 'riders']);
+    if (ending.length) out.push(['', ending.length + ' طيار مدة البونص بتاعتهم بتخلص خلال أسبوع — فرصة تشجعهم', 'riders']);
+    if (flags) out.push(['bad', flags + ' تنبيه محتاج مراجعة (تلاعب أو تكرار)', 'alerts']);
+    if (!out.length) return '<p class="muted" style="margin:0">كله تمام ✓</p>';
+    return out.map(function (o) { return '<div class="insight"><b class="tag ' + o[0] + '">' + (o[0] === 'bad' ? 'مهم' : o[0] === 'warn' ? 'متابعة' : 'فرصة') + '</b><span style="flex:1">' + o[1] + '</span><button class="btn btn-ghost btn-sm" data-go="' + o[2] + '">افتح</button></div>'; }).join('');
+  }
+  function bindOverview() {
+    bindFilters();
+    var sc = scoped(), weeks = [], w = weekStart(rangeStart());
+    while (w <= S.data.today) { weeks.push(w); w = addDays(w, 7); }
+    var key = function (d) { return iso(weekStart(d)); };
+    var a = {}, h = {};
+    sc.apps.forEach(function (x) { a[key(x.submitted)] = (a[key(x.submitted)] || 0) + 1; });
+    sc.hires.forEach(function (x) { h[key(x.hireDate)] = (h[key(x.hireDate)] || 0) + 1; });
+    chart('cTrend', { type: 'line', data: { labels: weeks.map(function (w) { return fmt(w); }), datasets: [
+      { label: 'ترشيحات', data: weeks.map(function (w) { return a[iso(w)] || 0; }), borderColor: css('--s1'), backgroundColor: css('--s1'), borderWidth: 2, pointRadius: 4, tension: .25 },
+      { label: 'تعيينات من ترشيحات', data: weeks.map(function (w) { return h[iso(w)] || 0; }), borderColor: css('--s2'), backgroundColor: css('--s2'), borderWidth: 2, pointRadius: 4, tension: .25 }
+    ] } });
+    var z = {};
+    sc.apps.forEach(function (x) { if (x.zone) z[x.zone] = (z[x.zone] || 0) + 1; });
+    var zs = Object.keys(z).sort(function (p, q) { return z[q] - z[p]; }).slice(0, 8);
+    chart('cZones', { type: 'bar', data: { labels: zs, datasets: [{ label: 'ترشيحات', data: zs.map(function (k) { return z[k]; }), backgroundColor: css('--s2'), borderRadius: 4, maxBarThickness: 22 }] },
+      options: { indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: css('--line') }, ticks: { precision: 0, color: css('--muted') }, reverse: true }, y: { grid: { display: false }, ticks: { color: css('--muted') }, position: 'right' } } } });
+  }
+
+  /* ─────────────── Analytics ─────────────── */
+  function viewAnalytics() {
+    var d = S.data, sc = scoped(), tiers = d.season.tiers;
+    // Zone conversion
+    var z = {};
+    sc.apps.forEach(function (a) { var k = a.zone || 'غير محدد'; z[k] = z[k] || { apps: 0, hired: 0, rejected: 0 }; z[k].apps++; if (a.status === 'اشتغل') z[k].hired++; if (a.status === 'مرفوض') z[k].rejected++; });
+    var zoneRows = Object.keys(z).sort(function (p, q) { return z[q].apps - z[p].apps; }).map(function (k) { return [esc(k), z[k].apps, z[k].hired, pct(z[k].hired, z[k].apps) + '%', z[k].rejected]; });
+    // Rejection reasons (admin notes on rejected)
+    var reasons = {};
+    sc.apps.filter(function (a) { return a.status === 'مرفوض'; }).forEach(function (a) { var r = (a.note || 'من غير سبب').split(/[—\-|،,]/)[0].trim() || 'من غير سبب'; reasons[r] = (reasons[r] || 0) + 1; });
+    var reasonRows = Object.keys(reasons).sort(function (p, q) { return reasons[q] - reasons[p]; }).slice(0, 10).map(function (k) { return [esc(k), reasons[k]]; });
+    // Bonus at risk: active riders closest to the next tier
+    var close = d.riders.filter(function (r) { return r.state === 'active' && r.ownerKey && r.nextOrders && zoneOk(r.zone) && srcOk(r.ownerType); })
+      .sort(function (a, b) { return a.daysLeft - b.daysLeft || a.ordersToNext - b.ordersToNext; }).slice(0, 10);
+    // Referrer leaderboard (all time in scope)
+    var by = {};
+    sc.apps.forEach(function (a) { if (a.refKey) { by[a.refKey] = by[a.refKey] || { apps: 0, hired: 0 }; by[a.refKey].apps++; if (a.status === 'اشتغل') by[a.refKey].hired++; } });
+    var lead = Object.keys(by).filter(function (k) { return by[k].apps >= 2; }).sort(function (p, q) { return pct(by[q].hired, by[q].apps) - pct(by[p].hired, by[p].apps) || by[q].apps - by[p].apps; }).slice(0, 10)
+      .map(function (k) { var u = d.usersByKey[k] || {}; return [esc(cleanName(u.name) || k), by[k].apps, by[k].hired, pct(by[k].hired, by[k].apps) + '%']; });
+    var sourceRows = ['talabat', 'app', 'none'].map(function (s) { return [{ talabat: 'كود طلبات (طيار داخلي)', app: 'استمارة البرنامج (شريك / كود الشركة)', none: 'من غير ترشيح' }[s], sc.allHires.filter(function (r) { return r.source === s; }).length]; });
+
+    return head('التحليلات', 'إيه اللي شغال، وفين المرشحين بيقعوا، والفلوس رايحة على فين') + filterBar() +
+      '<div class="charts">' +
+        '<section class="card"><h2>الطيارين حسب شريحة البونص<small>اللي اتعيّنوا في الفترة</small></h2><p class="sub">كام طيار وصل لكل شريحة — الأعمدة الشمال هي اللي لسه ما فتحتش بونص</p><div class="chart-box"><canvas id="cTiers" role="img" aria-label="توزيع الطيارين على الشرايح"></canvas></div></section>' +
+        '<section class="card"><h2>البونص اللي هيستحق الصرف<small>حسب أسبوع الاستحقاق</small></h2><p class="sub">المستحق الحالي + المتوقع لو كل طيار فضل على شريحته</p><div class="chart-box"><canvas id="cLiab" role="img" aria-label="البونص المتوقع حسب الأسبوع"></canvas></div></section>' +
+        '<section class="card"><h2>كام يوم من التقديم للتعيين</h2><div class="chart-box"><canvas id="cTTH" role="img" aria-label="توزيع أيام التعيين"></canvas></div></section>' +
+        '<section class="card"><h2>متوسط الأوردرات حسب أسبوع التعيين<small>الأوردرات المكتملة لحد النهارده</small></h2><div class="chart-box"><canvas id="cCohort" role="img" aria-label="متوسط أوردرات كل دفعة"></canvas></div></section>' +
+        '<section class="card"><h2>المناطق: ترشيحات وتحويل</h2>' + table([['المنطقة'], ['ترشيحات', 'n'], ['اشتغلوا', 'n'], ['تحويل', 'n'], ['مرفوض', 'n']], zoneRows, { empty: 'مفيش بيانات.', page: 10 }) + '</section>' +
+        '<section class="card"><h2>أسباب الرفض</h2><p class="sub">من ملاحظة الإدارة على المرفوضين</p>' + table([['السبب'], ['العدد', 'n']], reasonRows, { empty: 'مفيش مرفوضين في الفترة دي.' }) + '</section>' +
+        '<section class="card"><h2>أعلى نسبة تحويل<small>اللي رشّحوا 2 أو أكتر</small></h2>' + table([['المرشِّح'], ['ترشيحات', 'n'], ['اشتغلوا', 'n'], ['تحويل', 'n']], lead, { empty: 'مفيش بيانات كفاية.' }) + '</section>' +
+        '<section class="card"><h2>التعيينات جت منين</h2>' + table([['المصدر'], ['تعيينات', 'n']], sourceRows) + '</section>' +
+        '<section class="card wide"><h2>قريبين من الشريحة الجاية<small>أكتر ناس تشجيعهم يفرق دلوقتي</small></h2>' + table(
+          [['الطيار'], ['المرشِّح'], ['أوردرات', 'n'], ['باقي للشريحة', 'n'], ['هيفتح (ج)', 'n'], ['أيام باقية', 'n'], ['']],
+          close.map(function (r) { return [esc(cleanName(r.name)), esc(cleanName(r.ownerName) || r.ownerKey), r.orders, r.ordersToNext, '<span class="gold">' + money(r.nextBonus) + '</span>', r.daysLeft,
+            r.phone ? '<a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="' + wa(r.phone, 'يا ' + cleanName(r.name).split(' ')[0] + ' فاضلك ' + r.ordersToNext + ' أوردر بس على الشريحة الجاية وقدامك ' + r.daysLeft + ' يوم 💪 — Full Speed') + '">' + icon('wa') + 'شجّعه</a>' : '']; }),
+          { empty: 'مفيش طيارين قريبين من شريحة دلوقتي.' }) + '</section>' +
+      '</div>';
+  }
+  function bindAnalytics() {
+    bindFilters();
+    var d = S.data, sc = scoped(), tiers = d.season.tiers;
+    var labels = ['أقل من ' + tiers[0].orders].concat(tiers.map(function (t) { return t.orders + '+'; }));
+    var counts = labels.map(function () { return 0; });
+    sc.hires.forEach(function (r) { var i = 0; tiers.forEach(function (t, j) { if (r.orders >= t.orders) i = j + 1; }); counts[i]++; });
+    chart('cTiers', { type: 'bar', data: { labels: labels, datasets: [{ label: 'طيارين', data: counts, backgroundColor: css('--gold'), borderRadius: 4, maxBarThickness: 26 }] } });
+
+    var weeks = {}, t0 = weekStart(d.today);
+    d.riders.filter(function (r) { return (r.payStatus === 'due' || r.payStatus === 'pending') && r.ownerKey && r.bonus > 0 && srcOk(r.ownerType) && zoneOk(r.zone); }).forEach(function (r) {
+      var w = r.payStatus === 'due' ? t0 : weekStart(r.payoutDate); var k = iso(w < t0 ? t0 : w);
+      weeks[k] = (weeks[k] || 0) + (r.bonus - r.paid);
+    });
+    var wk = Object.keys(weeks).sort().slice(0, 10);
+    chart('cLiab', { type: 'bar', data: { labels: wk.map(function (k, i) { return i === 0 && k === iso(t0) ? 'الأسبوع ده' : fmt(k); }), datasets: [{ label: 'جنيه', data: wk.map(function (k) { return weeks[k]; }), backgroundColor: css('--gold'), borderRadius: 4, maxBarThickness: 30 }] } });
+
+    var buckets = ['0–3', '4–7', '8–14', '15–30', '+30'], bc = [0, 0, 0, 0, 0];
+    sc.hires.forEach(function (r) { var x = r.daysToHire; if (x === null || x === undefined) return; bc[x <= 3 ? 0 : x <= 7 ? 1 : x <= 14 ? 2 : x <= 30 ? 3 : 4]++; });
+    chart('cTTH', { type: 'bar', data: { labels: buckets.map(function (b) { return b + ' يوم'; }), datasets: [{ label: 'طيارين', data: bc, backgroundColor: css('--s1'), borderRadius: 4, maxBarThickness: 34 }] } });
+
+    var co = {};
+    sc.hires.forEach(function (r) { var k = iso(weekStart(r.hireDate)); co[k] = co[k] || { n: 0, o: 0 }; co[k].n++; co[k].o += r.orders; });
+    var ck = Object.keys(co).sort();
+    chart('cCohort', { type: 'bar', data: { labels: ck.map(function (k) { return fmt(k); }), datasets: [{ label: 'متوسط أوردرات', data: ck.map(function (k) { return Math.round(co[k].o / co[k].n); }), backgroundColor: css('--s2'), borderRadius: 4, maxBarThickness: 28 }] } });
+  }
+
+  /* ─────────────── Generic table ─────────────── */
+  var sortState = {};
+  function table(cols, rows, opt) {
+    opt = opt || {};
+    if (!rows.length) return '<div class="empty">' + (opt.empty || 'مفيش بيانات.') + '</div>';
+    var page = opt.page || 0, shown = page ? rows.slice(0, page) : rows;
+    return '<div class="tbl-wrap"><table><thead><tr>' + cols.map(function (c) { return '<th>' + c[0] + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      shown.map(function (r) { return '<tr>' + r.map(function (v, i) { return '<td class="' + (cols[i][1] || '') + '">' + v + '</td>'; }).join('') + '</tr>'; }).join('') +
+      '</tbody></table></div>' + (page && rows.length > page ? '<div class="pager">بيعرض ' + page + ' من ' + rows.length + '</div>' : '');
+  }
+
+  /* A sortable, paged list bound to real records. */
+  function list(id, cols, items, opt) {
+    var st = sortState[id] || { k: opt.sort || null, dir: opt.dir || -1, page: 0 };
+    sortState[id] = st;
+    var sorted = items.slice();
+    if (st.k) {
+      var col = cols.filter(function (c) { return c.k === st.k; })[0];
+      var val = col && col.sort ? col.sort : function (x) { return x[st.k]; };
+      sorted.sort(function (a, b) { var x = val(a), y = val(b); x = x instanceof Date ? +x : x; y = y instanceof Date ? +y : y; return (x > y ? 1 : x < y ? -1 : 0) * st.dir; });
+    }
+    var per = 50, pages = Math.max(1, Math.ceil(sorted.length / per)); st.page = Math.min(st.page, pages - 1);
+    var slice = sorted.slice(st.page * per, st.page * per + per);
+    if (!items.length) return '<div class="empty">' + (opt.empty || 'مفيش نتايج.') + '</div>';
+    return '<div class="tbl-wrap"><table data-list="' + id + '"><thead><tr>' +
+      (opt.select ? '<th style="width:32px"><input type="checkbox" data-all aria-label="تحديد الكل"></th>' : '') +
+      cols.map(function (c) { return '<th data-sort="' + (c.k || '') + '" aria-sort="' + (st.k === c.k ? (st.dir > 0 ? 'ascending' : 'descending') : 'none') + '">' + c.t + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      slice.map(function (x) {
+        return '<tr class="' + (opt.open ? 'clickable' : '') + '" data-id="' + esc(opt.id(x)) + '">' + (opt.select ? '<td><input type="checkbox" data-pick value="' + esc(opt.id(x)) + '"' + (S.picked && S.picked[opt.id(x)] ? ' checked' : '') + ' aria-label="تحديد"></td>' : '') +
+          cols.map(function (c) { return '<td class="' + (c.c || '') + '">' + c.v(x) + '</td>'; }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="pager"><span>' + sorted.length + ' نتيجة</span>' + (pages > 1 ? '<span><button class="btn btn-ghost btn-sm" data-page="-1"' + (st.page ? '' : ' disabled') + '>السابق</button> ' + (st.page + 1) + ' / ' + pages + ' <button class="btn btn-ghost btn-sm" data-page="1"' + (st.page < pages - 1 ? '' : ' disabled') + '>التالي</button></span>' : '') + '</div>';
+  }
+  function bindList(id, opt) {
+    var t = root.querySelector('[data-list="' + id + '"]'); if (!t) return;
+    t.querySelectorAll('th[data-sort]').forEach(function (th) { th.onclick = function () { var k = th.dataset.sort; if (!k) return; var st = sortState[id]; st.dir = st.k === k ? -st.dir : -1; st.k = k; render(); }; });
+    root.querySelectorAll('[data-page]').forEach(function (b) { b.onclick = function () { sortState[id].page += +b.dataset.page; render(); }; });
+    if (opt.open) t.querySelectorAll('tr.clickable').forEach(function (tr) { tr.onclick = function (e) { if (e.target.closest('input,a,button')) return; opt.open(tr.dataset.id); }; });
+    if (opt.select) {
+      t.querySelectorAll('[data-pick]').forEach(function (c) { c.onchange = function () { S.picked[c.value] = c.checked; if (!c.checked) delete S.picked[c.value]; render(); }; });
+      var all = t.querySelector('[data-all]'); if (all) all.onchange = function () { t.querySelectorAll('[data-pick]').forEach(function (c) { if (all.checked) S.picked[c.value] = true; else delete S.picked[c.value]; }); render(); };
+    }
+  }
+
+  /* ─────────────── Applicants ─────────────── */
+  var STATUS_PILL = { 'جديد': 'dim', 'تم التواصل': 'blue', 'قيد التعيين': 'blue', 'تم حضور المحاضرة': 'blue', 'اشتغل': 'green', 'مرفوض': 'red' };
+  S.picked = {};
+  S.af = { q: '', status: '', zone: '', flag: '', type: '', range: 'season' };
+  function applicantsFiltered() {
+    var f = S.af, q = f.q.toLowerCase();
+    return S.data.applicants.filter(function (a) {
+      if (f.range === 'season' && a.submitted && a.submitted < S.data.season.start) return false;
+      if (f.status === 'nudge' ? !a.nudge : f.status && a.status !== f.status) return false;
+      if (f.zone && a.zone !== f.zone) return false;
+      if (f.flag && !a.flags.length) return false;
+      if (f.type && a.refType !== f.type) return false;
+      if (q && (a.name + ' ' + a.phone + ' ' + a.nationalId + ' ' + a.refName + ' ' + a.refKey).toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+  }
+  function viewApplicants() {
+    var d = S.data, f = S.af, items = applicantsFiltered();
+    var picked = Object.keys(S.picked);
+    return head('المرشحين', 'كل اللي اترشحوا — غيّر الحالة، اكتب ملاحظة للمرشِّح، أو عدّل البيانات', '<button class="btn btn-ghost" id="expApps">' + icon('dl') + 'تصدير</button>') +
+      '<div class="filters"><input type="search" id="aq" placeholder="بحث بالاسم أو الموبايل أو الرقم القومي أو المرشِّح" value="' + esc(f.q) + '">' +
+      '<select id="as"><option value="">كل الحالات</option><option value="nudge"' + (f.status === 'nudge' ? ' selected' : '') + '>⏳ محتاج متابعة</option>' + d.statuses.map(function (s) { return '<option' + (f.status === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>' +
+      '<select id="az"><option value="">كل المناطق</option>' + d.zones.map(function (z) { return '<option' + (f.zone === z ? ' selected' : '') + '>' + esc(z) + '</option>'; }).join('') + '</select>' +
+      '<select id="at"><option value="">داخلي وخارجي</option><option value="internal"' + (f.type === 'internal' ? ' selected' : '') + '>طيارين داخليين</option><option value="external"' + (f.type === 'external' ? ' selected' : '') + '>شركاء</option></select>' +
+      '<label><input type="checkbox" id="afl"' + (f.flag ? ' checked' : '') + '> عليهم تنبيه</label>' +
+      '<label><input type="checkbox" id="ar"' + (f.range === 'all' ? ' checked' : '') + '> اعرض القديم كمان</label></div>' +
+      (picked.length && can('applicants.edit') ? '<div class="bulk"><b>' + picked.length + ' متحددين</b><select id="bs">' + d.statuses.map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select>' +
+        '<input id="bn" placeholder="ملاحظة للمرشِّح (لازم في الرفض)" style="min-width:240px;min-height:34px;border-radius:9px;border:1px solid var(--line-2);background:var(--bg-2);padding:4px 10px">' +
+        '<button class="btn btn-primary btn-sm" id="bApply">طبّق على الكل</button><button class="btn btn-ghost btn-sm" id="bClear">إلغاء التحديد</button></div>' : '') +
+      list('apps', [
+        { t: 'الاسم', k: 'name', v: function (a) { return '<b>' + esc(a.name) + '</b>' + (a.flags.length ? '<div class="flag">⚠ ' + a.flags.map(function (x) { return d.flagLabels[x]; }).join('، ') + '</div>' : ''); } },
+        { t: 'الموبايل', k: 'phone', c: 'n', v: function (a) { return '<span class="ltr">' + esc(a.phone || '—') + '</span>'; } },
+        { t: 'المنطقة', k: 'zone', v: function (a) { return esc(a.zone); } },
+        { t: 'المرشِّح', k: 'refName', v: function (a) { return esc(cleanName(a.refName) || a.refKey) + '<div class="muted" style="font-size:11px">' + (a.refType === 'external' ? 'شريك' : 'طيار') + '</div>'; } },
+        { t: 'اتقدم', k: 'submitted', c: 'n', v: function (a) { return fmt(a.submitted); } },
+        { t: 'الحالة', k: 'stage', v: function (a) { return '<span class="pill ' + (STATUS_PILL[a.status] || 'dim') + '">' + esc(a.status) + '</span>' + (a.nudge ? '<div class="flag" style="color:var(--gold)">⏳ ' + a.daysWaiting + ' يوم</div>' : ''); } },
+        { t: 'ملاحظة', k: 'note', v: function (a) { return '<span class="muted">' + esc(a.note).slice(0, 60) + '</span>'; } }
+      ], items, { id: function (a) { return a.row; }, sort: 'submitted', select: can('applicants.edit'), open: openApplicant, empty: 'مفيش مرشحين بالفلتر ده.' });
+  }
+  function bindApplicants() {
+    var f = S.af, deb;
+    document.getElementById('aq').oninput = function (e) { clearTimeout(deb); deb = setTimeout(function () { f.q = e.target.value; render(); var i = document.getElementById('aq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
+    document.getElementById('as').onchange = function (e) { f.status = e.target.value; render(); };
+    document.getElementById('az').onchange = function (e) { f.zone = e.target.value; render(); };
+    document.getElementById('at').onchange = function (e) { f.type = e.target.value; render(); };
+    document.getElementById('afl').onchange = function (e) { f.flag = e.target.checked; render(); };
+    document.getElementById('ar').onchange = function (e) { f.range = e.target.checked ? 'all' : 'season'; render(); };
+    document.getElementById('expApps').onclick = function () {
+      csv('المرشحين', [['التاريخ', 'الاسم', 'الموبايل', 'الرقم القومي', 'المنطقة', 'المرشِّح', 'كود/رقم المرشِّح', 'الحالة', 'ملاحظة', 'تنبيهات']].concat(applicantsFiltered().map(function (a) {
+        return [a.submitted ? iso(a.submitted) : '', a.name, a.phone, a.nationalId, a.zone, cleanName(a.refName), a.refKey, a.status, a.note, a.flags.map(function (x) { return S.data.flagLabels[x]; }).join(' / ')];
+      })));
+    };
+    bindList('apps', { open: openApplicant, select: can('applicants.edit') });
+    var ap = document.getElementById('bApply');
+    if (ap) ap.onclick = async function () {
+      var items = Object.keys(S.picked).map(function (r) { var a = S.data.applicants.filter(function (x) { return String(x.row) === r; })[0]; return { row: +r, phone: a && a.phone }; });
+      var note = document.getElementById('bn').value.trim();
+      var payload = { items: items, status: document.getElementById('bs').value }; if (note) payload.note = note;
+      busy(ap, true); var res = await call('adminUpdateApplicants', payload); busy(ap, false);
+      if (!res.ok) return;
+      S.picked = {}; toast('اتحدّث ' + res.data.done + (res.data.skipped ? ' — واتساب ' + res.data.skipped + ' لأن الشيت اتغير' : '') + ' ✓'); load(true);
+    };
+    var cl = document.getElementById('bClear'); if (cl) cl.onclick = function () { S.picked = {}; render(); };
+  }
+
+  function overlay(html, center) {
+    var o = document.getElementById('overlay');
+    o.innerHTML = '<div class="overlay' + (center ? ' center' : '') + '"><div class="drawer" role="dialog" aria-modal="true">' + html + '</div></div>';
+    var bg = o.firstChild; bg.onclick = function (e) { if (e.target === bg) closeOverlay(); };
+    o.querySelectorAll('[data-close]').forEach(function (b) { b.onclick = closeOverlay; });
+    return o;
+  }
+  function closeOverlay() { document.getElementById('overlay').innerHTML = ''; }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeOverlay(); });
+  function dhead(title, sub) { return '<div class="drawer-head"><div><h3>' + title + '</h3>' + (sub ? '<div class="muted" style="font-size:13px">' + sub + '</div>' : '') + '</div><button class="x" data-close aria-label="إغلاق">' + icon('x') + '</button></div>'; }
+
+  function openApplicant(row) {
+    var d = S.data, a = d.applicants.filter(function (x) { return String(x.row) === String(row); })[0]; if (!a) return;
+    var edit = can('applicants.edit');
+    var steps = '<div class="steps">' + d.statuses.slice(0, 5).map(function (s, i) { return '<div class="' + (a.status !== 'مرفوض' && i <= a.stage ? 'done' : '') + '">' + s.replace('تم حضور ', '') + '</div>'; }).join('') + '</div>';
+    var o = overlay(dhead(esc(a.name), 'اتقدم ' + fmt(a.submitted, true) + ' · صف ' + a.row + ' في الشيت') + steps +
+      (a.flags.length ? '<div class="flag">⚠ ' + a.flags.map(function (x) { return d.flagLabels[x]; }).join('، ') + '</div>' : '') +
+      '<div><div class="kv"><span>المرشِّح</span><span>' + esc(cleanName(a.refName) || a.refKey) + ' (' + (a.refType === 'external' ? 'شريك' : 'طيار') + ')</span></div>' +
+      '<div class="kv"><span>الرقم القومي</span><span class="ltr">' + esc(a.nationalId) + '</span></div>' +
+      (a.hiredCode ? '<div class="kv"><span>اتعين</span><span>كود #' + esc(a.hiredCode) + ' من ' + fmt(a.hiredDate) + '</span></div>' : '') + '</div>' +
+      (a.phone ? '<div style="display:flex;gap:8px"><a class="btn btn-wa" target="_blank" rel="noopener" href="' + wa(a.phone, 'أهلاً ' + a.name.split(' ')[0] + '، معاك فريق Full Speed 👋') + '">' + icon('wa') + 'واتساب</a><span class="btn btn-ghost ltr">' + esc(a.phone) + '</span></div>' : '') +
+      (edit ? '<form id="stF" class="card" style="display:grid;gap:10px"><h2>الحالة وملاحظة للمرشِّح</h2>' +
+        '<div class="field"><label>الحالة</label><select name="status">' + d.statuses.map(function (s) { return '<option' + (s === a.status ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label>ملاحظة (بتظهر للي رشّحه)</label><textarea name="note">' + esc(a.note) + '</textarea></div>' +
+        '<button class="btn btn-primary" type="submit">حفظ</button></form>' +
+        '<form id="edF" class="card" style="display:grid;gap:10px"><h2>تعديل البيانات</h2>' +
+        '<div class="field"><label>الاسم</label><input name="name" value="' + esc(a.name) + '"></div>' +
+        '<div class="grid2"><div class="field"><label>الموبايل</label><input name="phone" class="ltr" value="' + esc(a.phone) + '"></div>' +
+        '<div class="field"><label>الرقم القومي</label><input name="nationalId" class="ltr" value="' + esc(a.nationalId) + '"></div></div>' +
+        '<div class="field"><label>المنطقة</label><select name="zone">' + d.zones.map(function (z) { return '<option' + (z === a.zone ? ' selected' : '') + '>' + esc(z) + '</option>'; }).join('') + '</select></div>' +
+        '<button class="btn btn-ghost" type="submit">حفظ التعديل</button></form>' : '<p class="muted">صلاحياتك عرض بس.</p>'));
+    if (!edit) return;
+    o.querySelector('#stF').onsubmit = async function (e) {
+      e.preventDefault(); var fd = formData(e.target), b = e.target.querySelector('[type=submit]'); busy(b, true);
+      var res = await call('adminUpdateApplicants', { items: [{ row: a.row, phone: a.phone }], status: fd.status, note: fd.note }); busy(b, false);
+      if (res.ok) { closeOverlay(); toast('اتحفظ ✓'); load(true); }
+    };
+    o.querySelector('#edF').onsubmit = async function (e) {
+      e.preventDefault(); var fd = formData(e.target), b = e.target.querySelector('[type=submit]'); busy(b, true);
+      var res = await call('adminEditApplicant', { row: a.row, phone: a.phone, fields: fd }); busy(b, false);
+      if (!res.ok) { showErrors(e.target, res.fields); return; }
+      closeOverlay(); toast('اتعدّل ✓'); load(true);
+    };
+  }
+
+  /* ─────────────── Riders & bonus ─────────────── */
+  var PAY = { due: ['مستحق', 'gold'], pending: ['بيتحسب', 'blue'], paid: ['اتصرف ✓', 'green'], none: ['مفيش بونص', 'dim'] };
+  S.rf = { tab: 'due', q: '' };
+  function ridersFiltered() {
+    var f = S.rf, q = f.q.toLowerCase();
+    return S.data.riders.filter(function (r) {
+      if (!r.ownerKey && f.tab !== 'all') return false;
+      if (f.tab !== 'all' && r.payStatus !== f.tab) return false;
+      if (q && (r.name + ' ' + r.code + ' ' + r.ownerName + ' ' + r.ownerKey).toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+  }
+  function viewRiders() {
+    var d = S.data, f = S.rf;
+    var tabs = [['due', 'مستحق للصرف'], ['pending', 'بيتحسب'], ['paid', 'اتصرف'], ['none', 'مفيش بونص'], ['all', 'الكل']];
+    var due = d.riders.filter(function (r) { return r.payStatus === 'due'; });
+    return head('الطيارين والبونص', 'كل طيار اتعين من ترشيح: أوردراته، شريحته، وبونصه — وسجّل الصرف من هنا', '<button class="btn btn-ghost" id="expR">' + icon('dl') + 'كشف صرف Excel</button>') +
+      '<div class="kpis k3">' + kpi('مستحق دلوقتي', money(due.reduce(function (s, r) { return s + r.bonus - r.paid; }, 0)), 'gold', '<span class="delta">' + due.length + ' طيار · ج</span>') +
+        kpi('بيتحسب', money(d.riders.filter(function (r) { return r.payStatus === 'pending' && r.ownerKey; }).reduce(function (s, r) { return s + r.bonus; }, 0)), '', '<span class="delta">جنيه لحد النهارده</span>') +
+        kpi('اتصرف', money(d.payouts.reduce(function (s, p) { return s + p.amount; }, 0)), '', '<span class="delta">' + d.payouts.length + ' عملية صرف · ج</span>') + '</div>' +
+      '<div class="filters"><div class="seg">' + tabs.map(function (t) { var n = t[0] === 'all' ? d.riders.length : d.riders.filter(function (r) { return r.ownerKey && r.payStatus === t[0]; }).length;
+        return '<button data-rtab="' + t[0] + '" aria-pressed="' + (f.tab === t[0]) + '">' + t[1] + ' (' + n + ')</button>'; }).join('') + '</div>' +
+      '<input type="search" id="rq" placeholder="بحث بالاسم أو الكود أو المرشِّح" value="' + esc(f.q) + '"></div>' +
+      list('riders', [
+        { t: 'الطيار', k: 'name', v: function (r) { return '<b>' + esc(cleanName(r.name)) + '</b><div class="muted ltr" style="font-size:11px">#' + esc(r.code) + '</div>' + (r.flags.length ? '<div class="flag">⚠ ' + r.flags.map(function (x) { return d.flagLabels[x]; }).join('، ') + '</div>' : ''); } },
+        { t: 'المرشِّح', k: 'ownerName', v: function (r) { return r.ownerKey ? esc(cleanName(r.ownerName) || r.ownerKey) + '<div class="muted" style="font-size:11px">' + (r.source === 'talabat' ? 'كود طلبات' : 'استمارة') + '</div>' : '<span class="muted">—</span>'; } },
+        { t: 'اتعين', k: 'hireDate', c: 'n', v: function (r) { return fmt(r.hireDate); } },
+        { t: 'أوردرات', k: 'orders', c: 'n', v: function (r) { return money(r.orders) + (r.ordersSource === 'manual' ? '<div class="muted" style="font-size:10px">يدوي</div>' : ''); } },
+        { t: 'البونص', k: 'bonus', c: 'n', v: function (r) { return '<span class="gold">' + money(r.bonus) + '</span>' + (r.extra ? '<div class="muted" style="font-size:10px">منها ' + r.extra + ' حملة</div>' : ''); } },
+        { t: 'آخر يوم', k: 'lastDay', c: 'n', v: function (r) { return fmt(r.lastDay) + (r.state === 'active' ? '<div class="muted" style="font-size:11px">باقي ' + r.daysLeft + ' يوم</div>' : ''); } },
+        { t: 'الصرف', k: 'payStatus', v: function (r) { var p = PAY[r.payStatus] || PAY.none; return '<span class="pill ' + p[1] + '">' + p[0] + '</span>'; } },
+        { t: '', v: function (r) { return r.payStatus === 'due' && can('payouts.edit') ? '<button class="btn btn-gold btn-sm" data-pay="' + esc(r.code) + '">سجّل صرف</button>' : ''; } }
+      ], ridersFiltered(), { id: function (r) { return r.code; }, sort: 'payoutDate', dir: 1, open: openRider, empty: 'مفيش طيارين هنا.' });
+  }
+  function bindRiders() {
+    root.querySelectorAll('[data-rtab]').forEach(function (b) { b.onclick = function () { S.rf.tab = b.dataset.rtab; sortState.riders = null; render(); }; });
+    var deb; document.getElementById('rq').oninput = function (e) { clearTimeout(deb); deb = setTimeout(function () { S.rf.q = e.target.value; render(); var i = document.getElementById('rq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
+    root.querySelectorAll('[data-pay]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); openPay(b.dataset.pay); }; });
+    bindList('riders', { open: openRider });
+    document.getElementById('expR').onclick = function () {
+      csv('كشف-البونص', [['كود الطيار', 'اسم الطيار', 'المنطقة', 'تاريخ التعيين', 'آخر يوم', 'أوردرات', 'البونص', 'منها حملة', 'اتصرف', 'الباقي', 'الحالة', 'المرشِّح', 'كود/رقم المرشِّح', 'موبايل المرشِّح']].concat(ridersFiltered().map(function (r) {
+        var u = S.data.usersByKey[r.ownerKey] || {};
+        return [r.code, cleanName(r.name), r.zone, iso(r.hireDate), iso(r.lastDay), r.orders, r.bonus, r.extra, r.paid, r.bonus - r.paid, (PAY[r.payStatus] || PAY.none)[0], cleanName(r.ownerName), r.ownerKey, u.phone || ''];
+      })));
+    };
+  }
+  function openRider(code) {
+    var d = S.data, r = d.riders.filter(function (x) { return x.code === code; })[0]; if (!r) return;
+    var u = d.usersByKey[r.ownerKey] || {};
+    var o = overlay(dhead(esc(cleanName(r.name)), '#' + esc(r.code) + ' · ' + esc(r.zone)) +
+      '<div><div class="kv"><span>اتعين</span><span>' + fmt(r.hireDate, true) + '</span></div><div class="kv"><span>آخر يوم بيتحسب</span><span>' + fmt(r.lastDay, true) + '</span></div>' +
+      '<div class="kv"><span>أوردرات مكتملة</span><span>' + money(r.orders) + (r.ordersSource === 'manual' ? ' (من العمود اليدوي)' : '') + '</span></div>' +
+      '<div class="kv"><span>البونص</span><span class="gold">' + money(r.bonus) + ' ج' + (r.extra ? ' (منها ' + r.extra + ' حملة: ' + esc(r.campaigns.join('، ')) + ')' : '') + '</span></div>' +
+      '<div class="kv"><span>اتصرف</span><span>' + money(r.paid) + ' ج</span></div>' +
+      '<div class="kv"><span>المرشِّح</span><span>' + esc(cleanName(r.ownerName) || r.ownerKey || '—') + (u.phone ? ' · <span class="ltr">' + esc(u.phone) + '</span>' : '') + '</span></div></div>' +
+      (r.payouts && r.payouts.length ? '<div class="card"><h2>عمليات الصرف</h2>' + r.payouts.map(function (p) { return '<div class="kv"><span>' + fmt(p.paidAt, true) + ' — ' + esc(p.method) + (p.reference ? ' (' + esc(p.reference) + ')' : '') + '</span><span>' + money(p.amount) + ' ج</span></div>'; }).join('') + '</div>' : '') +
+      (r.payStatus === 'due' && can('payouts.edit') ? '<button class="btn btn-gold" id="payNow">سجّل صرف ' + money(r.bonus - r.paid) + ' ج</button>' : '') +
+      (u.phone && r.payStatus === 'paid' ? '<a class="btn btn-wa" target="_blank" rel="noopener" href="' + wa(u.phone, 'أهلاً ' + cleanName(u.name).split(' ')[0] + ' 👋 اتصرفلك بونص ' + money(r.paid) + ' ج عن ' + cleanName(r.name) + '. شكراً إنك جزء من Full Speed 💚') + '">' + icon('wa') + 'بلّغ المرشِّح إن الفلوس اتصرفت</a>' : ''));
+    var pn = o.querySelector('#payNow'); if (pn) pn.onclick = function () { openPay(code); };
+  }
+  function openPay(code) {
+    var d = S.data, r = d.riders.filter(function (x) { return x.code === code; })[0]; if (!r) return;
+    var left = r.bonus - r.paid, u = d.usersByKey[r.ownerKey] || {};
+    var o = overlay(dhead('تسجيل صرف بونص', esc(cleanName(r.name)) + ' ← ' + esc(cleanName(r.ownerName) || r.ownerKey)) +
+      '<form id="payF" style="display:grid;gap:10px" novalidate><div class="grid2"><div class="field"><label>المبلغ (ج)</label><input name="amount" type="number" min="1" value="' + left + '"></div>' +
+      '<div class="field"><label>طريقة الصرف</label><select name="method">' + d.payoutMethods.map(function (m) { return '<option>' + m + '</option>'; }).join('') + '</select></div></div>' +
+      '<div class="field"><label>رقم العملية / المرجع (اختياري)</label><input name="reference"></div>' +
+      '<div class="field"><label>ملاحظة (اختياري)</label><input name="note"></div>' +
+      '<p class="muted" style="margin:0;font-size:12px">المستحق ' + money(r.bonus) + ' ج — اتصرف قبل كده ' + money(r.paid) + ' ج. ' + (u.phone ? 'موبايل المرشِّح: <span class="ltr">' + esc(u.phone) + '</span>' : '') + '</p>' +
+      '<button class="btn btn-gold" type="submit" style="min-height:42px">تأكيد الصرف</button></form>', true);
+    o.querySelector('#payF').onsubmit = async function (e) {
+      e.preventDefault(); var fd = formData(e.target); fd.code = code; var b = e.target.querySelector('[type=submit]'); busy(b, true);
+      var res = await call('adminRecordPayout', fd); busy(b, false);
+      if (!res.ok) { showErrors(e.target, res.fields); return; }
+      closeOverlay(); toast('اتسجل الصرف ✓'); load(true);
+    };
+  }
+
+  /* ─────────────── Payouts log ─────────────── */
+  function viewPayouts() {
+    var d = S.data;
+    var byM = {}; d.payouts.forEach(function (p) { var k = p.method || 'أخرى'; byM[k] = (byM[k] || 0) + p.amount; });
+    return head('سجل الصرف', 'كل عملية صرف اتسجلت، مين سجلها وإمتى', '<button class="btn btn-ghost" id="expP">' + icon('dl') + 'تصدير</button>') +
+      '<div class="kpis">' + kpi('إجمالي المصروف', money(d.payouts.reduce(function (s, p) { return s + p.amount; }, 0)), 'gold', '<span class="delta">جنيه</span>') +
+        Object.keys(byM).map(function (k) { return kpi(k, money(byM[k]), '', '<span class="delta">جنيه</span>'); }).join('') + '</div>' +
+      list('payouts', [
+        { t: 'التاريخ', k: 'paidAt', c: 'n', v: function (p) { return fmt(p.paidAt, true); } },
+        { t: 'الطيار', k: 'riderName', v: function (p) { return esc(cleanName(p.riderName)) + '<div class="muted ltr" style="font-size:11px">#' + esc(p.riderCode) + '</div>'; } },
+        { t: 'المبلغ', k: 'amount', c: 'n', v: function (p) { return '<span class="gold">' + money(p.amount) + '</span>'; } },
+        { t: 'الطريقة', k: 'method', v: function (p) { return esc(p.method) + (p.reference ? '<div class="muted" style="font-size:11px">' + esc(p.reference) + '</div>' : ''); } },
+        { t: 'سجّلها', k: 'paidBy', v: function (p) { return esc(p.paidBy); } },
+        { t: 'ملاحظة', k: 'note', v: function (p) { return '<span class="muted">' + esc(p.note) + '</span>'; } },
+        { t: '', v: function (p) { return can('payouts.edit') ? '<button class="btn btn-danger btn-sm" data-undo="' + esc(p.id) + '">إلغاء</button>' : ''; } }
+      ], d.payouts, { id: function (p) { return p.id; }, sort: 'paidAt', empty: 'لسه مفيش صرف متسجل.' });
+  }
+  function bindPayouts() {
+    bindList('payouts', {});
+    document.getElementById('expP').onclick = function () { csv('سجل-الصرف', [['التاريخ', 'كود الطيار', 'الطيار', 'المبلغ', 'الطريقة', 'المرجع', 'سجّلها', 'ملاحظة']].concat(S.data.payouts.map(function (p) { return [p.paidAt ? iso(p.paidAt) : '', p.riderCode, cleanName(p.riderName), p.amount, p.method, p.reference, p.paidBy, p.note]; }))); };
+    root.querySelectorAll('[data-undo]').forEach(function (b) { b.onclick = function () {
+      var o = overlay(dhead('إلغاء عملية الصرف؟', 'هتتمسح من السجل والطيار يرجع "مستحق"') + '<div style="display:flex;gap:8px"><button class="btn btn-danger" id="yes">أيوه، ألغيها</button><button class="btn btn-ghost" data-close>لأ</button></div>', true);
+      o.querySelector('#yes').onclick = async function () { var res = await call('adminDeletePayout', { id: b.dataset.undo }); if (res.ok) { closeOverlay(); toast('اتلغت ✓'); load(true); } };
+    }; });
+  }
+
+  /* ─────────────── Users (referrers) ─────────────── */
+  S.uf = { q: '', type: '' };
+  function viewUsers() {
+    var d = S.data, f = S.uf, q = f.q.toLowerCase();
+    var items = d.users.filter(function (u) { return (!f.type || (f.type === 'unreg' ? !u.registered : u.type === f.type)) && (!q || (u.name + ' ' + u.key + ' ' + u.phone).toLowerCase().indexOf(q) !== -1); });
+    return head('المرشِّحين', 'الطيارين والشركاء اللي بيرشحوا — نشاطهم وحساباتهم') +
+      '<div class="filters"><input type="search" id="uq" placeholder="بحث بالاسم أو الكود أو الموبايل" value="' + esc(f.q) + '">' +
+      '<select id="ut"><option value="">الكل</option><option value="internal"' + (f.type === 'internal' ? ' selected' : '') + '>طيارين داخليين</option><option value="external"' + (f.type === 'external' ? ' selected' : '') + '>شركاء</option><option value="unreg"' + (f.type === 'unreg' ? ' selected' : '') + '>بيرشحوا بكود طلبات ومافعّلوش البرنامج</option></select></div>' +
+      list('users', [
+        { t: 'الاسم', k: 'name', v: function (u) { return '<b>' + esc(cleanName(u.name) || '—') + '</b>' + (u.status === 'blocked' ? ' <span class="pill red">موقوف</span>' : '') + (!u.registered ? ' <span class="pill dim">مش مفعّل</span>' : ''); } },
+        { t: 'النوع', k: 'type', v: function (u) { return u.type === 'external' ? 'شريك' : 'طيار'; } },
+        { t: 'الكود / الموبايل', k: 'key', c: 'n', v: function (u) { return '<span class="ltr">' + esc(u.type === 'external' ? u.phone : u.code) + '</span>'; } },
+        { t: 'ترشيحات', k: 'applicants', c: 'n', v: function (u) { return u.applicants; } },
+        { t: 'اتعيّنوا', k: 'hires', c: 'n', v: function (u) { return u.hires; } },
+        { t: 'بونص (ج)', k: 'bonus', c: 'n', v: function (u) { return '<span class="gold">' + money(u.bonus) + '</span>'; } },
+        { t: 'مستحق', k: 'due', c: 'n', v: function (u) { return u.due ? money(u.due) : '—'; } },
+        { t: 'آخر دخول', k: 'lastLogin', c: 'n', v: function (u) { return u.lastLogin ? fmt(u.lastLogin) : '—'; } }
+      ], items, { id: function (u) { return u.key; }, sort: 'hires', open: openUser, empty: 'مفيش نتايج.' });
+  }
+  function bindUsers() {
+    var deb; document.getElementById('uq').oninput = function (e) { clearTimeout(deb); deb = setTimeout(function () { S.uf.q = e.target.value; render(); var i = document.getElementById('uq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
+    document.getElementById('ut').onchange = function (e) { S.uf.type = e.target.value; render(); };
+    bindList('users', { open: openUser });
+  }
+  function openUser(key) {
+    var d = S.data, u = d.usersByKey[key]; if (!u) return;
+    var edit = can('users.edit') && u.registered;
+    var o = overlay(dhead(esc(cleanName(u.name) || key), (u.type === 'external' ? 'شريك خارجي' : 'طيار داخلي — كود ' + esc(u.code)) + (u.registered ? '' : ' · مافعّلش البرنامج')) +
+      '<div><div class="kv"><span>الموبايل</span><span class="ltr">' + esc(u.phone || '—') + '</span></div>' +
+      (u.refId ? '<div class="kv"><span>كود اللينك</span><span class="ltr">' + esc(u.refId) + '</span></div>' : '') +
+      '<div class="kv"><span>ترشيحات / اتعيّنوا</span><span>' + u.applicants + ' / ' + u.hires + '</span></div>' +
+      '<div class="kv"><span>البونص الكلي</span><span class="gold">' + money(u.bonus) + ' ج</span></div><div class="kv"><span>اتصرف / مستحق</span><span>' + money(u.paid) + ' / ' + money(u.due) + ' ج</span></div>' +
+      '<div class="kv"><span>آخر دخول</span><span>' + (u.lastLogin ? fmt(u.lastLogin, true) : '—') + '</span></div></div>' +
+      (u.phone ? '<a class="btn btn-wa" target="_blank" rel="noopener" href="' + wa(u.phone, 'أهلاً ' + cleanName(u.name).split(' ')[0] + ' 👋 معاك فريق Full Speed') + '">' + icon('wa') + 'واتساب</a>' : '') +
+      (edit ? '<div class="card" style="display:grid;gap:8px"><h2>الحساب</h2>' +
+        '<button class="btn btn-ghost" data-ua="reset">اعمل كلمة سر مؤقتة</button>' +
+        '<button class="btn btn-ghost" data-ua="logout">خرّجه من كل الأجهزة</button>' +
+        (u.status === 'blocked' ? '<button class="btn btn-primary" data-ua="unblock">فعّل الحساب</button>' : '<button class="btn btn-danger" data-ua="block">أوقف الحساب</button>') +
+        (u.type === 'internal' ? '<form id="phF" style="display:flex;gap:8px;align-items:end"><div class="field" style="flex:1"><label>تغيير رقم الموبايل</label><input name="phone" class="ltr" value="' + esc(u.phone) + '"></div><button class="btn btn-ghost" type="submit">حفظ</button></form>' : '') +
+        '<div id="tempBox"></div></div>' : (u.registered ? '' : '<p class="muted">لسه مافعّلش حسابه في البرنامج — بيرشّح بكود طلبات بس.</p>')));
+    if (!edit) return;
+    o.querySelectorAll('[data-ua]').forEach(function (b) { b.onclick = async function () {
+      busy(b, true); var res = await call('adminUserAction', { type: u.type, key: u.key, action: b.dataset.ua }); busy(b, false);
+      if (!res.ok) return;
+      if (b.dataset.ua === 'reset') {
+        o.querySelector('#tempBox').innerHTML = '<p class="muted" style="margin:0">كلمة السر المؤقتة (ابعتهاله ويغيرها من "حسابي"):</p><div class="secret">' + esc(res.data.temp) + '</div>' +
+          (u.phone ? '<a class="btn btn-wa" target="_blank" rel="noopener" href="' + wa(u.phone, 'أهلاً ' + cleanName(u.name).split(' ')[0] + ' 👋 كلمة السر المؤقتة لبرنامج Full Speed Champions: ' + res.data.temp + '\nادخل بيها وغيّرها من صفحة "حسابي".') + '">' + icon('wa') + 'ابعتهاله على واتساب</a>' : '');
+      } else { closeOverlay(); toast('تم ✓'); load(true); }
+    }; });
+    var ph = o.querySelector('#phF'); if (ph) ph.onsubmit = async function (e) { e.preventDefault(); var res = await call('adminUserAction', { type: u.type, key: u.key, action: 'phone', phone: formData(e.target).phone }); if (res.ok) { closeOverlay(); toast('اتغير ✓'); load(true); } };
+  }
+
+  /* ─────────────── Alerts ─────────────── */
+  function viewAlerts() {
+    var d = S.data, rows = [];
+    d.applicants.forEach(function (a) { a.flags.forEach(function (f) { rows.push({ kind: f, who: a.name, ref: cleanName(a.refName) || a.refKey, date: a.submitted, open: ['app', a.row] }); }); });
+    d.riders.forEach(function (r) { r.flags.forEach(function (f) { rows.push({ kind: f, who: cleanName(r.name), ref: cleanName(r.ownerName) || r.ownerKey, date: r.hireDate, open: ['rider', r.code] }); }); });
+    var groups = {}; rows.forEach(function (r) { groups[r.kind] = (groups[r.kind] || 0) + 1; });
+    var help = { self: 'المرشِّح رشّح رقمه هو. غالباً عايز ياخد البونص على نفسه.', burst: '5 ترشيحات أو أكتر من نفس الشخص في يوم واحد. راجع إنهم ناس حقيقيين.', dupe: 'نفس الموبايل أو الرقم القومي اترشح أكتر من مرة.', known: 'الرقم ده في Headcount — كان شغال عندنا قبل كده، فمش "جديد".', quiet: 'اتعين من أسبوعين أو أكتر ومعملش ولا أوردر.' };
+    return head('التنبيهات', 'حالات محتاجة مراجعة: تلاعب محتمل، تكرار، أو طيارين اتعيّنوا ومش بيشتغلوا') +
+      '<div class="kpis">' + Object.keys(d.flagLabels).map(function (k) { return kpi(d.flagLabels[k], groups[k] || 0, groups[k] ? 'gold' : '', '<span class="delta">' + help[k] + '</span>'); }).join('') + '</div>' +
+      list('alerts', [
+        { t: 'التنبيه', k: 'kind', v: function (r) { return '<span class="flag">⚠ ' + d.flagLabels[r.kind] + '</span>'; } },
+        { t: 'الاسم', k: 'who', v: function (r) { return esc(r.who); } },
+        { t: 'المرشِّح', k: 'ref', v: function (r) { return esc(r.ref); } },
+        { t: 'التاريخ', k: 'date', c: 'n', v: function (r) { return fmt(r.date); } }
+      ], rows, { id: function (r) { return r.open.join(':'); }, sort: 'date', open: function (id) { var p = id.split(':'); if (p[0] === 'app') openApplicant(p[1]); else openRider(p[1]); }, empty: 'مفيش تنبيهات ✓' });
+  }
+  function bindAlerts() { bindList('alerts', { open: function (id) { var p = id.split(':'); if (p[0] === 'app') openApplicant(p[1]); else openRider(p[1]); } }); }
+
+  /* ─────────────── Campaigns & announcement ─────────────── */
+  function viewCampaigns() {
+    var d = S.data, edit = can('campaigns.edit');
+    return head('الحملات والإعلانات', 'رسالة تظهر لكل الطيارين، وبونص إضافي لفترة أو منطقة') +
+      '<section class="card"><h2>الإعلان في التطبيق</h2><p class="sub">بيظهر فوق في الرئيسية عند كل الطيارين والشركاء. سيبه فاضي عشان تشيله.</p>' +
+      '<form id="anF" style="display:grid;gap:10px"><div class="field"><textarea name="text" maxlength="200" placeholder="مثلاً: الأسبوع ده كل تعيين في المعادي عليه 500 ج زيادة 🔥"' + (edit ? '' : ' disabled') + '>' + esc(d.config.ANNOUNCEMENT) + '</textarea></div>' +
+      (edit ? '<div><button class="btn btn-primary" type="submit">نشر</button></div>' : '') + '</form></section>' +
+      '<section class="card"><h2>حملات البونص الإضافي' + (edit ? '<button class="btn btn-primary btn-sm" id="newC">+ حملة جديدة</button>' : '') + '</h2><p class="sub">أي طيار يتعيّن جوه فترة الحملة (وفي منطقتها لو محددة) وبيوصل أول شريحة، بياخد المبلغ الإضافي فوق البونص.</p>' +
+      table([['الحملة'], ['من', 'n'], ['لحد', 'n'], ['المنطقة'], ['إضافي (ج)', 'n'], ['الحالة'], ['']], d.campaigns.map(function (c) {
+        var on = c.active && day(c.end) >= d.today && day(c.start) <= d.today;
+        return [esc(c.name), fmt(c.start, true), fmt(c.end, true), esc(c.zone || 'كل المناطق'), '<span class="gold">+' + money(c.extra) + '</span>',
+          '<span class="pill ' + (on ? 'green' : 'dim') + '">' + (!c.active ? 'متوقفة' : on ? 'شغالة' : day(c.start) > d.today ? 'لسه' : 'خلصت') + '</span>',
+          edit ? '<button class="btn btn-ghost btn-sm" data-ce="' + esc(c.id) + '">تعديل</button> <button class="btn btn-danger btn-sm" data-cd="' + esc(c.id) + '">مسح</button>' : ''];
+      }), { empty: 'مفيش حملات.' }) + '</section>';
+  }
+  function bindCampaigns() {
+    var an = document.getElementById('anF');
+    if (an && can('campaigns.edit')) an.onsubmit = async function (e) { e.preventDefault(); var res = await call('adminSaveAnnouncement', formData(e.target)); if (res.ok) { toast('اتنشر ✓'); load(true); } };
+    var nc = document.getElementById('newC'); if (nc) nc.onclick = function () { openCampaign(null); };
+    root.querySelectorAll('[data-ce]').forEach(function (b) { b.onclick = function () { openCampaign(S.data.campaigns.filter(function (c) { return c.id === b.dataset.ce; })[0]); }; });
+    root.querySelectorAll('[data-cd]').forEach(function (b) { b.onclick = async function () { var res = await call('adminDeleteCampaign', { id: b.dataset.cd }); if (res.ok) { toast('اتمسحت ✓'); load(true); } }; });
+  }
+  function openCampaign(c) {
+    c = c || { name: '', start: iso(S.data.today), end: iso(addDays(S.data.today, 7)), zone: '', extra: 500, active: true };
+    var o = overlay(dhead(c.id ? 'تعديل حملة' : 'حملة جديدة') + '<form id="cF" style="display:grid;gap:10px" novalidate>' +
+      '<div class="field"><label>اسم الحملة</label><input name="name" value="' + esc(c.name) + '" placeholder="مثلاً: أسبوع المعادي"></div>' +
+      '<div class="grid2"><div class="field"><label>من</label><input name="start" type="date" value="' + esc(typeof c.start === 'string' ? c.start.slice(0, 10) : iso(day(c.start))) + '"></div>' +
+      '<div class="field"><label>لحد</label><input name="end" type="date" value="' + esc(typeof c.end === 'string' ? c.end.slice(0, 10) : iso(day(c.end))) + '"></div></div>' +
+      '<div class="grid2"><div class="field"><label>المنطقة</label><select name="zone"><option value="">كل المناطق</option>' + S.data.zones.map(function (z) { return '<option' + (z === c.zone ? ' selected' : '') + '>' + esc(z) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label>بونص إضافي (ج)</label><input name="extra" type="number" min="1" value="' + esc(c.extra) + '"></div></div>' +
+      '<label><input type="checkbox" name="active"' + (c.active ? ' checked' : '') + '> شغالة</label>' +
+      '<button class="btn btn-primary" type="submit">حفظ</button></form>', true);
+    o.querySelector('#cF').onsubmit = async function (e) {
+      e.preventDefault(); var fd = formData(e.target); fd.active = !!e.target.active.checked; if (c.id) fd.id = c.id;
+      var res = await call('adminSaveCampaign', { campaign: fd }); if (!res.ok) { showErrors(e.target, res.fields); return; }
+      closeOverlay(); toast('اتحفظت ✓'); load(true);
+    };
+  }
+
+  /* ─────────────── Settings ─────────────── */
+  var SETTING_LABELS = [
+    ['PROGRAM_START_DATE', 'أول يوم تعيين بيتحسب في البرنامج', 'date'], ['BONUS_WINDOW_MONTHS', 'مدة البونص (شهور من التعيين)', 'number'],
+    ['NUDGE_AFTER_DAYS', 'تنبيه متابعة المرشح بعد (أيام)', 'number'], ['COMPANY_REF_CODE', 'كود طلبات الموحّد للشركاء', 'text'],
+    ['SUPPORT_WHATSAPP', 'واتساب الدعم (بالكود الدولي: 2011…)', 'text'], ['REPORT_EMAILS', 'إيميلات التقرير اليومي (افصل بفاصلة)', 'text'],
+    ['SESSION_DAYS', 'الطيار يفضل مسجل دخول (أيام)', 'number'], ['MAX_LOGIN_FAILURES', 'محاولات غلط قبل القفل', 'number'],
+    ['LOCK_MINUTES', 'مدة القفل (دقايق)', 'number'], ['MIN_PASSWORD_LENGTH', 'أقل طول لكلمة سر الطيار', 'number'],
+    ['PUBLIC_APPLY_PER_HOUR', 'أقصى طلبات من لينك واحد في الساعة', 'number'], ['PUBLIC_APP_URL', 'لينك التطبيق', 'text']
+  ];
+  function viewSettings() {
+    var d = S.data, edit = can('settings.edit');
+    return head('الإعدادات', edit ? 'أي تغيير هنا بيوصل للتطبيق على طول' : 'عرض بس — التعديل للمدير') +
+      '<form id="setF" novalidate><div class="charts"><section class="card"><h2>شرايح البونص</h2><p class="sub">عدد الأوردرات المكتملة ← قيمة البونص</p><div id="tiers" style="display:grid;gap:6px">' +
+      d.season.tiers.map(tierRow).join('') + '</div>' + (edit ? '<button type="button" class="btn btn-ghost btn-sm" id="addTier" style="margin-top:8px">+ شريحة</button>' : '') + '</section>' +
+      '<section class="card" style="display:grid;gap:10px"><h2>البرنامج والأمان</h2>' + SETTING_LABELS.map(function (s) {
+        return '<div class="field"><label>' + s[1] + '</label><input name="' + s[0] + '" type="' + s[2] + '" value="' + esc(d.config[s[0]]) + '"' + (edit ? '' : ' disabled') + (s[2] === 'text' && /WHATSAPP|URL|EMAILS|CODE/.test(s[0]) ? ' class="ltr"' : '') + '></div>';
+      }).join('') + '</section></div>' + (edit ? '<div style="margin-top:12px"><button class="btn btn-primary" type="submit" style="min-height:42px">حفظ الإعدادات</button></div>' : '') + '</form>';
+  }
+  function tierRow(t) { return '<div style="display:flex;gap:8px;align-items:center"><input type="number" data-to value="' + t.orders + '" style="width:100px" aria-label="أوردرات"' + (can('settings.edit') ? '' : ' disabled') + '><span class="muted">أوردر ←</span><input type="number" data-tb value="' + t.bonus + '" style="width:110px" aria-label="بونص"' + (can('settings.edit') ? '' : ' disabled') + '><span class="muted">ج</span>' + (can('settings.edit') ? '<button type="button" class="btn btn-ghost btn-sm" data-rmt>✕</button>' : '') + '</div>'; }
+  function bindSettings() {
+    var f = document.getElementById('setF'); if (!can('settings.edit')) return;
+    var bindRm = function () { f.querySelectorAll('[data-rmt]').forEach(function (b) { b.onclick = function () { b.parentNode.remove(); }; }); };
+    bindRm();
+    document.getElementById('addTier').onclick = function () { document.getElementById('tiers').insertAdjacentHTML('beforeend', tierRow({ orders: '', bonus: '' })); bindRm(); };
+    f.querySelectorAll('#tiers input').forEach(function (i) { i.style.cssText += ';min-height:34px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg-2);padding:4px 8px'; });
+    f.onsubmit = async function (e) {
+      e.preventDefault();
+      var cfg = {}; SETTING_LABELS.forEach(function (s) { cfg[s[0]] = f[s[0]].value; });
+      var tiers = Array.prototype.map.call(f.querySelectorAll('#tiers > div'), function (r) { return { orders: r.querySelector('[data-to]').value, bonus: r.querySelector('[data-tb]').value }; });
+      var b = f.querySelector('[type=submit]'); busy(b, true); var res = await call('adminSaveSettings', { config: cfg, tiers: tiers }); busy(b, false);
+      if (!res.ok) { showErrors(f, res.fields); return; }
+      toast('اتحفظت ✓'); load(true);
+    };
+  }
+
+  /* ─────────────── Team ─────────────── */
+  function viewTeam() {
+    var d = S.data;
+    if (!d.team) return head('الفريق') + '<div class="empty">الصفحة دي للمدير بس.</div>';
+    return head('الفريق', 'مين يدخل لوحة الإدارة وصلاحيات كل واحد', '<button class="btn btn-primary" id="addM">+ عضو جديد</button>') +
+      '<section class="card"><h2>الأدوار</h2><div class="kv"><span>مدير</span><span>كل حاجة</span></div><div class="kv"><span>فريق التعيينات</span><span>المرشحين + حسابات الطيارين</span></div><div class="kv"><span>الحسابات</span><span>البونص والصرف</span></div><div class="kv"><span>مشاهد</span><span>يشوف بس</span></div></section>' +
+      table([['الاسم'], ['اسم المستخدم'], ['الدور'], ['الحالة'], ['آخر دخول', 'n'], ['']], d.team.map(function (m) {
+        var me = m.username === S.me.username;
+        return [esc(m.name), '<span class="ltr">' + esc(m.username) + '</span>',
+          me ? esc(d.roles[m.role]) : '<select data-role="' + esc(m.username) + '">' + Object.keys(d.roles).map(function (r) { return '<option value="' + r + '"' + (r === m.role ? ' selected' : '') + '>' + d.roles[r] + '</option>'; }).join('') + '</select>',
+          '<span class="pill ' + (m.status === 'active' ? 'green' : 'red') + '">' + (m.status === 'active' ? 'فعّال' : 'موقوف') + '</span>' + (m.mustChange ? ' <span class="pill dim">لسه بكلمة سر مؤقتة</span>' : ''),
+          m.lastLogin ? fmt(m.lastLogin) : '—',
+          me ? '<span class="muted">إنت</span>' : '<button class="btn btn-ghost btn-sm" data-tm="reset" data-u="' + esc(m.username) + '">كلمة سر مؤقتة</button> <button class="btn ' + (m.status === 'active' ? 'btn-danger' : 'btn-primary') + ' btn-sm" data-tm="' + (m.status === 'active' ? 'disable' : 'enable') + '" data-u="' + esc(m.username) + '">' + (m.status === 'active' ? 'أوقف' : 'فعّل') + '</button>'];
+      }));
+  }
+  function bindTeam() {
+    var a = document.getElementById('addM');
+    if (a) a.onclick = function () {
+      var o = overlay(dhead('عضو جديد في الفريق') + '<form id="mF" style="display:grid;gap:10px" novalidate>' +
+        '<div class="field"><label>الاسم</label><input name="name"></div><div class="field"><label>اسم المستخدم (إنجليزي)</label><input name="username" class="ltr" placeholder="sara"></div>' +
+        '<div class="field"><label>الدور</label><select name="role">' + Object.keys(S.data.roles).map(function (r) { return '<option value="' + r + '"' + (r === 'recruiter' ? ' selected' : '') + '>' + S.data.roles[r] + '</option>'; }).join('') + '</select></div>' +
+        '<button class="btn btn-primary" type="submit">إضافة</button><div id="mOut"></div></form>', true);
+      o.querySelector('#mF').onsubmit = async function (e) {
+        e.preventDefault(); var fd = formData(e.target); fd.action = 'add';
+        var res = await call('adminTeam', fd); if (!res.ok) { showErrors(e.target, res.fields); return; }
+        o.querySelector('#mOut').innerHTML = '<p class="muted" style="margin:0">ابعتله البيانات دي — هيغير كلمة السر أول ما يدخل:</p><div class="secret">' + esc(fd.username) + ' / ' + esc(res.data.temp) + '</div>';
+        e.target.querySelector('[type=submit]').remove(); load(true);
+      };
+    };
+    root.querySelectorAll('[data-role]').forEach(function (s) { s.onchange = async function () { var res = await call('adminTeam', { action: 'role', username: s.dataset.role, role: s.value }); if (res.ok) { toast('اتغير ✓'); load(true); } }; });
+    root.querySelectorAll('[data-tm]').forEach(function (b) { b.onclick = async function () {
+      var res = await call('adminTeam', { action: b.dataset.tm, username: b.dataset.u }); if (!res.ok) return;
+      if (res.data.temp) overlay(dhead('كلمة سر مؤقتة') + '<div class="secret">' + esc(b.dataset.u) + ' / ' + esc(res.data.temp) + '</div><p class="muted">هيغيرها أول ما يدخل.</p>', true);
+      else toast('تم ✓');
+      load(true);
+    }; });
+  }
+
+  /* ─────────────── Audit ─────────────── */
+  S.auq = '';
+  function viewAudit() {
+    var q = S.auq.toLowerCase();
+    var items = S.data.audit.filter(function (x) { return !q || (x.by + ' ' + x.action + ' ' + x.target + ' ' + x.before + ' ' + x.after).toLowerCase().indexOf(q) !== -1; });
+    return head('سجل التعديلات', 'آخر 400 تعديل من لوحة الإدارة — مين عمل إيه وإمتى') +
+      '<div class="filters"><input type="search" id="auq" placeholder="بحث بالاسم أو العملية" value="' + esc(S.auq) + '"></div>' +
+      list('audit', [
+        { t: 'الوقت', k: 'at', c: 'n', v: function (x) { var d = new Date(x.at); return isNaN(d) ? esc(x.at) : DFY.format(d) + ' ' + d.toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' }); } },
+        { t: 'المسؤول', k: 'by', v: function (x) { return esc(x.by); } },
+        { t: 'العملية', k: 'action', v: function (x) { return '<b>' + esc(x.action) + '</b>'; } },
+        { t: 'على', k: 'target', v: function (x) { return esc(x.target); } },
+        { t: 'قبل ← بعد', v: function (x) { return (x.before || x.after) ? '<span class="muted">' + esc(x.before || '—') + '</span> ← ' + esc(x.after || '—') : ''; } }
+      ], items, { id: function (x) { return x.at; }, empty: 'لسه مفيش تعديلات.' });
+  }
+  function bindAudit() {
+    var deb; document.getElementById('auq').oninput = function (e) { clearTimeout(deb); deb = setTimeout(function () { S.auq = e.target.value; render(); var i = document.getElementById('auq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
+    bindList('audit', {});
+  }
+
+  function openPassword() {
+    var o = overlay(dhead('تغيير كلمة المرور') + '<form id="cpF" style="display:grid;gap:10px" novalidate><div class="field"><label>الحالية</label><input name="current" type="password"></div>' +
+      '<div class="field"><label>الجديدة (8 على الأقل)</label><input name="next" type="password" autocomplete="new-password"></div><button class="btn btn-primary" type="submit">حفظ</button></form>', true);
+    o.querySelector('#cpF').onsubmit = async function (e) {
+      e.preventDefault(); var res = await call('adminChangePassword', formData(e.target));
+      if (!res.ok) { showErrors(e.target, res.fields); return; }
+      S.token = res.data.token; store('fs_admin_token', S.token); closeOverlay(); toast('اتغيرت ✓');
+    };
+  }
+
+  var VIEWS = { overview: viewOverview, analytics: viewAnalytics, applicants: viewApplicants, riders: viewRiders, payouts: viewPayouts, users: viewUsers, alerts: viewAlerts, campaigns: viewCampaigns, settings: viewSettings, team: viewTeam, audit: viewAudit };
+  var BINDERS = { overview: bindOverview, analytics: bindAnalytics, applicants: bindApplicants, riders: bindRiders, payouts: bindPayouts, users: bindUsers, alerts: bindAlerts, campaigns: bindCampaigns, settings: bindSettings, team: bindTeam, audit: bindAudit };
+
+  /* ─────────────── Start ─────────────── */
+  (async function () {
+    var token = store('fs_admin_token');
+    if (!token) { renderLogin(); return; }
+    S.token = token;
+    var res = await Backend.call('adminSession', { token: token });
+    if (res && res.ok) { S.me = res.data.me; if (S.me.mustChange) renderForceChange(); else load(); }
+    else { store('fs_admin_token', null); renderLogin(); }
+  })();
+})();
+</script>

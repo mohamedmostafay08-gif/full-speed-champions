@@ -198,11 +198,75 @@ function buildWorld(raw, cfg, today) {
   applicants.slice().sort(function (a, b) { return (a.timestamp || 0) - (b.timestamp || 0); })
     .forEach(function (a) { if (a.phone && !appsByPhone[a.phone]) appsByPhone[a.phone] = a; });
 
+  var campaigns = (raw.campaigns || []).map(function (c) {
+    return {
+      id: cleanText(c.id), name: cleanText(c.name), zone: cleanText(c.zone),
+      start: parseSheetDate(c.start, opts), end: parseSheetDate(c.end, opts),
+      extra: Math.max(0, parseInt(String(c.extra).replace(/[^\d]/g, ''), 10) || 0),
+      active: !/^(لا|no|false|0|off)$/i.test(cleanText(c.active))
+    };
+  }).filter(function (c) { return c.name && c.start && c.end && c.extra > 0; });
+
+  var payoutsByCode = {};
+  (raw.payouts || []).forEach(function (p) {
+    var code = cleanCode(p.riderCode);
+    if (!code) return;
+    (payoutsByCode[code] = payoutsByCode[code] || []).push({
+      id: cleanText(p.id), amount: Number(String(p.amount).replace(/[^\d.]/g, '')) || 0,
+      method: cleanText(p.method), reference: cleanText(p.reference), note: cleanText(p.note),
+      paidBy: cleanText(p.paidBy), paidAt: parseSheetDate(p.paidAt, opts), row: p._row
+    });
+  });
+
   return {
     cfg: cfg, today: dateOnly(today),
     riders: riders, headcount: headcount, applicants: applicants, dailyOrders: dailyOrders,
     ridersByPhone: ridersByPhone, ridersByCode: ridersByCode, headcountByCode: headcountByCode,
-    appsByPhone: appsByPhone
+    appsByPhone: appsByPhone, campaigns: campaigns, payoutsByCode: payoutsByCode
+  };
+}
+
+/** Extra bonus from active campaigns: hire date inside the campaign, zone matches (or campaign is for all zones). */
+function campaignExtra(rider, world) {
+  var extra = 0, names = [];
+  (world.campaigns || []).forEach(function (c) {
+    if (!c.active || !rider.hireDate || rider.hireDate < c.start || rider.hireDate > c.end) return;
+    if (c.zone && headerKey(c.zone) !== headerKey(rider.zone)) return;
+    extra += c.extra; names.push(c.name);
+  });
+  return { extra: extra, names: names };
+}
+
+/**
+ * One hired rider, fully evaluated: bonus (tiers + campaigns), window,
+ * and payout state. Used by both the rider app and the admin dashboard.
+ *
+ * payStatus: 'paid' | 'due' (window over or max reached, not paid yet) | 'pending' | 'none' (no bonus earned)
+ */
+function evaluateRider(r, world) {
+  var cfg = world.cfg;
+  var ev = evaluateReferral({
+    hireDate: r.hireDate,
+    dailyOrders: world.dailyOrders[r.code] || [],
+    totalOrders: r.orders,
+    today: world.today,
+    tiers: cfg.TIERS,
+    windowMonths: cfg.BONUS_WINDOW_MONTHS
+  });
+  var camp = ev.bonus > 0 ? campaignExtra(r, world) : { extra: 0, names: [] };
+  var payouts = (world.payoutsByCode && world.payoutsByCode[r.code]) || [];
+  var paid = payouts.reduce(function (s, p) { return s + p.amount; }, 0);
+  var total = ev.bonus + camp.extra;
+  var finished = ev.state === 'maxed' || ev.state === 'closed';
+  var payStatus = paid > 0 && paid >= total ? 'paid' : total <= 0 ? (finished ? 'none' : 'pending') : finished ? 'due' : 'pending';
+  return {
+    code: r.code, name: r.name, zone: r.zone, phone: r.phone, vehicle: r.vehicle,
+    hireDate: ev.hireDate, lastDay: ev.lastDay, payoutDate: ev.payoutDate,
+    orders: ev.orders, tierBonus: ev.bonus, extra: camp.extra, campaigns: camp.names, bonus: total,
+    state: ev.state, daysLeft: ev.daysLeft, ordersToNext: ev.ordersToNext, progress: ev.progress,
+    nextBonus: ev.nextTier ? ev.nextTier.bonus + camp.extra : null, nextOrders: ev.nextTier ? ev.nextTier.orders : null,
+    ordersSource: ev.ordersSource,
+    paid: paid, payStatus: payStatus, payouts: payouts
   };
 }
 
@@ -250,21 +314,9 @@ function buildDashboard(world, user) {
   var team = world.riders
     .filter(function (r) { return r.hireDate && r.hireDate >= start && r.code !== key && riderOwner(r, world) === key; })
     .map(function (r) {
-      var ev = evaluateReferral({
-        hireDate: r.hireDate,
-        dailyOrders: world.dailyOrders[r.code] || [],
-        totalOrders: r.orders,
-        today: today,
-        tiers: cfg.TIERS,
-        windowMonths: cfg.BONUS_WINDOW_MONTHS
-      });
-      return {
-        code: r.code, name: r.name, zone: r.zone, phone: r.phone, vehicle: r.vehicle,
-        hireDate: ev.hireDate, lastDay: ev.lastDay, payoutDate: ev.payoutDate,
-        orders: ev.orders, bonus: ev.bonus, state: ev.state, daysLeft: ev.daysLeft,
-        ordersToNext: ev.ordersToNext, progress: ev.progress,
-        nextBonus: ev.nextTier ? ev.nextTier.bonus : null, nextOrders: ev.nextTier ? ev.nextTier.orders : null
-      };
+      var e = evaluateRider(r, world);
+      delete e.payouts;
+      return e;
     })
     .sort(function (a, b) {
       var rank = { active: 0, upcoming: 1, maxed: 2, closed: 3 };
@@ -291,7 +343,7 @@ function buildDashboard(world, user) {
     .sort(function (a, b) { return b.submitted - a.submitted; });
 
   // ── Totals ──
-  var totals = { bonus: 0, payable: 0, pending: 0, orders: 0, riders: team.length, active: 0, maxed: 0, closed: 0 };
+  var totals = { bonus: 0, payable: 0, pending: 0, paid: 0, orders: 0, riders: team.length, active: 0, maxed: 0, closed: 0 };
   var nextPayout = null;
   team.forEach(function (t) {
     totals.bonus += t.bonus;
@@ -299,8 +351,9 @@ function buildDashboard(world, user) {
     if (t.state === 'active' || t.state === 'upcoming') { totals.active++; totals.pending += t.bonus; }
     if (t.state === 'maxed') totals.maxed++;
     if (t.state === 'closed') totals.closed++;
-    if (t.state === 'maxed' || t.state === 'closed') totals.payable += t.bonus;
-    if (t.bonus > 0 && t.payoutDate >= today && (!nextPayout || t.payoutDate < nextPayout)) nextPayout = t.payoutDate;
+    if (t.payStatus === 'due') totals.payable += t.bonus - t.paid;
+    totals.paid += t.paid;
+    if (t.bonus > 0 && t.payStatus !== 'paid' && t.payoutDate >= today && (!nextPayout || t.payoutDate < nextPayout)) nextPayout = t.payoutDate;
   });
   totals.nextPayout = nextPayout;
   totals.applicants = pipeline.length;
@@ -318,6 +371,7 @@ function buildDashboard(world, user) {
       nudgeAfterDays: cfg.NUDGE_AFTER_DAYS
     },
     statuses: STATUSES,
+    announcement: cleanText(cfg.ANNOUNCEMENT),
     today: today
   };
 }
@@ -344,6 +398,136 @@ function buildProfile(world, user) {
     vehicle: r.vehicle || h.vehicle || '',
     talabatLink: cfg.TALABAT_REF_BASE + code,
     refParam: code
+  };
+}
+
+/* ─────────────────────────── Admin data ───────────────────────────── */
+
+var FLAG_LABELS = {
+  self: 'رشّح نفسه',
+  burst: 'ترشيحات كتير في يوم واحد',
+  dupe: 'نفس الرقم أو الرقم القومي متكرر',
+  known: 'كان شغال عندنا قبل كده',
+  quiet: 'اتعين ومش بيشتغل'
+};
+
+/**
+ * Everything the admin dashboard needs, as flat lists. Analytics are
+ * computed in the browser from these, so date filters are instant.
+ *
+ * users: rows from FS Users (readUsers_ shape).
+ */
+function buildAdminData(world, users) {
+  var cfg = world.cfg, today = world.today;
+
+  // ── Who is who: registered users, plus Talabat referrers who never signed up ──
+  var people = {};
+  (users || []).forEach(function (u) {
+    var key = u.type === 'external' ? u.phone : u.code;
+    if (!key) return;
+    people[key] = {
+      key: key, type: u.type, code: u.code, name: u.name, phone: u.phone, refId: u.refId || '',
+      status: u.status || 'active', registered: true, created: u.created || null, lastLogin: u.lastLogin || null,
+      applicants: 0, hires: 0, active: 0, bonus: 0, paid: 0, due: 0, orders: 0
+    };
+  });
+  function person(key) {
+    if (!key) return null;
+    if (!people[key]) {
+      var r = world.ridersByCode[key] || world.headcountByCode[key] || {};
+      var phone = canonicalPhone(key);
+      people[key] = {
+        key: key, type: phone ? 'external' : 'internal', code: phone ? '' : key, name: r.name || '', phone: phone || r.phone || '',
+        refId: '', status: 'active', registered: false, created: null, lastLogin: null,
+        applicants: 0, hires: 0, active: 0, bonus: 0, paid: 0, due: 0, orders: 0
+      };
+    }
+    var p = people[key];
+    if (!p.name) { var rr = world.ridersByCode[key] || world.headcountByCode[key]; if (rr) p.name = rr.name; }
+    if (!p.phone && !canonicalPhone(key)) { var hh = world.headcountByCode[key] || world.ridersByCode[key]; if (hh) p.phone = hh.phone; }
+    return p;
+  }
+
+  // ── Hired riders since the program start ──
+  var riders = world.riders.filter(function (r) { return r.hireDate && r.hireDate >= cfg.PROGRAM_START_DATE; }).map(function (r) {
+    var owner = riderOwner(r, world);
+    if (owner === r.code) owner = '';
+    var e = evaluateRider(r, world);
+    var p = person(owner);
+    var app = r.phone && world.appsByPhone[r.phone];
+    e.ownerKey = owner;
+    e.ownerName = p ? p.name : '';
+    e.ownerType = p ? p.type : '';
+    e.source = !owner ? 'none' : (r.referralCode && r.referralCode !== cfg.COMPANY_REF_CODE ? 'talabat' : 'app');
+    e.appliedOn = app ? app.timestamp : null;
+    e.daysToHire = app && app.timestamp ? Math.max(0, diffDays(app.timestamp, r.hireDate)) : null;
+    if (!owner) { e.bonus = 0; e.payStatus = 'none'; }
+    e.flags = [];
+    if (e.state === 'active' && diffDays(r.hireDate, today) >= 14 && e.orders === 0) e.flags.push('quiet');
+    if (p) {
+      p.hires++; p.orders += e.orders; p.bonus += e.bonus; p.paid += e.paid;
+      if (e.state === 'active' || e.state === 'upcoming') p.active++;
+      if (e.payStatus === 'due') p.due += e.bonus - e.paid;
+    }
+    return e;
+  });
+
+  // ── Applications ──
+  var byNid = {}, byPhone = {}, perRefDay = {};
+  world.applicants.forEach(function (a) {
+    if (a.nationalId) byNid[a.nationalId] = (byNid[a.nationalId] || 0) + 1;
+    if (a.phone) byPhone[a.phone] = (byPhone[a.phone] || 0) + 1;
+    var k = appOwnerKey(a.refCode) + '|' + (a.timestamp ? a.timestamp.getTime() : '');
+    perRefDay[k] = (perRefDay[k] || 0) + 1;
+  });
+  var headPhones = {};
+  world.headcount.forEach(function (h) { if (h.phone) headPhones[h.phone] = true; });
+
+  var applicants = world.applicants.map(function (a) {
+    var key = appOwnerKey(a.refCode);
+    var p = person(key);
+    var hired = a.phone && world.ridersByPhone[a.phone];
+    var status = hired ? STATUS_HIRED : (a.status || STATUSES[0]);
+    var since = a.statusUpdated || a.timestamp;
+    var waiting = since ? diffDays(since, today) : 0;
+    var flags = [];
+    if (p && a.phone && p.phone === a.phone) flags.push('self');
+    if ((perRefDay[key + '|' + (a.timestamp ? a.timestamp.getTime() : '')] || 0) >= 5) flags.push('burst');
+    if ((a.nationalId && byNid[a.nationalId] > 1) || (a.phone && byPhone[a.phone] > 1)) flags.push('dupe');
+    if (a.phone && headPhones[a.phone] && !hired) flags.push('known');
+    if (p) p.applicants++;
+    return {
+      row: a.row, submitted: a.timestamp, refKey: key, refName: p ? p.name : '', refType: p ? p.type : '',
+      name: a.name, phone: a.phone, nationalId: a.nationalId, zone: a.zone,
+      status: status, sheetStatus: a.rawStatus, note: a.note, statusUpdated: a.statusUpdated,
+      daysWaiting: waiting, stage: stageIndex(status),
+      hiredCode: hired ? hired.code : '', hiredDate: hired ? hired.hireDate : null,
+      nudge: status !== STATUS_HIRED && status !== STATUS_REJECTED && waiting >= cfg.NUDGE_AFTER_DAYS,
+      flags: flags
+    };
+  });
+
+  var payouts = [];
+  Object.keys(world.payoutsByCode || {}).forEach(function (code) {
+    world.payoutsByCode[code].forEach(function (p) {
+      var r = world.ridersByCode[code] || {};
+      payouts.push({ id: p.id, riderCode: code, riderName: r.name || '', amount: p.amount, method: p.method,
+        reference: p.reference, note: p.note, paidBy: p.paidBy, paidAt: p.paidAt });
+    });
+  });
+  payouts.sort(function (a, b) { return (b.paidAt || 0) - (a.paidAt || 0); });
+
+  return {
+    today: today,
+    season: { start: cfg.PROGRAM_START_DATE, windowMonths: cfg.BONUS_WINDOW_MONTHS, tiers: cfg.TIERS, nudgeAfterDays: cfg.NUDGE_AFTER_DAYS },
+    statuses: STATUSES,
+    flagLabels: FLAG_LABELS,
+    applicants: applicants,
+    riders: riders,
+    users: Object.keys(people).map(function (k) { return people[k]; }),
+    payouts: payouts,
+    campaigns: world.campaigns || [],
+    zones: Object.keys(world.riders.concat(world.headcount).reduce(function (m, r) { if (r.zone) m[r.zone] = 1; return m; }, {})).sort()
   };
 }
 
@@ -427,6 +611,6 @@ if (typeof module !== 'undefined' && module.exports) {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
     cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
     buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, buildDashboard: buildDashboard,
-    findNewlyHired: findNewlyHired, validateCandidate: validateCandidate
+    findNewlyHired: findNewlyHired, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
   };
 }

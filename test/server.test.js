@@ -53,13 +53,13 @@ test('setup creates the new tabs, upgrades New Applicants, migrates accounts', (
   assert.equal(users.length, 2);
   assert.equal(users[1][3], '01144077041');                       // leading zero restored
   assert.match(users[1][4], /^P[0-9A-F]{8}$/);                     // opaque ref id
-  assert.equal(env.triggers.length, 3);
+  assert.equal(env.triggers.length, 4);
   assert.ok(report.length >= 4);
   // Running it again changes nothing.
   env.ctx.setupFullSpeed();
   assert.equal(env.sheets['New Applicants'].rows[4][12], 'عنده عقد | الحالة القديمة: شغال مع ال 4pl');
   assert.equal(env.sheets['FS Users'].rows.length, 3);
-  assert.equal(env.triggers.length, 3);
+  assert.equal(env.triggers.length, 4);
 });
 
 test('legacy partner can log in with 01… (old bug) and gets a stronger hash', () => {
