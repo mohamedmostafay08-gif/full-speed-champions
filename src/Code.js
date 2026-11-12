@@ -246,7 +246,9 @@ function currentUser_(token) {
 
 function dashboardFor_(user) {
   invalidate_();
-  return buildDashboard(loadWorld_(), user);
+  var world = loadWorld_(), dash = buildDashboard(world, user);
+  try { dash.leaderboard = buildLeaderboard(world, readUsers_(), ownerKey(user)); } catch (e) { log_('error', 'leaderboard: ' + e); }
+  return dash;
 }
 
 function session_(p) {

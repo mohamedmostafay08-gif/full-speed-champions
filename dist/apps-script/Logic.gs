@@ -382,6 +382,37 @@ function stageIndex(status) {
 }
 
 /** Everything the app shows a signed-in user, in one object. */
+/**
+ * This month's top referrers by hires — first names only, no money.
+ * Ties share a rank. me = where the signed-in user stands.
+ */
+function buildLeaderboard(world, users, meKey) {
+  var t = world.today, from = new Date(t.getFullYear(), t.getMonth(), 1), start = world.cfg.PROGRAM_START_DATE;
+  if (start && start > from) from = start;
+  var count = {};
+  world.riders.forEach(function (r) {
+    if (!r.hireDate || r.hireDate < from || r.hireDate > t) return;
+    var k = riderOwner(r, world); if (!k || k === r.code) return;
+    count[k] = (count[k] || 0) + 1;
+  });
+  var byKey = {}; (users || []).forEach(function (u) { byKey[u.type === 'external' ? u.phone : u.code] = u; });
+  var first = function (k) {
+    var u = byKey[k], h = world.headcountByCode[k] || world.ridersByCode[k];
+    var n = cleanText((u && u.name) || (h && h.name) || '').replace(/\s*_?FULL\s*SPEED(_BC)?\s*$/i, '').split(/\s+/)[0];
+    return n || 'مرشِّح';
+  };
+  var rows = Object.keys(count).map(function (k) { return { key: k, hires: count[k] }; }).sort(function (a, b) { return b.hires - a.hires; });
+  var rank = 0, prev = null;
+  rows.forEach(function (r, i) { if (r.hires !== prev) { rank = i + 1; prev = r.hires; } r.rank = rank; });
+  var mine = rows.filter(function (r) { return r.key === meKey; })[0];
+  var above = mine ? rows.filter(function (r) { return r.rank < mine.rank; }).pop() : null;
+  return {
+    month: from, total: rows.length,
+    top: rows.slice(0, 10).map(function (r) { return { rank: r.rank, name: first(r.key), hires: r.hires, me: r.key === meKey }; }),
+    me: mine ? { rank: mine.rank, hires: mine.hires, toNext: above ? above.hires - mine.hires + 1 : 0 } : { rank: null, hires: 0, toNext: 1 }
+  };
+}
+
 function buildDashboard(world, user) {
   var cfg = world.cfg, today = world.today, key = ownerKey(user);
   var start = cfg.PROGRAM_START_DATE;
@@ -838,7 +869,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
     cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
-    buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, buildDashboard: buildDashboard,
+    buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, buildDashboard: buildDashboard, buildLeaderboard: buildLeaderboard,
     findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildReportTables: buildReportTables, buildDailySummary: buildDailySummary, dailySummaryText: dailySummaryText, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
   };
 }

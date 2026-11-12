@@ -165,3 +165,21 @@ test('daily summary: yesterday numbers, money and problems', () => {
   assert.match(text, /مستني اعتمادك: \*800 ج\*/);
   assert.match(text, /https:\/\/x\/admin\//);
 });
+
+test('leaderboard: this month, first names, shared ranks, my place', () => {
+  const world = {
+    today: D(2026, 11, 20), cfg: { PROGRAM_START_DATE: D(2026, 11, 1), COMPANY_REF_CODE: '3901026' },
+    riders: [
+      { code: '1', hireDate: D(2026, 11, 2), referralCode: '100' }, { code: '2', hireDate: D(2026, 11, 3), referralCode: '100' },
+      { code: '3', hireDate: D(2026, 11, 4), referralCode: '200' }, { code: '4', hireDate: D(2026, 11, 5), referralCode: '300' },
+      { code: '5', hireDate: D(2026, 10, 25), referralCode: '300' }
+    ],
+    headcountByCode: { '100': { name: 'Ahmed Ali _FULL SPEED' }, '200': { name: 'Sara Mohamed' }, '300': { name: 'Omar Hany' } },
+    ridersByCode: {}, applicants: [], appsByPhone: {}
+  };
+  const lb = L.buildLeaderboard(world, [], '300');
+  assert.equal(lb.top[0].name, 'Ahmed'); assert.equal(lb.top[0].hires, 2); assert.equal(lb.top[0].rank, 1);
+  assert.equal(lb.top[1].rank, 2); assert.equal(lb.top[2].rank, 2);
+  assert.deepEqual({ ...lb.me }, { rank: 2, hires: 1, toNext: 2 });
+  assert.equal(L.buildLeaderboard(world, [], '999').me.toNext, 1);
+});
