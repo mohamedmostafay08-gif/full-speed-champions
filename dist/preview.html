@@ -1146,9 +1146,10 @@ function buildWorld(raw, cfg, today) {
   // Daily orders tab: one row per rider per work day (Date = the day worked,
   // rider_id, Completed Deliveries). A rider's orders = the sum of their rows
   // inside the bonus window. Empty cells count as 0.
-  var dailyOrders = {}, orderTotals = {};
+  var dailyOrders = {}, orderTotals = {}, ordersNoDate = 0;
   (raw.dailyOrders || []).forEach(function (d) {
     var code = cleanCode(d.code), date = parseSheetDate(d.date, opts);
+    if (code && !date) ordersNoDate++;
     if (!code || !date) return;
     var n = Math.max(0, Math.floor(Number(String(d.orders).replace(/[^\d.]/g, '')) || 0));
     (dailyOrders[code] = dailyOrders[code] || []).push({ date: date, orders: n });
@@ -1220,7 +1221,7 @@ function buildWorld(raw, cfg, today) {
     cfg: cfg, today: dateOnly(today),
     riders: riders, headcount: headcount, applicants: applicants, dailyOrders: dailyOrders,
     ridersByPhone: ridersByPhone, ridersByCode: ridersByCode, headcountByCode: headcountByCode, headcountByPhone: headcountByPhone,
-    appsByPhone: appsByPhone, appsByCode: appsByCode, orderTotals: orderTotals, campaigns: campaigns, payoutsByCode: payoutsByCode
+    appsByPhone: appsByPhone, appsByCode: appsByCode, orderTotals: orderTotals, ordersNoDate: ordersNoDate, campaigns: campaigns, payoutsByCode: payoutsByCode
   };
 }
 
@@ -1709,8 +1710,19 @@ function buildDataCheck(world, tabs) {
     var item = { row: a.row, name: a.name, phone: a.phone, refCode: a.refCode, status: a.status, code: a.matchedCode,
       by: label[a.matchedBy] || '', hireDate: r ? r.hireDate : null, inTracker: !!(r && world.ridersByCode[r.code] && world.ridersByCode[r.code].inTracker),
       counted: !!(r && r.hireDate && r.hireDate >= start && owner), orders: r && world.orderTotals[r.code] !== undefined ? world.orderTotals[r.code] : null };
-    if (r) hiredApps.push(item);
-    else if (a.status === STATUS_HIRED) lost.push(item);
+    if (r) {
+      var rr = world.ridersByCode[r.code];
+      item.talabatCode = rr && rr.referralCode && rr.referralCode !== world.cfg.COMPANY_REF_CODE ? rr.referralCode : '';
+      item.mismatch = !!(item.talabatCode && appOwnerKey(a.refCode) && item.talabatCode !== appOwnerKey(a.refCode));
+      hiredApps.push(item);
+    } else if (a.status === STATUS_HIRED || a.matchedCode) {
+      // Why it didn't count: phone not found anywhere, or the application came after the hire day.
+      var found = a.matchedCode && (world.ridersByCode[a.matchedCode] || world.headcountByCode[a.matchedCode]);
+      item.applied = a.timestamp;
+      item.hireDate = found && found.hireDate ? found.hireDate : null;
+      item.reason = !found ? 'notFound' : 'afterHire';
+      if (item.reason === 'notFound' ? a.status === STATUS_HIRED : true) lost.push(item);
+    }
   });
   var counted = hiredApps.filter(function (x) { return x.counted; });
   return {
@@ -1722,7 +1734,7 @@ function buildDataCheck(world, tabs) {
     noTracker: hiredApps.filter(function (x) { return !x.hireDate; }),
     noOrders: counted.filter(function (x) { return x.orders === null; }),
     lost: lost,
-    orders: { codes: Object.keys(world.orderTotals).length,
+    orders: { codes: Object.keys(world.orderTotals).length, noDate: world.ordersNoDate || 0,
       matchedHires: world.riders.filter(function (r) { return world.orderTotals[r.code] !== undefined; }).length },
     hires: { tracker: world.riders.filter(function (r) { return r.inTracker; }).length, sinceStart: world.riders.filter(function (r) { return r.hireDate && r.hireDate >= start; }).length }
   };
