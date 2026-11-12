@@ -23,7 +23,7 @@ var ADMIN_ACTIONS_ = {
   adminRecordPayout: adminRecordPayout_,
   adminRefreshReports: adminRefreshReports_,
   adminSendReport: adminSendReport_,
-  adminRider: adminRider_,
+  adminDataCheck: adminDataCheck_,
   adminDeletePayout: adminDeletePayout_,
   adminUserAction: adminUserAction_,
   adminSaveSettings: adminSaveSettings_,
@@ -638,13 +638,18 @@ function dailySummaryHtml_(s, dateLabel, link) {
     (link ? '<p style="margin-top:18px"><a href="' + link + '" style="background:#187A31;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">افتح لوحة الإدارة</a></p>' : '') + '</div>';
 }
 
-/** One rider's daily orders, for the full rider page. */
-function adminRider_(p) {
+/** Data check page: every tab's recognised columns, and how applications became counted hires. */
+function adminDataCheck_(p) {
   return asAdmin_(p, null, function () {
-    var code = cleanCode(p.code), world = loadWorld_();
-    if (!world.ridersByCode[code]) return fail_('الطيار ده مش موجود.');
-    var days = (world.dailyOrders[code] || []).slice().sort(function (a, b) { return a.date - b.date; });
-    return ok_({ code: code, daily: days.map(function (d) { return { date: d.date, orders: d.orders }; }) });
+    invalidate_();
+    var want = [['HIRING', 'تاريخ التعيين، الكود، الموبايل، SV، SP'], ['HEADCOUNT', 'الكود، الموبايل، SPV، Active، SP، Batch'], ['APPLICANTS', 'المرشحين اللي اترشحوا من البرنامج'],
+      ['DAILY_ORDERS', 'كود المندوب + إجمالي الأوردرات'], ['RIDERS', 'كود طلبات (Referral Code) — احتياطي لو استمارة من غير كود']];
+    var tabs = want.map(function (w) {
+      var sh = tab_(TABS[w[0]]), vals = values_(TABS[w[0]]), head = vals[0] || [], map = mapHeaders(head, COLUMNS[w[0]]), cols = {};
+      Object.keys(map).forEach(function (f) { cols[f] = map[f] === -1 ? null : String(head[map[f]]); });
+      return { key: w[0], name: sh ? sh.getName() : TABS[w[0]], found: !!sh, rows: Math.max(0, vals.length - 1), use: w[1], columns: cols };
+    });
+    return ok_(buildDataCheck(loadWorld_(), tabs));
   });
 }
 

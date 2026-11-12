@@ -124,9 +124,9 @@ var COLUMNS = {
     hiredDate: ['تاريخ التعيين الفعلي']
   },
   DAILY_ORDERS: {
-    date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم'],
-    code: ['كود المندوب', 'Rider Code', 'Rider ID', 'Code', 'ID', 'الكود'],
-    orders: ['أوردرات مكتملة', 'Completed Orders', 'Orders', 'Completed', 'عدد الأوردرات', 'الأوردرات', 'Order Count']
+    date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم', 'Hire Date', 'تاريخ التعيين'],
+    code: ['كود المندوب', 'Rider Code', 'Rider ID', 'rider_id', 'Code', 'ID', 'الكود'],
+    orders: ['أوردرات مكتملة', 'Completed Deliveries', 'Deliveries', 'Completed Orders', 'Orders', 'Completed', 'عدد الأوردرات', 'الأوردرات', 'Order Count']
   },
   USERS: {
     type: ['Type'],
@@ -757,20 +757,24 @@ function buildWorld(raw, cfg, today) {
     };
   });
 
-  var dailyOrders = {};
+  // Daily orders tab: one row per rider with the TOTAL completed orders so far
+  // (the sheet is replaced on every update). Its date column is ignored — the
+  // hire date comes from Hiring tracker only. A repeated code keeps the larger total.
+  var dailyOrders = {}, orderTotals = {};
   (raw.dailyOrders || []).forEach(function (d) {
-    var code = cleanCode(d.code), date = parseSheetDate(d.date, opts);
-    if (!code || !date) return;
-    (dailyOrders[code] = dailyOrders[code] || []).push({ date: date, orders: Number(d.orders) || 0 });
+    var code = cleanCode(d.code); if (!code) return;
+    var n = Math.max(0, Math.floor(Number(String(d.orders).replace(/[^\d.]/g, '')) || 0));
+    orderTotals[code] = Math.max(orderTotals[code] || 0, n);
+  });
+  riders.forEach(function (r) {
+    if (orderTotals[r.code] !== undefined) { r.orders = orderTotals[r.code]; r.ordersFromTab = true; }
   });
 
   // Started = Active in Hiring tracker, or at least one order. Not in the
   // tracker at all (older hires) = assume started.
   riders.forEach(function (r) {
-    var orders = (dailyOrders[r.code] || []).some(function (d) { return d.orders > 0; }) || r.orders > 0;
-    var firstOrder = (dailyOrders[r.code] || []).filter(function (d) { return d.orders > 0; }).sort(function (a, b) { return a.date - b.date; })[0];
-    r.firstOrderDate = firstOrder ? firstOrder.date : null;
-    r.started = r.inTracker ? (/^active/.test(r.statusKey || '') || orders) : true;
+    r.firstOrderDate = null;
+    r.started = r.inTracker ? (/^active/.test(r.statusKey || '') || r.orders > 0) : true;
   });
 
   var ridersByPhone = {}, ridersByCode = {}, headcountByCode = {};
@@ -778,7 +782,8 @@ function buildWorld(raw, cfg, today) {
     ridersByCode[r.code] = r;
     if (r.phone && !ridersByPhone[r.phone]) ridersByPhone[r.phone] = r;
   });
-  headcount.forEach(function (h) { headcountByCode[h.code] = h; });
+  var headcountByPhone = {};
+  headcount.forEach(function (h) { headcountByCode[h.code] = h; if (h.phone && !headcountByPhone[h.phone]) headcountByPhone[h.phone] = h; });
   riders.forEach(function (r) {
     var h = headcountByCode[r.code];
     if (!h) return;
@@ -791,6 +796,17 @@ function buildWorld(raw, cfg, today) {
   var appsByPhone = {};
   applicants.slice().sort(function (a, b) { return (a.timestamp || 0) - (b.timestamp || 0); })
     .forEach(function (a) { if (a.phone && !appsByPhone[a.phone]) appsByPhone[a.phone] = a; });
+
+  // Which rider code each application became: the code typed in "كود بعد التعيين",
+  // else the candidate's phone in Headcount, else in Hiring tracker / Normal Riders Handle.
+  // Only hires matched to an application here count as "from a referral".
+  var appsByCode = {};
+  applicants.slice().sort(function (a, b) { return (a.timestamp || 0) - (b.timestamp || 0); }).forEach(function (a) {
+    var h = a.phone && headcountByPhone[a.phone], r = a.phone && ridersByPhone[a.phone];
+    a.matchedCode = a.hiredCode || (h && h.code) || (r && r.code) || '';
+    a.matchedBy = a.hiredCode ? 'typed' : h ? 'headcount' : r ? 'tracker' : '';
+    if (a.matchedCode && !appsByCode[a.matchedCode]) appsByCode[a.matchedCode] = a;
+  });
 
   var campaigns = (raw.campaigns || []).map(function (c) {
     return {
@@ -816,8 +832,8 @@ function buildWorld(raw, cfg, today) {
   return {
     cfg: cfg, today: dateOnly(today),
     riders: riders, headcount: headcount, applicants: applicants, dailyOrders: dailyOrders,
-    ridersByPhone: ridersByPhone, ridersByCode: ridersByCode, headcountByCode: headcountByCode,
-    appsByPhone: appsByPhone, campaigns: campaigns, payoutsByCode: payoutsByCode
+    ridersByPhone: ridersByPhone, ridersByCode: ridersByCode, headcountByCode: headcountByCode, headcountByPhone: headcountByPhone,
+    appsByPhone: appsByPhone, appsByCode: appsByCode, orderTotals: orderTotals, campaigns: campaigns, payoutsByCode: payoutsByCode
   };
 }
 
@@ -864,10 +880,11 @@ function evaluateRider(r, world) {
   var payStatus = paid > 0 && paid >= total ? 'paid' : total <= 0 ? (finished ? 'none' : 'pending') : !finished ? 'pending' : paid + approved >= total ? 'approved' : 'due';
   // Orders in the first 30 days (only once the rider has had 30 days) — a fair
   // way to compare riders hired on different dates.
-  var d30 = null, days = world.dailyOrders[r.code];
-  if (days && days.length && r.hireDate && diffDays(r.hireDate, world.today) >= 30) {
-    var end = addDays(r.hireDate, 30);
-    d30 = days.filter(function (x) { return x.date >= r.hireDate && x.date < end; }).reduce(function (s2, x) { return s2 + (Number(x.orders) || 0); }, 0);
+  // Orders per day on the road (hire day → today, or the last bonus day): fair across riders hired on different days.
+  var perDay = null;
+  if (r.hireDate && ev.orders !== null && ev.orders !== undefined && r.hireDate <= world.today) {
+    var end = ev.lastDay && ev.lastDay < world.today ? ev.lastDay : world.today;
+    perDay = Math.round(ev.orders / Math.max(1, diffDays(r.hireDate, end) + 1) * 10) / 10;
   }
   return {
     code: r.code, name: r.name, zone: r.zone, phone: r.phone, vehicle: r.vehicle,
@@ -875,10 +892,10 @@ function evaluateRider(r, world) {
     orders: ev.orders, tierBonus: ev.bonus, extra: camp.extra, campaigns: camp.names, bonus: total,
     state: ev.state, daysLeft: ev.daysLeft, ordersToNext: ev.ordersToNext, progress: ev.progress,
     nextBonus: ev.nextTier ? ev.nextTier.bonus + camp.extra : null, nextOrders: ev.nextTier ? ev.nextTier.orders : null,
-    ordersSource: ev.ordersSource,
+    ordersSource: r.ordersFromTab ? 'tab' : ev.ordersSource,
     started: r.started !== false, firstOrderDate: r.firstOrderDate || null,
     daysSinceHire: r.hireDate ? diffDays(r.hireDate, world.today) : null,
-    paid: paid, approved: approved, payStatus: payStatus, payouts: payouts, orders30: d30, batch: r.batch || null
+    paid: paid, approved: approved, payStatus: payStatus, payouts: payouts, ordersPerDay: perDay, batch: r.batch || null
   };
 }
 
@@ -904,10 +921,23 @@ function appOwnerKey(refCode) {
  * external partners use. Riders under that code (or with no code) belong to
  * whoever submitted their application in the program.
  */
+/** The application a hired rider came from (New Applicants), if any — made on or before the hire day. */
+function riderApp(rider, world) {
+  var app = (world.appsByCode && world.appsByCode[rider.code]) || null;
+  return app && appliedBeforeHire(app, rider) ? app : null;
+}
+
+/**
+ * Who gets the bonus for a hired rider. Only riders who came through New
+ * Applicants count: the Referral Code on the application, and if that is
+ * empty, Talabat's referral code (unless it's the company code).
+ */
 function riderOwner(rider, world) {
-  if (rider.referralCode && rider.referralCode !== world.cfg.COMPANY_REF_CODE) return rider.referralCode;
-  var app = rider.phone && world.appsByPhone[rider.phone];
-  return app && appliedBeforeHire(app, rider) ? appOwnerKey(app.refCode) : '';
+  var app = riderApp(rider, world);
+  if (!app) return '';
+  var key = appOwnerKey(app.refCode);
+  if (key) return key;
+  return rider.referralCode && rider.referralCode !== world.cfg.COMPANY_REF_CODE ? rider.referralCode : '';
 }
 
 /**
@@ -919,9 +949,16 @@ function appliedBeforeHire(app, rider) {
 }
 
 /** The rider a candidate became, if their phone was hired after the application. */
+/** The hired rider an application became (by typed code or phone in Headcount / hire tabs), or null. */
 function hiredFrom(app, world) {
-  var r = app.phone && world.ridersByPhone[app.phone];
-  return r && appliedBeforeHire(app, r) ? r : null;
+  var code = app.matchedCode; if (!code) return null;
+  var r = world.ridersByCode[code];
+  if (!r) {
+    var h = world.headcountByCode[code]; if (!h) return null;
+    // In Headcount but not in Hiring tracker yet: hired, hire date still unknown.
+    r = { code: code, name: h.name, zone: h.zone, phone: h.phone, hireDate: null, started: /^active/i.test(h.active), noTracker: true };
+  }
+  return appliedBeforeHire(app, r) ? r : null;
 }
 
 /* ──────────────────────────── Dashboard ───────────────────────────── */
@@ -1114,7 +1151,7 @@ function buildAdminData(world, users) {
     if (owner === r.code) owner = '';
     var e = evaluateRider(r, world);
     var p = person(owner);
-    var app = r.phone && world.appsByPhone[r.phone];
+    var app = riderApp(r, world);
     e.ownerKey = owner;
     e.ownerName = p ? p.name : '';
     e.sv = r.sv || '';
@@ -1123,7 +1160,7 @@ function buildAdminData(world, users) {
     e.inTracker = !!r.inTracker;
     e.ownerSv = svOf(owner, world);
     e.ownerType = p ? p.type : '';
-    e.source = !owner ? 'none' : (r.referralCode && r.referralCode !== cfg.COMPANY_REF_CODE ? 'talabat' : 'app');
+    e.source = !owner ? 'none' : (app && appOwnerKey(app.refCode) ? 'app' : 'talabat');
     e.appliedOn = app ? app.timestamp : null;
     e.daysToHire = app && app.timestamp ? Math.max(0, diffDays(app.timestamp, r.hireDate)) : null;
     if (!owner) { e.bonus = 0; e.payStatus = 'none'; }
@@ -1269,6 +1306,40 @@ function dailySummaryText(s, dateLabel, link) {
   return lines.join('\n');
 }
 
+/**
+ * "Data check" page: what was read from every tab, and how New Applicants
+ * turned into counted referral hires — so numbers can be traced by hand.
+ * tabs = [{ key, name, found, rows, columns: { field: headerOrNull } }]
+ */
+function buildDataCheck(world, tabs) {
+  var start = world.cfg.PROGRAM_START_DATE, rows = [];
+  var apps = world.applicants.filter(function (a) { return !a.timestamp || a.timestamp >= start; });
+  var label = { typed: 'الكود المكتوب في "كود بعد التعيين"', headcount: 'الموبايل في Headcount', tracker: 'الموبايل في Hiring tracker' };
+  var hiredApps = [], lost = [];
+  apps.forEach(function (a) {
+    var r = hiredFrom(a, world), owner = r && r.code ? riderOwner(world.ridersByCode[r.code] || r, world) : '';
+    var item = { row: a.row, name: a.name, phone: a.phone, refCode: a.refCode, status: a.status, code: a.matchedCode,
+      by: label[a.matchedBy] || '', hireDate: r ? r.hireDate : null, inTracker: !!(r && world.ridersByCode[r.code] && world.ridersByCode[r.code].inTracker),
+      counted: !!(r && r.hireDate && r.hireDate >= start && owner), orders: r && world.orderTotals[r.code] !== undefined ? world.orderTotals[r.code] : null };
+    if (r) hiredApps.push(item);
+    else if (a.status === STATUS_HIRED) lost.push(item);
+  });
+  var counted = hiredApps.filter(function (x) { return x.counted; });
+  return {
+    tabs: tabs,
+    start: start,
+    applicants: { total: world.applicants.length, sinceStart: apps.length,
+      byStatus: STATUSES.map(function (s) { return [s, apps.filter(function (a) { return a.status === s; }).length]; }) },
+    hired: hiredApps, counted: counted.length,
+    noTracker: hiredApps.filter(function (x) { return !x.hireDate; }),
+    noOrders: counted.filter(function (x) { return x.orders === null; }),
+    lost: lost,
+    orders: { codes: Object.keys(world.orderTotals).length,
+      matchedHires: world.riders.filter(function (r) { return world.orderTotals[r.code] !== undefined; }).length },
+    hires: { tracker: world.riders.filter(function (r) { return r.inTracker; }).length, sinceStart: world.riders.filter(function (r) { return r.hireDate && r.hireDate >= start; }).length }
+  };
+}
+
 function buildReportTables(data) {
   var avg = function (a) { return a.length ? Math.round(a.reduce(function (s, x) { return s + x; }, 0) / a.length) : ''; };
   var pct = function (a, b) { return b ? Math.round(a / b * 100) + '%' : ''; };
@@ -1303,14 +1374,14 @@ function buildReportTables(data) {
   var monthRows = Object.keys(byMonth).filter(Boolean).sort().map(function (k) { var x = byMonth[k]; return [k, x.apps, x.hires, x.bonus, x.paid]; });
 
   var cmp = function (label, list) {
-    var w30 = list.filter(function (r) { return r.orders30 !== null && r.orders30 !== undefined; });
+    var w30 = list.filter(function (r) { return r.ordersPerDay !== null && r.ordersPerDay !== undefined; });
     var sp = list.filter(function (r) { return r.sp === true || r.sp === false; });
-    return [label, list.length, avg(w30.map(function (r) { return r.orders30; })), avg(list.filter(function (r) { return r.batch; }).map(function (r) { return r.batch; })),
+    return [label, list.length, avg(w30.map(function (r) { return r.ordersPerDay; })), avg(list.filter(function (r) { return r.batch; }).map(function (r) { return r.batch; })),
       pct(sp.filter(function (r) { return r.sp; }).length, sp.length)];
   };
 
   return [
-    { title: 'مقارنة: من ترشيح قصاد من غير ترشيح', header: ['المجموعة', 'تعيينات', 'متوسط أوردرات أول 30 يوم', 'متوسط Batch (1 أقوى)', 'With SP'],
+    { title: 'مقارنة: من ترشيح قصاد من غير ترشيح', header: ['المجموعة', 'تعيينات', 'متوسط أوردرات في اليوم', 'متوسط Batch (1 أقوى)', 'With SP'],
       rows: [cmp('من ترشيح', referred), cmp('من غير ترشيح', data.riders.filter(function (r) { return !r.ownerKey; })),
         cmp('ترشيح طيار داخلي', referred.filter(function (r) { return r.ownerType === 'internal'; })), cmp('ترشيح شريك خارجي', referred.filter(function (r) { return r.ownerType === 'external'; }))] },
     { title: 'حسب الشهر', header: ['الشهر', 'ترشيحات', 'تعيينات من ترشيحات', 'البونص (ج)', 'اتصرف (ج)'], rows: monthRows },
@@ -1419,8 +1490,8 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
     cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
-    buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, buildDashboard: buildDashboard, buildLeaderboard: buildLeaderboard,
-    findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildReportTables: buildReportTables, buildDailySummary: buildDailySummary, dailySummaryText: dailySummaryText, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
+    buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, hiredFrom: hiredFrom, buildDashboard: buildDashboard, buildLeaderboard: buildLeaderboard,
+    findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildReportTables: buildReportTables, buildDataCheck: buildDataCheck, buildDailySummary: buildDailySummary, dailySummaryText: dailySummaryText, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
   };
 }
 
@@ -1442,8 +1513,12 @@ function ss_() {
   return SS_;
 }
 
+/** A tab by name — ignoring capital letters and extra spaces ("Daily orders" = "Daily Orders"). */
 function tab_(name) {
-  return ss_().getSheetByName(name);
+  var ss = ss_(), sh = ss.getSheetByName(name);
+  if (sh) return sh;
+  var want = String(name).toLowerCase().replace(/\s+/g, ' ').trim();
+  return ss.getSheets().filter(function (s) { return s.getName().toLowerCase().replace(/\s+/g, ' ').trim() === want; })[0] || null;
 }
 
 function values_(name) {
@@ -2413,7 +2488,7 @@ var ADMIN_ACTIONS_ = {
   adminRecordPayout: adminRecordPayout_,
   adminRefreshReports: adminRefreshReports_,
   adminSendReport: adminSendReport_,
-  adminRider: adminRider_,
+  adminDataCheck: adminDataCheck_,
   adminDeletePayout: adminDeletePayout_,
   adminUserAction: adminUserAction_,
   adminSaveSettings: adminSaveSettings_,
@@ -3028,13 +3103,18 @@ function dailySummaryHtml_(s, dateLabel, link) {
     (link ? '<p style="margin-top:18px"><a href="' + link + '" style="background:#187A31;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">افتح لوحة الإدارة</a></p>' : '') + '</div>';
 }
 
-/** One rider's daily orders, for the full rider page. */
-function adminRider_(p) {
+/** Data check page: every tab's recognised columns, and how applications became counted hires. */
+function adminDataCheck_(p) {
   return asAdmin_(p, null, function () {
-    var code = cleanCode(p.code), world = loadWorld_();
-    if (!world.ridersByCode[code]) return fail_('الطيار ده مش موجود.');
-    var days = (world.dailyOrders[code] || []).slice().sort(function (a, b) { return a.date - b.date; });
-    return ok_({ code: code, daily: days.map(function (d) { return { date: d.date, orders: d.orders }; }) });
+    invalidate_();
+    var want = [['HIRING', 'تاريخ التعيين، الكود، الموبايل، SV، SP'], ['HEADCOUNT', 'الكود، الموبايل، SPV، Active، SP، Batch'], ['APPLICANTS', 'المرشحين اللي اترشحوا من البرنامج'],
+      ['DAILY_ORDERS', 'كود المندوب + إجمالي الأوردرات'], ['RIDERS', 'كود طلبات (Referral Code) — احتياطي لو استمارة من غير كود']];
+    var tabs = want.map(function (w) {
+      var sh = tab_(TABS[w[0]]), vals = values_(TABS[w[0]]), head = vals[0] || [], map = mapHeaders(head, COLUMNS[w[0]]), cols = {};
+      Object.keys(map).forEach(function (f) { cols[f] = map[f] === -1 ? null : String(head[map[f]]); });
+      return { key: w[0], name: sh ? sh.getName() : TABS[w[0]], found: !!sh, rows: Math.max(0, vals.length - 1), use: w[1], columns: cols };
+    });
+    return ok_(buildDataCheck(loadWorld_(), tabs));
   });
 }
 

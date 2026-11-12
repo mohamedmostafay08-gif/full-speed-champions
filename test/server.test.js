@@ -23,7 +23,8 @@ function sheetToday() {
       ['11/3/2026 10:00:00', 1144077041, 'بلال محمد احمد', 1220211045, 29902020100012, 'x', 'Nasr city', '', '', '', '', 'قيد التعيين', '', ''],
       ['11/4/2026 10:00:00', 4722422, 'مرشح قديم', 1000000009, 29903030100013, 'x', 'Maadi', '', '', '', '', 'استلم ونزل', '', ''],
       ['11/5/2026 10:00:00', 4722422, 'مرشح استعلام', 1000000010, 29904040100014, 'x', 'Maadi', '', '', '', '', 'اترفع استعلام', '', ''],
-      ['11/6/2026 10:00:00', 4722422, 'مرشح شركة تانية', 1000000011, 29905050100015, 'x', 'Maadi', '', '', '', '', 'شغال مع ال 4pl', 'عنده عقد', '']
+      ['11/6/2026 10:00:00', 4722422, 'مرشح شركة تانية', 1000000011, 29905050100015, 'x', 'Maadi', '', '', '', '', 'شغال مع ال 4pl', 'عنده عقد', ''],
+      ['11/1/2026 10:00:00', 4722422, 'محمود اشرف', 1151307016, 29906060100016, 'x', 'Maadi', '', '', '', '', 'قيد التعيين', '', '']
     ],
     Passwords: [['Referral Code', 'Password'], [2638129, sha('1234')]],
     'External Partners': [['Phone Code', 'Name', 'Password'], ['', '', ''], [1144077041, 'احمد مختار شحاته', sha('partner99')]],
@@ -129,7 +130,7 @@ test('session restore, candidate submission, duplicate block, logout', () => {
   assert.equal(col('تاريخ الميلاد'), '1998-05-05');                 // read from the national ID
   assert.equal(col('العنوان'), '=HYPERLINK("x")');                   // stored as text, not a formula (apostrophe consumed)
   assert.match(col('لينك الترشيح'), /raf_4722422$/);
-  assert.equal(sub.data.dashboard.pipeline.length, 4);              // + the three November ones already in the sheet
+  assert.equal(sub.data.dashboard.pipeline.length, 5);              // + the four November ones already in the sheet
   assert.equal(sub.data.dashboard.pipeline[0].name, 'محمود علي حسن');
 
   const dupe = env.api('submitCandidate', { token, form });

@@ -13,8 +13,12 @@ function ss_() {
   return SS_;
 }
 
+/** A tab by name — ignoring capital letters and extra spaces ("Daily orders" = "Daily Orders"). */
 function tab_(name) {
-  return ss_().getSheetByName(name);
+  var ss = ss_(), sh = ss.getSheetByName(name);
+  if (sh) return sh;
+  var want = String(name).toLowerCase().replace(/\s+/g, ' ').trim();
+  return ss.getSheets().filter(function (s) { return s.getName().toLowerCase().replace(/\s+/g, ' ').trim() === want; })[0] || null;
 }
 
 function values_(name) {

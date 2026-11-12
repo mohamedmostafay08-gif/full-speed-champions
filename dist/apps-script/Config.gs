@@ -122,9 +122,9 @@ var COLUMNS = {
     hiredDate: ['تاريخ التعيين الفعلي']
   },
   DAILY_ORDERS: {
-    date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم'],
-    code: ['كود المندوب', 'Rider Code', 'Rider ID', 'Code', 'ID', 'الكود'],
-    orders: ['أوردرات مكتملة', 'Completed Orders', 'Orders', 'Completed', 'عدد الأوردرات', 'الأوردرات', 'Order Count']
+    date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم', 'Hire Date', 'تاريخ التعيين'],
+    code: ['كود المندوب', 'Rider Code', 'Rider ID', 'rider_id', 'Code', 'ID', 'الكود'],
+    orders: ['أوردرات مكتملة', 'Completed Deliveries', 'Deliveries', 'Completed Orders', 'Orders', 'Completed', 'عدد الأوردرات', 'الأوردرات', 'Order Count']
   },
   USERS: {
     type: ['Type'],

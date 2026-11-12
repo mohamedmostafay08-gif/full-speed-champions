@@ -213,6 +213,9 @@ td .gold { color: var(--gold); font-weight: 700; }
 .dl i { width: 10px; height: 10px; border-radius: 3px; }
 .dl b { font-variant-numeric: tabular-nums; }
 .dl small { color: var(--muted); text-align: end; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--green-soft); color: var(--ink); border: 1px solid var(--line); }
+.kpi .num.bad { color: var(--danger); }
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 760px) { .grid3 { grid-template-columns: 1fr; } }
 details.steps { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
@@ -433,7 +436,7 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
   var NAV = [
     ['', [['overview', 'لوحة القيادة', 'dash'], ['analytics', 'التحليلات', 'chart'], ['compare', 'المقارنات', 'chart'], ['sv', 'السوبرفايزرز', 'team']]],
     ['التشغيل', [['applicants', 'المرشحين', 'people'], ['riders', 'الطيارين والبونص', 'bike'], ['payouts', 'سجل الصرف', 'money'], ['users', 'المرشِّحين', 'user']]],
-    ['التحكم', [['alerts', 'التنبيهات', 'flag'], ['campaigns', 'الحملات والإعلانات', 'mega'], ['settings', 'الإعدادات', 'gear'], ['team', 'الفريق', 'team'], ['audit', 'سجل التعديلات', 'log']]]
+    ['التحكم', [['alerts', 'التنبيهات', 'flag'], ['check', 'فحص البيانات', 'log'], ['campaigns', 'الحملات والإعلانات', 'mega'], ['settings', 'الإعدادات', 'gear'], ['team', 'الفريق', 'team'], ['audit', 'سجل التعديلات', 'log']]]
   ];
 
   function counts() {
@@ -467,7 +470,7 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
     document.getElementById('themeBtn').onclick = toggleTheme;
     document.getElementById('outBtn').onclick = function () { call('adminLogout'); signOut(); };
     document.getElementById('pwBtn').onclick = openPassword;
-    var r = root.querySelector('[data-refresh]'); if (r) r.onclick = function () { load(true).then(function () { toast('البيانات اتحدّثت ✓'); }); };
+    var r = root.querySelector('[data-refresh]'); if (r) r.onclick = function () { S.check = null; load(true).then(function () { if (S.view === 'check') render(); toast('البيانات اتحدّثت ✓'); }); };
     (BINDERS[S.view] || function () {})();
   }
 
@@ -885,11 +888,11 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
 
   /* ─────────────── Comparisons ─────────────── */
   function grp(list) {
-    var o30 = list.filter(function (r) { return r.orders30 !== null && r.orders30 !== undefined; }).map(function (r) { return r.orders30; });
+    var o30 = list.filter(function (r) { return r.ordersPerDay !== null && r.ordersPerDay !== undefined; }).map(function (r) { return r.ordersPerDay; });
     var b = list.filter(function (r) { return r.batch; }).map(function (r) { return r.batch; });
     var sp = list.filter(function (r) { return r.sp !== null && r.sp !== undefined; });
     var st = list.filter(function (r) { return r.started !== null && r.started !== undefined; });
-    return { n: list.length, o30: o30.length ? Math.round(avg(o30)) : null, batch: b.length ? Math.round(avg(b) * 10) / 10 : null,
+    return { n: list.length, o30: o30.length ? Math.round(avg(o30) * 10) / 10 : null, batch: b.length ? Math.round(avg(b) * 10) / 10 : null,
       sp: sp.length ? pct(sp.filter(function (r) { return r.sp; }).length, sp.length) : null, started: st.length ? pct(st.filter(function (r) { return r.started; }).length, st.length) : null,
       strong: b.length ? pct(b.filter(function (x) { return x <= 2; }).length, b.length) : null };
   }
@@ -926,7 +929,7 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
     };
     var I = side('internal'), E = side('external'), M = monthStats(), cur = M[M.length - 1], prv = M[M.length - 2];
     var dl = function (a, b) { if (!b) return a ? '<span class="delta">جديد</span>' : ''; var p = Math.round((a - b) / b * 100); return '<span class="delta"><b class="' + (p >= 0 ? 'up' : 'down') + '">' + (p >= 0 ? '▲ ' : '▼ ') + Math.abs(p) + '%</b> عن ' + prv.label + '</span>'; };
-    var verdict = A.o30 !== null && B.o30 !== null ? (A.o30 >= B.o30 ? 'طيارين الترشيحات بيعملوا في المتوسط <b>' + A.o30 + '</b> أوردر في أول 30 يوم من تعيينهم مقابل <b>' + B.o30 + '</b> للباقيين — الترشيح بيجيب طيارين أقوى.' : 'طيارين الترشيحات بيعملوا <b>' + A.o30 + '</b> أوردر في أول 30 يوم من تعيينهم مقابل <b>' + B.o30 + '</b> للباقيين — محتاجين نركّز على جودة المرشحين.') : 'لسه مفيش أوردرات كفاية في Daily Orders للمقارنة.';
+    var verdict = A.o30 !== null && B.o30 !== null ? (A.o30 >= B.o30 ? 'طيارين الترشيحات بيعملوا في المتوسط <b>' + A.o30 + '</b> أوردر في اليوم مقابل <b>' + B.o30 + '</b> للباقيين — الترشيح بيجيب طيارين أقوى.' : 'طيارين الترشيحات بيعملوا <b>' + A.o30 + '</b> أوردر في اليوم مقابل <b>' + B.o30 + '</b> للباقيين — محتاجين نركّز على جودة المرشحين.') : 'لسه مفيش أوردرات كفاية في Daily Orders للمقارنة.';
     return head('المقارنات', 'الترشيح قصاد التعيين العادي، الداخلي قصاد الشركاء، وشهر قصاد شهر') + filterBar() +
       '<div class="kpis">' +
         kpi('ترشيحات ' + cur.label, cur.apps, '', dl(cur.apps, prv.apps)) +
@@ -936,16 +939,16 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
       '</div>' + insight(verdict) +
       '<div class="charts">' +
         cmpCard('الترشيح قصاد التعيين العادي', 'كل اللي اتعيّنوا في الفترة — الأخضر هو الأحسن', 'من ترشيح', 'من غير ترشيح', [
-          cmpRow('عدد التعيينات', A.n, B.n), cmpRow('متوسط أوردرات أول 30 يوم', A.o30, B.o30), cmpRow('متوسط الباتش (الأقل أقوى)', A.batch, B.batch, '', true),
+          cmpRow('عدد التعيينات', A.n, B.n), cmpRow('متوسط أوردرات في اليوم', A.o30, B.o30), cmpRow('متوسط الباتش (الأقل أقوى)', A.batch, B.batch, '', true),
           cmpRow('باتش 1–2 (قوي)', A.strong, B.strong, '%'), cmpRow('With SP', A.sp, B.sp, '%'), cmpRow('بدأوا شغل فعلاً', A.started, B.started, '%')]) +
         cmpCard('الطيارين الداخليين قصاد الشركاء', 'مين بيجيب مرشحين أكتر وأحسن', 'طيارين داخليين', 'شركاء', [
           cmpRow('مرشِّحين جابوا تعيين', I.refs, E.refs), cmpRow('ترشيحات', I.apps, E.apps), cmpRow('اتعيّنوا', I.hires, E.hires), cmpRow('نسبة التحويل', I.conv, E.conv, '%'),
-          cmpRow('تكلفة البونص لكل تعيين', I.cost, E.cost, ' ج', true), cmpRow('متوسط أوردرات أول 30 يوم', I.o30, E.o30), cmpRow('متوسط الباتش', I.batch, E.batch, '', true)]) +
+          cmpRow('تكلفة البونص لكل تعيين', I.cost, E.cost, ' ج', true), cmpRow('متوسط أوردرات في اليوم', I.o30, E.o30), cmpRow('متوسط الباتش', I.batch, E.batch, '', true)]) +
         '<section class="card wide"><h2>توزيع الباتش<small>نسبة الطيارين في كل باتش — 1 أقوى</small></h2>' + legend([['من ترشيح', css('--s2')], ['من غير ترشيح', css('--s1')]]) +
           '<div class="chart-box"><canvas id="cBatch" role="img" aria-label="توزيع الباتش للترشيحات قصاد غير الترشيحات"></canvas></div></section>' +
         '<section class="card wide"><h2>شهر قصاد شهر<small>من بداية البرنامج (لحد 6 شهور) — بالفلاتر اللي فوق ما عدا الفترة</small></h2>' + legend([['ترشيحات', css('--s1')], ['تعيينات من ترشيحات', css('--s2')], ['تعيينات من غير ترشيح', css('--s3')]]) +
           '<div class="chart-box"><canvas id="cMonths" role="img" aria-label="مقارنة شهرية"></canvas></div>' +
-          table([['الشهر'], ['ترشيحات', 'n'], ['كل التعيينات', 'n'], ['من ترشيحات', 'n'], ['نسبة الترشيحات', 'n'], ['تحويل', 'n'], ['أوردرات أول 30 يوم', 'n'], ['بونص التعيينات دي (ج)', 'n'], ['اتصرف (ج)', 'n']],
+          table([['الشهر'], ['ترشيحات', 'n'], ['كل التعيينات', 'n'], ['من ترشيحات', 'n'], ['نسبة الترشيحات', 'n'], ['تحويل', 'n'], ['أوردرات في اليوم', 'n'], ['بونص التعيينات دي (ج)', 'n'], ['اتصرف (ج)', 'n']],
             M.slice().reverse().map(function (x) { return [x.label, x.apps, x.all, x.ref, x.share + '%', x.conv + '%', x.o30 === null ? '—' : x.o30, '<span class="gold">' + money(x.bonus) + '</span>', money(x.paid)]; }), { name: 'شهر-قصاد-شهر' }) + '</section>' +
       '</div>';
   }
@@ -1263,7 +1266,7 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
       '<div class="kv"><span>اتصرف</span><span>' + money(r.paid) + ' ج</span></div>' +
       '<div class="kv"><span>المرشِّح</span><span>' + esc(cleanName(r.ownerName) || r.ownerKey || '—') + (u.phone ? ' · <span class="ltr">' + esc(u.phone) + '</span>' : '') + '</span></div></div>' +
       (r.batch ? '<div class="kv"><span>الباتش التشغيلي</span><span>' + r.batch + '</span></div>' : '') +
-      (r.orders30 !== null && r.orders30 !== undefined ? '<div class="kv"><span>أوردرات أول 30 يوم</span><span>' + money(r.orders30) + '</span></div>' : '') +
+      (r.ordersPerDay !== null && r.ordersPerDay !== undefined ? '<div class="kv"><span>أوردرات في اليوم</span><span>' + money(r.ordersPerDay) + '</span></div>' : '') +
       (r.payouts && r.payouts.length ? '<div class="card"><h2>عمليات الصرف</h2>' + r.payouts.map(function (p) { return '<div class="kv"><span>' + (p.approved ? 'اعتمده ' + esc(p.approvedBy) + ' ' + fmt(p.approvedAt, true) + ' — مستني الصرف' : fmt(p.paidAt, true) + ' — ' + esc(p.method) + (p.reference ? ' (' + esc(p.reference) + ')' : '')) + '</span><span>' + money(p.amount) + ' ج</span></div>'; }).join('') + '</div>' : '') +
       (r.payStatus === 'due' && can('payouts.approve') ? '<button class="btn btn-gold" id="aprNow">اعتمد صرف ' + money(r.bonus - r.paid - r.approved) + ' ج</button>' : '') +
       (r.payStatus === 'approved' && can('payouts.edit') ? '<button class="btn btn-gold" id="payNow">سجّل الصرف ' + money(r.approved) + ' ج</button>' : '') +
@@ -1273,7 +1276,6 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
     var an = o.querySelector('#aprNow'); if (an) an.onclick = function () { approveCodes([code]); };
   }
   /* ─────────────── Full rider profile ─────────────── */
-  S.daily = {};
   function openProfile(code) { S.back = S.view; S.riderCode = code; S.view = 'rider'; render(); scrollTo(0, 0); }
   function viewRider() {
     var d = S.data, r = d.riders.filter(function (x) { return x.code === S.riderCode; })[0];
@@ -1292,14 +1294,12 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
       '<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="pill ' + p[1] + '" style="font-size:13px;padding:6px 12px">' + p[0] + '</span>' + (r.sp === false ? '<span class="pill red" style="font-size:13px;padding:6px 12px">No SP</span>' : r.sp ? '<span class="pill green" style="font-size:13px;padding:6px 12px">With SP</span>' : '') + '</div></div>' +
       '<div class="kpis">' + kpi('أوردرات في مدة البونص', money(r.orders), '', '<span class="delta">' + (r.ordersSource === 'manual' ? 'من العمود اليدوي' : 'من Daily Orders') + '</span>') +
         kpi('البونص', money(r.bonus), 'gold', '<span class="delta">' + (r.nextBonus ? 'باقي ' + money(r.ordersToNext) + ' أوردر على ' + money(r.nextBonus) + ' ج' : 'وصل لأعلى شريحة') + '</span>') +
-        kpi('أوردرات أول 30 يوم', r.orders30 === null || r.orders30 === undefined ? '—' : money(r.orders30), '', '<span class="delta">' + (r.batch ? 'باتش ' + r.batch : 'الباتش مش متسجل') + '</span>') +
+        kpi('أوردرات في اليوم', r.ordersPerDay === null || r.ordersPerDay === undefined ? '—' : money(r.ordersPerDay), '', '<span class="delta">' + (r.batch ? 'باتش ' + r.batch : 'الباتش مش متسجل') + '</span>') +
         kpi(r.state === 'active' ? 'باقي على آخر يوم' : 'مدة البونص', r.state === 'active' ? r.daysLeft + ' يوم' : 'خلصت', 'txt', '<span class="delta">لحد ' + fmt(r.lastDay, true) + '</span>') + '</div>' +
       '<section class="card" style="margin-top:12px"><h2>طريقه لأعلى شريحة<small>' + money(r.orders) + ' من ' + money(top) + ' أوردر</small></h2><div class="ladder">' +
         tiers.map(function (t) { var on = r.orders >= t.orders; return '<div class="rung' + (on ? ' on' : '') + '" title="' + t.orders + ' أوردر"><b>' + money(t.bonus) + '</b><span>' + money(t.orders) + '</span></div>'; }).join('') +
         '</div><div class="ladder-bar"><i style="width:' + Math.min(100, r.orders / top * 100) + '%"></i></div></section>' +
       '<div class="charts" style="margin-top:12px">' +
-        '<section class="card wide"><h2>الأوردرات يوم بيوم<small>العمود = أوردرات اليوم · الخط = المجموع</small></h2>' + legend([['أوردرات اليوم', css('--s1')], ['المجموع', css('--gold')]]) +
-          '<div class="chart-box tall" id="dailyBox"><div class="sk" style="height:100%"></div><canvas id="cDaily" role="img" aria-label="أوردرات الطيار يوم بيوم" hidden></canvas></div></section>' +
         '<section class="card"><h2>الرحلة</h2><ol class="timeline">' + steps.map(function (st) { return '<li><b>' + st[1] + '</b><span class="muted">' + (st[0] ? fmt(st[0], true) : '') + (st[2] ? ' · ' + st[2] : '') + '</span></li>'; }).join('') + '</ol></section>' +
         '<section class="card"><h2>المرشِّح</h2>' + (r.ownerKey ? '<div class="kv"><span>الاسم</span><span>' + esc(cleanName(r.ownerName) || r.ownerKey) + (u.left ? ' <span class="pill red">ساب</span>' : '') + '</span></div>' +
           '<div class="kv"><span>النوع</span><span>' + (r.ownerType === 'external' ? 'شريك خارجي' : 'طيار داخلي') + '</span></div>' +
@@ -1310,22 +1310,48 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
   }
   function bindRider() {
     document.getElementById('back').onclick = function () { S.view = S.back && S.back !== 'rider' ? S.back : 'riders'; render(); };
-    var code = S.riderCode, draw = function (days) {
-      var box = document.getElementById('dailyBox'); if (!box || S.riderCode !== code) return;
-      var r = S.data.riders.filter(function (x) { return x.code === code; })[0];
-      var list = days.map(function (x) { return { d: day(x.date), n: Number(x.orders) || 0 }; }).filter(function (x) { return x.d && (!r.hireDate || x.d >= r.hireDate); });
-      if (!list.length) { box.innerHTML = '<div class="empty">مفيش أوردرات للطيار ده في Daily Orders لسه.</div>'; return; }
-      box.querySelector('.sk').remove(); box.querySelector('canvas').hidden = false;
-      var cum = 0, inWin = function (x) { return !r.lastDay || x.d <= r.lastDay; };
-      chart('cDaily', { data: { labels: list.map(function (x) { return fmt(x.d); }), datasets: [
-        { type: 'bar', label: 'أوردرات اليوم', data: list.map(function (x) { return x.n; }), backgroundColor: list.map(function (x) { return inWin(x) ? css('--s1') : css('--line-2'); }), borderRadius: 3, maxBarThickness: 14, yAxisID: 'y' },
-        { type: 'line', label: 'المجموع في مدة البونص', data: list.map(function (x) { if (inWin(x)) cum += x.n; return cum; }), borderColor: css('--gold'), backgroundColor: css('--gold'), borderWidth: 2, pointRadius: 0, tension: .2, yAxisID: 'y2' }] },
-        options: { scales: { x: { grid: { display: false }, ticks: { color: css('--muted'), maxTicksLimit: 12 }, reverse: true },
-          y: { beginAtZero: true, grid: { color: css('--line') }, ticks: { color: css('--muted'), precision: 0 }, position: 'right', title: { display: true, text: 'في اليوم', color: css('--muted') } },
-          y2: { beginAtZero: true, grid: { display: false }, ticks: { color: css('--gold') }, position: 'left', title: { display: true, text: 'المجموع', color: css('--gold') } } } } });
-    };
-    if (S.daily[code]) draw(S.daily[code]);
-    else call('adminRider', { code: code }).then(function (res) { if (res.ok) { S.daily[code] = res.data.daily; draw(res.data.daily); } });
+  }
+
+  /* ─────────────── Data check ─────────────── */
+  var FIELD_AR = { hireDate: 'تاريخ التعيين', code: 'كود المندوب', zone: 'المنطقة', name: 'الاسم', phone: 'الموبايل', status: 'الحالة', sv: 'SV', sp: 'SP', vehicle: 'المركبة',
+    supervisor: 'SPV', manager: 'المدير', active: 'Active ?', spStatus: 'SP Status', batch: 'Batch', timestamp: 'تاريخ التقديم', refCode: 'Referral Code', nationalId: 'الرقم القومي',
+    address: 'العنوان', licenseExpiry: 'انتهاء الرخصة', idExpiry: 'انتهاء البطاقة', birthDate: 'تاريخ الميلاد', plate: 'اللوحة', note: 'ملاحظات', link: 'لينك الترشيح', refType: 'نوع المرشِّح',
+    statusUpdated: 'آخر تحديث', hiredCode: 'كود بعد التعيين', hiredDate: 'تاريخ التعيين الفعلي', date: 'التاريخ', orders: 'الأوردرات', referralCode: 'Referral Code', referralName: 'Referral Name' };
+  var NEEDED = { HIRING: ['hireDate', 'code', 'phone'], HEADCOUNT: ['code', 'phone'], APPLICANTS: ['timestamp', 'refCode', 'phone', 'status'], DAILY_ORDERS: ['code', 'orders'], RIDERS: ['code', 'referralCode'] };
+  function viewCheck() {
+    var c = S.check;
+    var top = head('فحص البيانات', 'البرنامج بيقرا إيه من كل تاب، وإزاي كل مرشح اتحسب أو ما اتحسبش — عشان تراجع الأرقام بنفسك');
+    if (!c) return top + '<div class="sk" style="height:120px"></div><div class="sk" style="height:300px"></div>';
+    var tabs = '<div class="charts">' + c.tabs.map(function (t) {
+      var miss = (NEEDED[t.key] || []).filter(function (f) { return !t.columns[f]; });
+      return '<section class="card"><h2>' + esc(t.name) + '<small>' + (t.found ? t.rows + ' صف' : '') + '</small></h2><p class="sub">' + esc(t.use) + '</p>' +
+        (!t.found ? '<div class="flag">⚠ التاب ده مش موجود في الشيت</div>' :
+          (miss.length ? '<div class="flag" style="margin-bottom:8px">⚠ مش لاقي عمود: ' + miss.map(function (f) { return FIELD_AR[f] || f; }).join('، ') + '</div>' : '<div style="color:var(--green-hi);font-size:12px;margin-bottom:8px">✓ كل العواميد المهمة موجودة</div>') +
+          '<div class="chips">' + Object.keys(t.columns).filter(function (f) { return t.columns[f]; }).map(function (f) { return '<span class="chip" title="' + esc(FIELD_AR[f] || f) + '">' + esc(t.columns[f]) + '</span>'; }).join('') + '</div>') + '</section>';
+    }).join('') + '</div>';
+    var st = c.applicants.byStatus.map(function (x) { return x[0] + ': ' + x[1]; }).join(' · ');
+    return top +
+      '<div class="kpis">' + kpi('مرشحين من ' + fmt(day(c.start), true), c.applicants.sinceStart, '', '<span class="delta">' + esc(st) + '</span>') +
+        kpi('لقينا كودهم (اتعيّنوا)', c.hired.length, '', '<span class="delta">بالكود المكتوب أو الموبايل</span>') +
+        kpi('اتحسبوا تعيين من ترشيح', c.counted, 'gold', '<span class="delta">ده الرقم اللي في لوحة القيادة</span>') +
+        kpi('حالتهم "اشتغل" ومش لاقيين كودهم', c.lost.length, c.lost.length ? 'bad' : '', '<span class="delta">موبايلهم مش في Headcount ولا Hiring tracker</span>') + '</div>' +
+      '<div class="kpis">' + kpi('طيارين في Hiring tracker', c.hires.tracker, '', '<span class="delta">' + c.hires.sinceStart + ' منهم من بداية البرنامج</span>') +
+        kpi('أكواد في Daily orders', c.orders.codes, '', '<span class="delta">' + c.orders.matchedHires + ' منهم طيارين في تابات التعيين</span>') +
+        kpi('اتعيّنوا ومش في Hiring tracker', c.noTracker.length, c.noTracker.length ? 'bad' : '', '<span class="delta">مالهمش تاريخ تعيين ← مفيش بونص لسه</span>') +
+        kpi('من ترشيح ومالهمش أوردرات', c.noOrders.length, '', '<span class="delta">كودهم مش في Daily orders</span>') + '</div>' +
+      tabs +
+      '<section class="card"><h2>المرشحين اللي اتعيّنوا<small>صف بصف من New Applicants</small></h2>' +
+        table([['الصف', 'n'], ['المرشح'], ['Referral Code'], ['الكود'], ['اتلقى عن طريق'], ['تاريخ التعيين', 'n'], ['أوردرات', 'n'], ['اتحسب؟']],
+          c.hired.map(function (x) { return [x.row, esc(x.name), '<span class="ltr">' + esc(x.refCode || '—') + '</span>', '<span class="ltr">' + esc(x.code) + '</span>', esc(x.by),
+            x.hireDate ? fmt(day(x.hireDate), true) : '<span class="flag">مش في Hiring tracker</span>', x.orders === null ? '<span class="muted">—</span>' : money(x.orders),
+            x.counted ? '<span class="pill green">اتحسب</span>' : '<span class="pill dim">' + (!x.hireDate ? 'مستني تاريخ التعيين' : 'قبل البرنامج أو مفيش مرشِّح') + '</span>']; }),
+          { name: 'فحص-التعيينات', page: 25, empty: 'مفيش مرشح لقينا كوده لسه.' }) + '</section>' +
+      (c.lost.length ? '<section class="card"><h2>حالتهم "اشتغل" ومش لاقيين كودهم<small>اكتب الكود في عمود "كود بعد التعيين" أو صحّح الموبايل</small></h2>' +
+        table([['الصف', 'n'], ['المرشح'], ['الموبايل'], ['Referral Code']], c.lost.map(function (x) { return [x.row, esc(x.name), '<span class="ltr">' + esc(x.phone || '—') + '</span>', '<span class="ltr">' + esc(x.refCode || '—') + '</span>']; }), { name: 'مش-لاقيين-كودهم' }) + '</section>' : '');
+  }
+  function bindCheck() {
+    if (S.check) return;
+    call('adminDataCheck', {}).then(function (res) { if (res.ok) { S.check = res.data; if (S.view === 'check') render(); } });
   }
 
   function approveCodes(codes) {
@@ -1623,8 +1649,8 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
     };
   }
 
-  var VIEWS = { overview: viewOverview, analytics: viewAnalytics, compare: viewCompare, rider: viewRider, sv: viewSV, applicants: viewApplicants, riders: viewRiders, payouts: viewPayouts, users: viewUsers, alerts: viewAlerts, campaigns: viewCampaigns, settings: viewSettings, team: viewTeam, audit: viewAudit };
-  var BINDERS = { overview: bindOverview, analytics: bindAnalytics, compare: bindCompare, rider: bindRider, sv: bindSV, applicants: bindApplicants, riders: bindRiders, payouts: bindPayouts, users: bindUsers, alerts: bindAlerts, campaigns: bindCampaigns, settings: bindSettings, team: bindTeam, audit: bindAudit };
+  var VIEWS = { overview: viewOverview, analytics: viewAnalytics, compare: viewCompare, check: viewCheck, rider: viewRider, sv: viewSV, applicants: viewApplicants, riders: viewRiders, payouts: viewPayouts, users: viewUsers, alerts: viewAlerts, campaigns: viewCampaigns, settings: viewSettings, team: viewTeam, audit: viewAudit };
+  var BINDERS = { overview: bindOverview, analytics: bindAnalytics, compare: bindCompare, check: bindCheck, rider: bindRider, sv: bindSV, applicants: bindApplicants, riders: bindRiders, payouts: bindPayouts, users: bindUsers, alerts: bindAlerts, campaigns: bindCampaigns, settings: bindSettings, team: bindTeam, audit: bindAudit };
 
   /* ─────────────── Start ─────────────── */
   (async function () {

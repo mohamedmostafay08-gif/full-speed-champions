@@ -22,7 +22,9 @@ function sheet() {
       ['Timestamp', 'Referral Code', 'الاسم الرباعي', 'الموبايل', 'الرقم القومي', 'العنوان', 'المنطقة', 'انتهاء الرخصة', 'انتهاء البطاقة', 'تاريخ الميلاد', 'اللوحة', 'الحالة', 'ملاحظات الإدارة', 'لينك الترشيح'],
       ['11/3/2026 10:00:00', 1144077041, 'بلال محمد احمد', 1220211045, 29902020100012, 'x', 'Nasr city', '', '', '', '', 'قيد التعيين', '', ''],
       ['11/4/2026 10:00:00', 4722422, 'مرشح بيستنى', 1000000009, 29903030100013, 'x', 'Maadi', '', '', '', '', 'تم التواصل', '', ''],
-      ['11/5/2026 10:00:00', 4722422, 'زياد نفسه', 1148005931, 29904040100014, 'x', 'Maadi', '', '', '', '', 'جديد', '', '']
+      ['11/5/2026 10:00:00', 4722422, 'زياد نفسه', 1148005931, 29904040100014, 'x', 'Maadi', '', '', '', '', 'جديد', '', ''],
+      // Applied with no referral code → Talabat's code (4722422) is the referrer
+      ['11/1/2026 10:00:00', '', 'محمود اشرف', 1151307016, 29905050100015, 'x', 'Maadi', '', '', '', '', 'قيد التعيين', '', '']
     ],
     Passwords: [['Referral Code', 'Password'], [4722422, sha('ziad2026')]],
     'External Partners': [['Phone Code', 'Name', 'Password'], [1144077041, 'احمد مختار', sha('partner99')]],
@@ -278,4 +280,18 @@ test('a referral must be made on or before the hire day', () => {
   env.ctx.setupFullSpeed();
   const partner = env.api('login', { type: 'external', code: '01144077041', password: 'partner99' }).data;
   assert.equal(partner.dashboard.team.length, 0);
+});
+
+test('data check: recognised columns and how applications became counted hires', () => {
+  const { env, temp } = ready();
+  const token = ownerToken(env, temp);
+  const c = plain(env.api('adminDataCheck', { token }).data);
+  const apps = c.tabs.find((t) => t.key === 'APPLICANTS');
+  assert.equal(apps.found, true);
+  assert.equal(apps.columns.phone, 'الموبايل');
+  const hired = Object.fromEntries(c.hired.map((x) => [x.code, x]));
+  assert.equal(hired['5037565'].counted, true);       // empty Referral Code → Talabat code
+  assert.equal(hired['5031339'].counted, true);       // partner application
+  assert.ok(!hired['5032000']);                       // never applied → not a referral
+  assert.equal(c.counted, 2);
 });

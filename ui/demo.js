@@ -56,7 +56,7 @@
       riders: rowsToRecords(riders, COLUMNS.RIDERS),
       headcount: rowsToRecords(headcount, COLUMNS.HEADCOUNT),
       applicants: rowsToRecords(applicants, COLUMNS.APPLICANTS),
-      dailyOrders: rowsToRecords(daily, COLUMNS.DAILY_ORDERS)
+      dailyOrders: (function () { var t = {}; rowsToRecords(daily, COLUMNS.DAILY_ORDERS).forEach(function (d) { t[d.code] = (t[d.code] || 0) + (Number(d.orders) || 0); }); return Object.keys(t).map(function (c) { return { code: c, orders: t[c] }; }); })()
     }, cfg, today);
   }
 

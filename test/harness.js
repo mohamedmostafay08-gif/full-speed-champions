@@ -83,6 +83,7 @@ function makeEnv(tabs) {
     getSheetByName: (n) => sheets[n] || null,
     insertSheet: (n) => (sheets[n] = new Sheet(n)),
     deleteSheet: (sh) => { delete sheets[sh.getName()]; },
+    getSheets: () => Object.values(sheets),
     setSpreadsheetTimeZone() {}
   };
   const pad = (n) => String(n).padStart(2, '0');

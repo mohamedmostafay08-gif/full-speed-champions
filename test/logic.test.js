@@ -26,7 +26,9 @@ const APPLICANTS = [
   ['11/2/2026 13:01:05', 1948971, 'كريم احمد محمد علي', 1000000002, 29901010100011, 'x', 'Maadi', '', '', '', '', 'قيد التعيين', '', ''],
   ['11/3/2026 10:00:00', 1144077041, 'شريك مرشح واحد', 1026477826, 29902020100012, 'x', 'Haram', '', '', '', '', 'تم حضور المحاضره', '', ''],
   ['11/10/2026 10:00:00', 1948971, 'لسه جديد خالص', 1000000003, 29903030100013, 'x', 'Maadi', '', '', '', '', '', 'محتاج صورة البطاقة', ''],
-  ['10/30/2026 22:47:23', 1948971, 'قبل البرنامج', 1000000004, 29904040100014, 'x', 'Maadi', '', '', '', '', 'شغال', '', '']
+  ['10/30/2026 22:47:23', 1948971, 'قبل البرنامج', 1000000004, 29904040100014, 'x', 'Maadi', '', '', '', '', 'شغال', '', ''],
+  // Applied through the program with no referral code: Talabat's code decides the referrer.
+  ['11/5/2026 09:00:00', '', 'محمود اشرف', 1151307016, 29905050100015, 'x', 'Maadi', '', '', '', '', 'قيد التعيين', '', '']
 ];
 
 function world(today = D(2026, 11, 11), dailyRows = []) {
@@ -71,7 +73,7 @@ test('formula injection is neutralised', () => {
   assert.equal(L.safeCell('محمد'), 'محمد');
 });
 
-test('internal rider sees Talabat referrals from the program start only', () => {
+test('a hire counts only through New Applicants; empty Referral Code falls back to Talabat', () => {
   const dash = L.buildDashboard(world(), { type: 'internal', code: '1948971' });
   assert.deepEqual(dash.team.map((t) => t.code), ['5037565']);  // 29-Oct hire excluded
   assert.equal(dash.user.supervisor, 'Kabo Maadi');
@@ -93,7 +95,7 @@ test('applicant becomes "اشتغل" automatically when the phone is hired', () 
   const partner = L.buildDashboard(world(), { type: 'external', phone: '01144077041' });
   assert.equal(partner.pipeline[0].status, 'اشتغل');
   assert.equal(partner.pipeline[0].hiredCode, '5029498');
-  assert.deepEqual(L.findNewlyHired(world()).map((h) => h.code), ['5029498']);
+  assert.deepEqual(L.findNewlyHired(world()).map((h) => h.code), ['5029498', '5037565']);
 });
 
 test('pipeline: nudges after 3 days, pre-season applications hidden', () => {
@@ -105,9 +107,9 @@ test('pipeline: nudges after 3 days, pre-season applications hidden', () => {
   assert.equal(fresh.note, 'محتاج صورة البطاقة');
 });
 
-test('daily orders beat the manual column and drive the bonus', () => {
-  const rows = [];
-  for (let i = 0; i < 20; i++) rows.push([C.addDays(D(2026, 11, 8), i), '5037565', 16]);
+test('Daily orders total beats the manual column and drives the bonus', () => {
+  // One row per rider with the running total; a stale duplicate never adds up.
+  const rows = [['8-Nov', '5037565', 320], ['8-Nov', '5037565', 150]];
   const dash = L.buildDashboard(world(D(2026, 11, 28), rows), { type: 'internal', code: '1948971' });
   assert.equal(dash.team[0].orders, 320);
   assert.equal(dash.team[0].bonus, 800);
@@ -175,11 +177,26 @@ test('leaderboard: this month, first names, shared ranks, my place', () => {
       { code: '5', hireDate: D(2026, 10, 25), referralCode: '300' }
     ],
     headcountByCode: { '100': { name: 'Ahmed Ali _FULL SPEED' }, '200': { name: 'Sara Mohamed' }, '300': { name: 'Omar Hany' } },
-    ridersByCode: {}, applicants: [], appsByPhone: {}
+    ridersByCode: {}, applicants: [], appsByPhone: {},
+    appsByCode: { '1': { refCode: '100' }, '2': { refCode: '100' }, '3': { refCode: '200' }, '4': { refCode: '300' }, '5': { refCode: '300' } }
   };
   const lb = L.buildLeaderboard(world, [], '300');
   assert.equal(lb.top[0].name, 'Ahmed'); assert.equal(lb.top[0].hires, 2); assert.equal(lb.top[0].rank, 1);
   assert.equal(lb.top[1].rank, 2); assert.equal(lb.top[2].rank, 2);
   assert.deepEqual({ ...lb.me }, { rank: 2, hires: 1, toNext: 2 });
   assert.equal(L.buildLeaderboard(world, [], '999').me.toNext, 1);
+});
+
+test('Talabat code alone (no application) is not a referral', () => {
+  // 5013180-style: Normal Riders Handle has 1948971 as referral code but nobody applied through the program
+  const w = world();
+  const r = w.ridersByCode['5031339'];   // referral 4906555, no application
+  assert.equal(L.riderOwner(r, w), '');
+});
+
+test('application matched by phone in Headcount, or by the typed code', () => {
+  const w = world();
+  const app = w.applicants.find((a) => a.name === 'محمود اشرف');
+  assert.equal(app.matchedCode, '5037565');
+  assert.equal(L.hiredFrom(app, w).code, '5037565');
 });
