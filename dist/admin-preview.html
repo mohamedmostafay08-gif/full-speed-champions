@@ -201,6 +201,8 @@ td .gold { color: var(--gold); font-weight: 700; }
   .filters input[type=search] { min-width: 0; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  table.cmp td .win { color: var(--green); font-weight: 800; }
+  table.cmp td .win::after { content: ' ✓'; font-size: 11px; }
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -1590,7 +1592,7 @@ if (typeof module !== 'undefined' && module.exports) {
     var skill = rnd();
     refs.push({ key: code, type: 'internal', weight: skill < .25 ? 6 : skill < .6 ? 2.5 : 1, quality: .2 + rnd() * .5, phone: ph });
     var hz = zone();
-    headcount.push({ code: code, name: nm, zone: hz, supervisor: svFor(hz).name, manager: 'Full Speed', phone: ph, vehicle: pick(['Bike', 'Bike', 'Bicycle']), active: 'Active' });
+    headcount.push({ code: code, name: nm, zone: hz, supervisor: svFor(hz).name, manager: 'Full Speed', phone: ph, vehicle: pick(['Bike', 'Bike', 'Bicycle']), active: i === 9 || i === 17 ? 'No Contract' : 'Active', spStatus: 'With SP', batch: int(1, 5) });
     if (rnd() < .85) users.push({ type: 'internal', code: code, name: nm, phone: ph, refId: '', status: 'active', created: ago(int(60, 120)), lastLogin: ago(int(0, 14)) });
   }
   for (var j = 0; j < 6; j++) {
@@ -1624,6 +1626,7 @@ if (typeof module !== 'undefined' && module.exports) {
         var tenure = diffDays(hire, today), spOn = perDay > 0 && rnd() > Math.min(.6, tenure / 160 + (1.2 - sv.q) * .25);
         hiring.push({ _row: hiring.length + 2, hireDate: hire, code: code2, zone: z, name: name(3) + ' _FULL SPEED', phone: p, status: perDay && tenure > 1 ? 'Active' : 'Inactive', sv: sv.name, sp: spOn ? 'With SP' : 'No SP', vehicle: veh });
         riders.push({ _row: riders.length + 2, code: code2, referralCode: ref.type === 'internal' ? ref.key : COMPANY });
+        headcount.push({ code: code2, name: name(3), zone: z, supervisor: sv.name, manager: 'Full Speed', phone: p, vehicle: veh, active: 'Active', spStatus: spOn ? 'With SP' : 'No SP', batch: perDay ? Math.max(1, Math.min(7, Math.round(6.2 - perDay / 4 + (rnd() - .5) * 2))) : '' });
         for (var x = hire; x < today; x = addDays(x, 1)) if (perDay) daily.push({ date: x, code: code2, orders: Math.max(0, Math.round(perDay + (rnd() - .5) * 8)) });
       }
     }
@@ -1632,7 +1635,10 @@ if (typeof module !== 'undefined' && module.exports) {
   for (var u2 = 0; u2 < 70; u2++) {
     var c3 = String(riderCode += int(3, 40)), h3 = ago(int(0, 90));
     var z3 = zone();
-    hiring.push({ _row: hiring.length + 2, hireDate: h3, code: c3, zone: z3, name: name(3) + ' _FULL SPEED', phone: phone(), status: 'Inactive', sv: svFor(z3).name, sp: rnd() < .8 ? 'With SP' : 'No SP', vehicle: 'Bike' });
+    var sv3 = svFor(z3), pd3 = rnd() < .18 ? 0 : (3 + rnd() * 13) * sv3.q, t3 = diffDays(h3, today), sp3 = pd3 > 0 && rnd() > Math.min(.7, t3 / 130 + .1);
+    hiring.push({ _row: hiring.length + 2, hireDate: h3, code: c3, zone: z3, name: name(3) + ' _FULL SPEED', phone: phone(), status: pd3 && t3 > 1 ? 'Active' : 'Inactive', sv: sv3.name, sp: sp3 ? 'With SP' : 'No SP', vehicle: pick(['Bike', 'Bike', 'Bicycle', 'Walker']) });
+    headcount.push({ code: c3, name: name(3), zone: z3, supervisor: sv3.name, manager: 'Full Speed', phone: '', vehicle: 'Bike', active: 'Active', spStatus: sp3 ? 'With SP' : 'No SP', batch: pd3 ? Math.max(1, Math.min(7, Math.round(7 - pd3 / 3.5 + (rnd() - .5) * 2))) : '' });
+    for (var x3 = h3; x3 < today; x3 = addDays(x3, 1)) if (pd3) daily.push({ date: x3, code: c3, orders: Math.max(0, Math.round(pd3 + (rnd() - .5) * 8)) });
   }
   // A few things the alerts page should catch
   var cheater = refs[3];
@@ -1647,7 +1653,12 @@ if (typeof module !== 'undefined' && module.exports) {
   (function () {
     var w = world(), methods = ['فودافون كاش', 'كاش', 'إنستاباي', 'مع المرتب'];
     buildAdminData(w, users).riders.filter(function (r) { return r.payStatus === 'due' && r.payoutDate < ago(5) && rnd() < .8; }).forEach(function (r) {
-      payouts.push({ id: 'PO-' + r.code, riderCode: r.code, amount: r.bonus, method: pick(methods), reference: rnd() < .5 ? 'TX' + int(100000, 999999) : '', note: '', paidBy: pick(['منى (حسابات)', 'المدير']), paidAt: addDays(r.payoutDate, int(1, 4)) });
+      var at = addDays(r.payoutDate, int(1, 4));
+      payouts.push({ id: 'PO-' + r.code, riderCode: r.code, amount: r.bonus, method: pick(methods), reference: rnd() < .5 ? 'TX' + int(100000, 999999) : '', note: '', paidBy: pick(['منى (حسابات)', 'المدير']), paidAt: at, status: 'اتصرف', approvedBy: 'المدير', approvedAt: addDays(at, -1) });
+    });
+    // A few approved and waiting for finance
+    buildAdminData(world(), users).riders.filter(function (r) { return r.payStatus === 'due'; }).slice(0, 4).forEach(function (r) {
+      payouts.push({ id: 'PO-A' + r.code, riderCode: r.code, amount: r.bonus - r.paid, method: '', reference: '', note: '', paidBy: '', paidAt: null, status: 'معتمد', approvedBy: 'المدير', approvedAt: ago(1) });
     });
   })();
 
@@ -1696,12 +1707,17 @@ if (typeof module !== 'undefined' && module.exports) {
       return ok({ done: done, skipped: 0 });
     },
     adminEditApplicant: function (p) { var a = applicants.filter(function (x) { return x._row === +p.row; })[0]; Object.keys(p.fields || {}).forEach(function (k) { if (a && p.fields[k]) a[k] = p.fields[k]; }); log('عدّل بيانات مرشح', a ? a.name : ''); return ok(); },
+    adminApprovePayouts: function (p) {
+      var rs = buildAdminData(world(), users).riders.filter(function (x) { return (p.codes || []).indexOf(x.code) !== -1 && x.payStatus === 'due'; }), total = 0;
+      rs.forEach(function (r) { var amt = r.bonus - r.paid - r.approved; total += amt; payouts.push({ id: 'PO-' + Date.now() + r.code, riderCode: r.code, amount: amt, method: '', reference: '', note: '', paidBy: '', paidAt: null, status: 'معتمد', approvedBy: 'المدير', approvedAt: today }); });
+      log('اعتمد صرف بونص', rs.length + ' طيار', '', total + ' ج'); return ok({ approved: rs.length, total: total, skipped: (p.codes || []).length - rs.length });
+    },
+    adminRefreshReports: function () { log('حدّث تاب التقارير', ''); return ok(); },
     adminRecordPayout: function (p) {
-      var r = buildAdminData(world(), users).riders.filter(function (x) { return x.code === p.code; })[0];
-      if (!r) return { ok: false, error: 'الطيار ده مش موجود.' };
-      if (r.paid + Number(p.amount) > r.bonus) return { ok: false, error: 'المبلغ أكبر من المستحق (' + r.bonus + ' ج).', fields: { amount: 'أكبر من المستحق.' } };
-      payouts.push({ id: 'PO-' + Date.now(), riderCode: p.code, amount: Number(p.amount), method: p.method, reference: p.reference, note: p.note, paidBy: 'المدير', paidAt: today });
-      log('سجّل صرف بونص', cleanText(r.name) + ' #' + r.code, '', p.amount + ' ج — ' + p.method); return ok();
+      var po = payouts.filter(function (x) { return x.id === p.id && /معتمد/.test(x.status); })[0];
+      if (!po) return { ok: false, error: 'لازم المدير يعتمد الصرف الأول.' };
+      po.method = p.method; po.reference = p.reference; po.note = p.note; po.paidBy = 'منى (حسابات)'; po.paidAt = today; po.status = 'اتصرف';
+      log('سجّل صرف بونص', po.riderCode, 'معتمد', po.amount + ' ج — ' + p.method); return ok({ id: po.id });
     },
     adminDeletePayout: function (p) { payouts = payouts.filter(function (x) { return x.id !== p.id; }); log('لغى صرف بونص', p.id); return ok(); },
     adminUserAction: function (p) {
@@ -1855,13 +1871,13 @@ if (typeof module !== 'undefined' && module.exports) {
     d.season.start = day(d.season.start);
     d.applicants.forEach(function (a) { a.submitted = day(a.submitted); a.hiredDate = day(a.hiredDate); a.statusUpdated = day(a.statusUpdated); });
     d.riders.forEach(function (r) { ['hireDate', 'lastDay', 'payoutDate', 'appliedOn'].forEach(function (k) { r[k] = day(r[k]); }); });
-    d.payouts.forEach(function (p) { p.paidAt = day(p.paidAt); });
+    d.payouts.forEach(function (p) { p.paidAt = day(p.paidAt); p.approvedAt = day(p.approvedAt); });
     d.usersByKey = {}; d.users.forEach(function (u) { d.usersByKey[u.key] = u; });
   }
 
   /* ─────────────── Shell ─────────────── */
   var NAV = [
-    ['', [['overview', 'لوحة القيادة', 'dash'], ['analytics', 'التحليلات', 'chart'], ['sv', 'السوبرفايزرز', 'team']]],
+    ['', [['overview', 'لوحة القيادة', 'dash'], ['analytics', 'التحليلات', 'chart'], ['compare', 'المقارنات', 'chart'], ['sv', 'السوبرفايزرز', 'team']]],
     ['التشغيل', [['applicants', 'المرشحين', 'people'], ['riders', 'الطيارين والبونص', 'bike'], ['payouts', 'سجل الصرف', 'money'], ['users', 'المرشِّحين', 'user']]],
     ['التحكم', [['alerts', 'التنبيهات', 'flag'], ['campaigns', 'الحملات والإعلانات', 'mega'], ['settings', 'الإعدادات', 'gear'], ['team', 'الفريق', 'team'], ['audit', 'سجل التعديلات', 'log']]]
   ];
@@ -1877,6 +1893,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
   function render() {
     charts.forEach(function (c) { c.destroy(); }); charts = [];
+    EXPORTS = {}; EXPORT_N = 0;
     var c = counts();
     var nav = NAV.map(function (g) {
       return (g[0] ? '<div class="nav-group">' + g[0] + '</div>' : '') + g[1].filter(function (n) { return n[0] !== 'team' || S.data.team; }).map(function (n) {
@@ -1906,46 +1923,73 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 
   /* ─────────────── Filters for analytic views ─────────────── */
-  var RANGES = [['7', '7 أيام'], ['30', '30 يوم'], ['month', 'الشهر ده'], ['season', 'من بداية البرنامج']];
+  var RANGES = [['7', '7 أيام'], ['30', '30 يوم'], ['month', 'الشهر ده'], ['season', 'من بداية البرنامج'], ['custom', 'من / لحد']];
+  S.from = S.from || ''; S.to = S.to || ''; S.veh = ''; S.batch = ''; S.rst = ''; S.refq = '';
   function rangeStart() {
     var t = S.data.today;
     if (S.range === '7') return addDays(t, -6);
     if (S.range === '30') return addDays(t, -29);
     if (S.range === 'month') return new Date(t.getFullYear(), t.getMonth(), 1);
+    if (S.range === 'custom' && S.from) return day(S.from);
     return S.data.season.start;
   }
-  function inRange(d) { return d && d >= rangeStart() && d <= S.data.today; }
+  function rangeEnd() { return S.range === 'custom' && S.to ? day(S.to) : S.data.today; }
+  function inRange(d) { return d && d >= rangeStart() && d <= rangeEnd(); }
   function srcOk(t) { return S.source === 'all' || t === S.source; }
   function zoneOk(z) { return !S.zone || z === S.zone; }
   function svOk(v) { return !S.sv || v === S.sv; }
+  var VEH = { 'موتوسيكل': /^(bike|موتوسيكل|hybrid)/i, 'عجلة': /^(bicycle|عجلة)/i, 'مشي': /^(walker|مشي)/i };
+  function vehKind(v) { var k = Object.keys(VEH).filter(function (x) { return VEH[x].test(String(v || '').trim()); })[0]; return k || 'غير محدد'; }
+  function batchKind(b) { return !b ? 'غير محدد' : b <= 2 ? '1–2 (قوي)' : b <= 4 ? '3–4 (متوسط)' : '5+ (ضعيف)'; }
+  function refOk(key, name) { if (!S.refq) return true; var q = S.refq.toLowerCase(); return String(key || '').toLowerCase().indexOf(q) !== -1 || cleanName(name).toLowerCase().indexOf(q) !== -1; }
+  /* Rider-level filters (vehicle, batch, status) only apply to hires. */
+  function riderOk(r) {
+    if (S.veh && vehKind(r.vehicle) !== S.veh) return false;
+    if (S.batch && batchKind(r.batch) !== S.batch) return false;
+    if (S.rst === 'sp' && r.sp !== true) return false;
+    if (S.rst === 'nosp' && r.sp !== false) return false;
+    if (S.rst === 'started' && r.started === false) return false;
+    if (S.rst === 'notstarted' && r.started !== false) return false;
+    return true;
+  }
+  function activeFilters() { return [S.veh, S.batch, S.rst, S.refq, S.sv, S.zone, S.source !== 'all' ? 1 : ''].filter(Boolean).length; }
   function filterBar() {
+    var opt = function (v, cur, label) { return '<option value="' + esc(v) + '"' + (cur === v ? ' selected' : '') + '>' + esc(label || v) + '</option>'; };
     return '<div class="filters"><div class="seg" role="group" aria-label="الفترة">' + RANGES.map(function (r) {
       return '<button data-range="' + r[0] + '" aria-pressed="' + (S.range === r[0]) + '">' + r[1] + '</button>';
     }).join('') + '</div>' +
-    '<label>المصدر <select id="fSource"><option value="all">الكل</option><option value="internal"' + (S.source === 'internal' ? ' selected' : '') + '>طيارين داخليين</option><option value="external"' + (S.source === 'external' ? ' selected' : '') + '>شركاء خارجيين</option></select></label>' +
-    '<label title="الترشيحات: فريق المرشِّح · التعيينات: فريق الطيار الجديد">SV <select id="fSv"><option value="">كل السوبرفايزرز</option>' + (S.data.svs || []).map(function (v) { return '<option' + (S.sv === v ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('') + '</select></label>' +
-    '<label>المنطقة <select id="fZone"><option value="">كل المناطق</option>' + S.data.zones.map(function (z) { return '<option' + (S.zone === z ? ' selected' : '') + '>' + esc(z) + '</option>'; }).join('') + '</select></label>' +
-    '<span class="muted" style="margin-inline-start:auto;font-size:12px">' + fmt(rangeStart(), true) + ' ← ' + fmt(S.data.today, true) + '</span></div>';
+    (S.range === 'custom' ? '<label>من <input type="date" id="fFrom" value="' + esc(S.from || iso(S.data.season.start)) + '"></label><label>لحد <input type="date" id="fTo" value="' + esc(S.to || iso(S.data.today)) + '"></label>' : '') +
+    '<label>المصدر <select id="fSource">' + opt('all', S.source, 'الكل') + opt('internal', S.source, 'طيارين داخليين') + opt('external', S.source, 'شركاء خارجيين') + '</select></label>' +
+    '<label title="الترشيحات: فريق المرشِّح · التعيينات: فريق الطيار الجديد">SV <select id="fSv">' + opt('', S.sv, 'كل السوبرفايزرز') + (S.data.svs || []).map(function (v) { return opt(v, S.sv); }).join('') + '</select></label>' +
+    '<label>المنطقة <select id="fZone">' + opt('', S.zone, 'كل المناطق') + S.data.zones.map(function (z) { return opt(z, S.zone); }).join('') + '</select></label>' +
+    '<label>المركبة <select id="fVeh">' + opt('', S.veh, 'الكل') + Object.keys(VEH).map(function (v) { return opt(v, S.veh); }).join('') + '</select></label>' +
+    '<label>الباتش <select id="fBatch">' + opt('', S.batch, 'الكل') + ['1–2 (قوي)', '3–4 (متوسط)', '5+ (ضعيف)'].map(function (v) { return opt(v, S.batch); }).join('') + '</select></label>' +
+    '<label>حالة الطيار <select id="fRst">' + opt('', S.rst, 'الكل') + opt('sp', S.rst, 'With SP') + opt('nosp', S.rst, 'No SP (موقوف)') + opt('started', S.rst, 'بدأ شغل (Active)') + opt('notstarted', S.rst, 'لسه ما بدأش (Inactive)') + '</select></label>' +
+    '<label>المرشِّح <input type="search" id="fRef" placeholder="اسم أو كود أو موبايل" value="' + esc(S.refq) + '" style="min-width:170px"></label>' +
+    (activeFilters() ? '<button class="btn btn-ghost btn-sm" id="fClear">مسح الفلاتر</button>' : '') +
+    '<span class="muted" style="margin-inline-start:auto;font-size:12px">' + fmt(rangeStart(), true) + ' ← ' + fmt(rangeEnd(), true) + '</span></div>';
   }
   function bindFilters() {
     root.querySelectorAll('[data-range]').forEach(function (b) { b.onclick = function () { S.range = b.dataset.range; render(); }; });
-    var s = document.getElementById('fSource'); if (s) s.onchange = function () { S.source = s.value; render(); };
-    var z = document.getElementById('fZone'); if (z) z.onchange = function () { S.zone = z.value; render(); };
-    var v = document.getElementById('fSv'); if (v) v.onchange = function () { S.sv = v.value; render(); };
+    var map = { fSource: 'source', fZone: 'zone', fSv: 'sv', fVeh: 'veh', fBatch: 'batch', fRst: 'rst', fFrom: 'from', fTo: 'to' };
+    Object.keys(map).forEach(function (id) { var el = document.getElementById(id); if (el) el.onchange = function () { S[map[id]] = el.value; render(); }; });
+    var rf = document.getElementById('fRef'), deb;
+    if (rf) rf.oninput = function () { clearTimeout(deb); deb = setTimeout(function () { S.refq = rf.value.trim(); render(); var i = document.getElementById('fRef'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); };
+    var c = document.getElementById('fClear'); if (c) c.onclick = function () { S.source = 'all'; S.zone = S.sv = S.veh = S.batch = S.rst = S.refq = ''; render(); };
   }
   function scoped() {
     var d = S.data;
-    var apps = d.applicants.filter(function (a) { return inRange(a.submitted) && srcOk(a.refType) && zoneOk(a.zone) && svOk(a.refSv); });
-    var hires = d.riders.filter(function (r) { return r.ownerKey && inRange(r.hireDate) && srcOk(r.ownerType) && zoneOk(r.zone) && svOk(r.sv); });
-    var allHires = d.riders.filter(function (r) { return inRange(r.hireDate) && zoneOk(r.zone) && svOk(r.sv); });
+    var apps = d.applicants.filter(function (a) { return inRange(a.submitted) && srcOk(a.refType) && zoneOk(a.zone) && svOk(a.refSv) && refOk(a.refKey, a.refName); });
+    var hires = d.riders.filter(function (r) { return r.ownerKey && inRange(r.hireDate) && srcOk(r.ownerType) && zoneOk(r.zone) && svOk(r.sv) && riderOk(r) && refOk(r.ownerKey, r.ownerName); });
+    var allHires = d.riders.filter(function (r) { return inRange(r.hireDate) && zoneOk(r.zone) && svOk(r.sv) && riderOk(r) && (!S.refq || refOk(r.ownerKey, r.ownerName)) && (S.source === 'all' || !r.ownerKey || r.ownerType === S.source); });
     return { apps: apps, hires: hires, allHires: allHires };
   }
   function prevScoped() {
-    var start = rangeStart(), len = diff(start, S.data.today) + 1, pStart = addDays(start, -len), pEnd = addDays(start, -1);
+    var start = rangeStart(), len = diff(start, rangeEnd()) + 1, pStart = addDays(start, -len), pEnd = addDays(start, -1);
     var inP = function (d) { return d && d >= pStart && d <= pEnd; };
     return {
-      apps: S.data.applicants.filter(function (a) { return inP(a.submitted) && srcOk(a.refType) && zoneOk(a.zone) && svOk(a.refSv); }).length,
-      hires: S.data.riders.filter(function (r) { return r.ownerKey && inP(r.hireDate) && srcOk(r.ownerType) && zoneOk(r.zone) && svOk(r.sv); }).length
+      apps: S.data.applicants.filter(function (a) { return inP(a.submitted) && srcOk(a.refType) && zoneOk(a.zone) && svOk(a.refSv) && refOk(a.refKey, a.refName); }).length,
+      hires: S.data.riders.filter(function (r) { return r.ownerKey && inP(r.hireDate) && srcOk(r.ownerType) && zoneOk(r.zone) && svOk(r.sv) && riderOk(r) && refOk(r.ownerKey, r.ownerName); }).length
     };
   }
   function delta(now, before) {
@@ -1996,7 +2040,7 @@ if (typeof module !== 'undefined' && module.exports) {
     sc.hires.forEach(function (r) { (by[r.ownerKey] = by[r.ownerKey] || { k: r.ownerKey, apps: 0, hires: 0, bonus: 0 }); by[r.ownerKey].hires++; by[r.ownerKey].bonus += r.bonus; });
     var top = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return (b.hires - a.hires) || (b.apps - a.apps); }).slice(0, 8);
 
-    return head('لوحة القيادة', 'صورة البرنامج كله في شاشة واحدة') + filterBar() +
+    return head('لوحة القيادة', 'صورة البرنامج كله في شاشة واحدة', '<button class="btn btn-wa" id="waSum">' + icon('wa') + 'ملخص واتساب</button>' + (true ? '<button class="btn btn-ghost" id="repTab" title="يكتب كل الجداول في تاب FS Reports في الشيت">' + icon('dl') + 'حدّث تاب التقارير</button>' : '')) + filterBar() +
       '<div class="kpis">' +
         kpi('ترشيحات جديدة', sc.apps.length, '', delta(sc.apps.length, prev.apps)) +
         kpi('اتعيّنوا من ترشيحات', sc.hires.length, '', delta(sc.hires.length, prev.hires)) +
@@ -2039,8 +2083,33 @@ if (typeof module !== 'undefined' && module.exports) {
     if (!out.length) return '<p class="muted" style="margin:0">كله تمام ✓</p>';
     return out.map(function (o) { return '<div class="insight"><b class="tag ' + o[0] + '">' + (o[0] === 'bad' ? 'مهم' : o[0] === 'warn' ? 'متابعة' : 'فرصة') + '</b><span style="flex:1">' + o[1] + '</span><button class="btn btn-ghost btn-sm" data-go="' + o[2] + '">افتح</button></div>'; }).join('');
   }
+  function summaryText() {
+    var d = S.data, sc = scoped(), prev = prevScoped();
+    var conv = sc.apps.length ? pct(sc.apps.filter(function (a) { return a.status === 'اشتغل'; }).length, sc.apps.length) : 0;
+    var due = d.riders.filter(function (r) { return r.payStatus === 'due'; }), apr = d.payouts.filter(function (p) { return p.status === 'approved'; });
+    var stuck = d.applicants.filter(function (a) { return a.nudge; }).length;
+    var idle = d.riders.filter(function (r) { return r.ownerKey && r.started === false && r.daysSinceHire >= 3; }).length;
+    var by = {}; sc.hires.forEach(function (r) { by[r.ownerKey] = (by[r.ownerKey] || 0) + 1; });
+    var top = Object.keys(by).sort(function (a, b) { return by[b] - by[a]; }).slice(0, 3).map(function (k, i) { var u = d.usersByKey[k] || {}; return (i + 1) + '. ' + (cleanName(u.name) || k) + ' — ' + by[k] + ' تعيين'; });
+    var f = activeFilters() ? '\n(بفلاتر: ' + [S.source !== 'all' ? (S.source === 'internal' ? 'داخلي' : 'شركاء') : '', S.sv, S.zone, S.veh, S.batch].filter(Boolean).join('، ') + ')' : '';
+    return '🏁 *Full Speed Champions*\n' + fmt(rangeStart(), true) + ' ← ' + fmt(rangeEnd(), true) + f + '\n\n' +
+      '📝 ترشيحات: *' + sc.apps.length + '*' + (S.range !== 'season' ? ' (قبلها ' + prev.apps + ')' : '') + '\n' +
+      '✅ اتعيّنوا من ترشيحات: *' + sc.hires.length + '*' + (S.range !== 'season' ? ' (قبلها ' + prev.hires + ')' : '') + '\n' +
+      '🔁 نسبة التحويل: *' + conv + '%*\n' +
+      '💰 مستني اعتماد: *' + money(due.reduce(function (s, r) { return s + r.bonus - r.paid - r.approved; }, 0)) + ' ج* (' + due.length + ' طيار)\n' +
+      '🧾 معتمد ومستني صرف: *' + money(apr.reduce(function (s, p) { return s + p.amount; }, 0)) + ' ج*\n' +
+      (stuck ? '⏳ ' + stuck + ' مرشح واقفين على نفس الحالة\n' : '') + (idle ? '🛵 ' + idle + ' طيار كودهم وصل ولسه ما بدأوش\n' : '') +
+      (top.length ? '\n🏆 الأكتر تعيينات:\n' + top.join('\n') : '');
+  }
   function bindOverview() {
     bindFilters();
+    document.getElementById('waSum').onclick = function () {
+      var t = summaryText();
+      var o = overlay(dhead('ملخص واتساب', 'انسخه أو ابعته على طول') + '<textarea id="sumT" rows="14" style="width:100%;font:inherit;direction:rtl">' + esc(t) + '</textarea>' +
+        '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-ghost" id="cp">انسخ</button><a class="btn btn-wa" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(t) + '">' + icon('wa') + 'افتح واتساب</a></div>', true);
+      o.querySelector('#cp').onclick = function () { var ta = o.querySelector('#sumT'); ta.select(); try { navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); } toast('اتنسخ ✓'); };
+    };
+    var rt = document.getElementById('repTab'); if (rt) rt.onclick = async function () { busy(rt, true); var res = await call('adminRefreshReports', {}); busy(rt, false); if (res.ok) toast('تاب FS Reports اتحدّث ✓'); };
     var sc = scoped(), weeks = [], w = weekStart(rangeStart());
     while (w <= S.data.today) { weeks.push(w); w = addDays(w, 7); }
     var key = function (d) { return iso(weekStart(d)); };
@@ -2216,18 +2285,100 @@ if (typeof module !== 'undefined' && module.exports) {
   /* ─────────────── Supervisors ─────────────── */
   function svStats(sc) {
     var d = S.data, out = {};
-    var get = function (k) { return out[k] = out[k] || { sv: k, hires: 0, refHires: 0, orders: [], reached: 0, bonus: 0, spKnown: 0, spOn: 0, refs: {}, apps: 0, appHired: 0 }; };
+    var get = function (k) { return out[k] = out[k] || { sv: k, hires: 0, refHires: 0, orders: [], reached: 0, bonus: 0, spKnown: 0, spOn: 0, refs: {}, apps: 0, appHired: 0, batches: [] }; };
     if (S.svView === 'rider') {
       sc.allHires.forEach(function (r) {
         var s = get(r.sv || 'غير محدد'); s.hires++;
         if (r.ownerKey) { s.refHires++; s.orders.push(r.orders); if (reached1(r)) s.reached++; s.bonus += r.bonus; }
+        if (r.batch) s.batches.push(r.batch);
         if (r.sp !== null && r.sp !== undefined) { s.spKnown++; if (r.sp) s.spOn++; }
       });
     } else {
       sc.apps.forEach(function (a) { if (a.refType !== 'internal') return; var s = get(a.refSv || 'غير محدد'); s.apps++; s.refs[a.refKey] = 1; if (a.status === 'اشتغل') s.appHired++; });
-      sc.hires.forEach(function (r) { if (r.ownerType !== 'internal') return; var s = get(r.ownerSv || 'غير محدد'); s.refHires++; s.refs[r.ownerKey] = 1; s.orders.push(r.orders); if (reached1(r)) s.reached++; s.bonus += r.bonus; });
+      sc.hires.forEach(function (r) { if (r.ownerType !== 'internal') return; var s = get(r.ownerSv || 'غير محدد'); s.refHires++; s.refs[r.ownerKey] = 1; s.orders.push(r.orders); if (reached1(r)) s.reached++; s.bonus += r.bonus; if (r.batch) s.batches.push(r.batch); });
     }
-    return Object.keys(out).map(function (k) { var s = out[k]; s.avgOrders = Math.round(avg(s.orders)); s.referrers = Object.keys(s.refs).length; return s; });
+    return Object.keys(out).map(function (k) { var s = out[k]; s.avgOrders = Math.round(avg(s.orders)); s.avgBatch = s.batches.length ? Math.round(avg(s.batches) * 10) / 10 : null; s.referrers = Object.keys(s.refs).length; return s; });
+  }
+
+  /* ─────────────── Comparisons ─────────────── */
+  function grp(list) {
+    var o30 = list.filter(function (r) { return r.orders30 !== null && r.orders30 !== undefined; }).map(function (r) { return r.orders30; });
+    var b = list.filter(function (r) { return r.batch; }).map(function (r) { return r.batch; });
+    var sp = list.filter(function (r) { return r.sp !== null && r.sp !== undefined; });
+    var st = list.filter(function (r) { return r.started !== null && r.started !== undefined; });
+    return { n: list.length, o30: o30.length ? Math.round(avg(o30)) : null, batch: b.length ? Math.round(avg(b) * 10) / 10 : null,
+      sp: sp.length ? pct(sp.filter(function (r) { return r.sp; }).length, sp.length) : null, started: st.length ? pct(st.filter(function (r) { return r.started; }).length, st.length) : null,
+      strong: b.length ? pct(b.filter(function (x) { return x <= 2; }).length, b.length) : null };
+  }
+  function better(a, b, lowWins) { if (a === null || b === null || a === b) return ['', '']; var w = lowWins ? a < b : a > b; return w ? [' class="win"', ''] : ['', ' class="win"']; }
+  function cmpRow(label, a, b, unit, lowWins) { var w = better(a, b, lowWins); var f = function (v) { return v === null ? '—' : money(v) + (unit || ''); }; return '<tr><td>' + label + '</td><td class="n"><span' + w[0] + '>' + f(a) + '</span></td><td class="n"><span' + w[1] + '>' + f(b) + '</span></td></tr>'; }
+  function cmpCard(title, sub, aName, bName, rows) {
+    return '<section class="card"><h2>' + title + '</h2><p class="sub">' + sub + '</p><div class="tbl-wrap"><table class="cmp"><thead><tr><th></th><th class="n">' + aName + '</th><th class="n">' + bName + '</th></tr></thead><tbody>' + rows.join('') + '</tbody></table></div></section>';
+  }
+  function monthsBack(n) { var t = S.data.today, out = []; for (var i = n - 1; i >= 0; i--) out.push(new Date(t.getFullYear(), t.getMonth() - i, 1)); return out; }
+  function monthStats() {
+    var d = S.data;
+    var st = d.season.start, first = st ? new Date(st.getFullYear(), st.getMonth(), 1) : null;
+    var ms = monthsBack(6), keep = ms.filter(function (m) { return !first || m >= first; });
+    if (keep.length < 2) keep = ms.slice(-2);
+    return keep.map(function (m) {
+      var end = new Date(m.getFullYear(), m.getMonth() + 1, 0), inM = function (x) { return x && x >= m && x <= end; };
+      var apps = d.applicants.filter(function (a) { return inM(a.submitted) && srcOk(a.refType) && zoneOk(a.zone) && svOk(a.refSv) && refOk(a.refKey, a.refName); });
+      var all = d.riders.filter(function (r) { return inM(r.hireDate) && zoneOk(r.zone) && svOk(r.sv) && riderOk(r); });
+      var ref = all.filter(function (r) { return r.ownerKey && srcOk(r.ownerType) && refOk(r.ownerKey, r.ownerName); });
+      var paid = d.payouts.filter(function (p) { return p.status !== 'approved' && inM(p.paidAt); }).reduce(function (s, p) { return s + p.amount; }, 0);
+      return { m: m, label: m.toLocaleDateString('ar-EG', { month: 'short', year: '2-digit' }), apps: apps.length, all: all.length, ref: ref.length,
+        conv: apps.length ? pct(apps.filter(function (a) { return a.status === 'اشتغل'; }).length, apps.length) : 0,
+        share: all.length ? pct(ref.length, all.length) : 0, bonus: ref.reduce(function (s, r) { return s + r.bonus; }, 0), paid: paid, o30: grp(ref).o30 };
+    });
+  }
+  function viewCompare() {
+    var sc = scoped(), ref = sc.allHires.filter(function (r) { return r.ownerKey; }), non = sc.allHires.filter(function (r) { return !r.ownerKey; });
+    var A = grp(ref), B = grp(non);
+    var side = function (t) {
+      var apps = sc.apps.filter(function (a) { return a.refType === t; }), hires = sc.hires.filter(function (r) { return r.ownerType === t; }), g = grp(hires);
+      var bonus = hires.reduce(function (s, r) { return s + r.bonus; }, 0);
+      return { apps: apps.length, hires: hires.length, conv: apps.length ? pct(apps.filter(function (a) { return a.status === 'اشتغل'; }).length, apps.length) : null,
+        cost: hires.length ? Math.round(bonus / hires.length) : null, o30: g.o30, batch: g.batch, refs: Object.keys(hires.reduce(function (o, r) { o[r.ownerKey] = 1; return o; }, {})).length };
+    };
+    var I = side('internal'), E = side('external'), M = monthStats(), cur = M[M.length - 1], prv = M[M.length - 2];
+    var dl = function (a, b) { if (!b) return a ? '<span class="delta">جديد</span>' : ''; var p = Math.round((a - b) / b * 100); return '<span class="delta"><b class="' + (p >= 0 ? 'up' : 'down') + '">' + (p >= 0 ? '▲ ' : '▼ ') + Math.abs(p) + '%</b> عن ' + prv.label + '</span>'; };
+    var verdict = A.o30 !== null && B.o30 !== null ? (A.o30 >= B.o30 ? 'طيارين الترشيحات بيعملوا في المتوسط <b>' + A.o30 + '</b> أوردر في آخر 30 يوم مقابل <b>' + B.o30 + '</b> للباقيين — الترشيح بيجيب طيارين أقوى.' : 'طيارين الترشيحات بيعملوا <b>' + A.o30 + '</b> أوردر في آخر 30 يوم مقابل <b>' + B.o30 + '</b> للباقيين — محتاجين نركّز على جودة المرشحين.') : 'لسه مفيش أوردرات كفاية في Daily Orders للمقارنة.';
+    return head('المقارنات', 'الترشيح قصاد التعيين العادي، الداخلي قصاد الشركاء، وشهر قصاد شهر') + filterBar() +
+      '<div class="kpis">' +
+        kpi('ترشيحات ' + cur.label, cur.apps, '', dl(cur.apps, prv.apps)) +
+        kpi('تعيينات من ترشيحات', cur.ref, '', dl(cur.ref, prv.ref)) +
+        kpi('نسبة الترشيحات من التعيين', cur.share + '%', '', '<span class="delta">' + prv.label + ': ' + prv.share + '%</span>') +
+        kpi('اتصرف الشهر ده', money(cur.paid), 'gold', dl(cur.paid, prv.paid)) +
+      '</div>' + insight(verdict) +
+      '<div class="charts">' +
+        cmpCard('الترشيح قصاد التعيين العادي', 'كل اللي اتعيّنوا في الفترة — الأخضر هو الأحسن', 'من ترشيح', 'من غير ترشيح', [
+          cmpRow('عدد التعيينات', A.n, B.n), cmpRow('متوسط أوردرات آخر 30 يوم', A.o30, B.o30), cmpRow('متوسط الباتش (الأقل أقوى)', A.batch, B.batch, '', true),
+          cmpRow('باتش 1–2 (قوي)', A.strong, B.strong, '%'), cmpRow('With SP', A.sp, B.sp, '%'), cmpRow('بدأوا شغل فعلاً', A.started, B.started, '%')]) +
+        cmpCard('الطيارين الداخليين قصاد الشركاء', 'مين بيجيب مرشحين أكتر وأحسن', 'طيارين داخليين', 'شركاء', [
+          cmpRow('مرشِّحين جابوا تعيين', I.refs, E.refs), cmpRow('ترشيحات', I.apps, E.apps), cmpRow('اتعيّنوا', I.hires, E.hires), cmpRow('نسبة التحويل', I.conv, E.conv, '%'),
+          cmpRow('تكلفة البونص لكل تعيين', I.cost, E.cost, ' ج', true), cmpRow('متوسط أوردرات آخر 30 يوم', I.o30, E.o30), cmpRow('متوسط الباتش', I.batch, E.batch, '', true)]) +
+        '<section class="card wide"><h2>توزيع الباتش<small>نسبة الطيارين في كل باتش — 1 أقوى</small></h2>' + legend([['من ترشيح', css('--s2')], ['من غير ترشيح', css('--s1')]]) +
+          '<div class="chart-box"><canvas id="cBatch" role="img" aria-label="توزيع الباتش للترشيحات قصاد غير الترشيحات"></canvas></div></section>' +
+        '<section class="card wide"><h2>شهر قصاد شهر<small>من بداية البرنامج (لحد 6 شهور) — بالفلاتر اللي فوق ما عدا الفترة</small></h2>' + legend([['ترشيحات', css('--s1')], ['تعيينات من ترشيحات', css('--s2')], ['تعيينات من غير ترشيح', css('--s3')]]) +
+          '<div class="chart-box"><canvas id="cMonths" role="img" aria-label="مقارنة شهرية"></canvas></div>' +
+          table([['الشهر'], ['ترشيحات', 'n'], ['كل التعيينات', 'n'], ['من ترشيحات', 'n'], ['نسبة الترشيحات', 'n'], ['تحويل', 'n'], ['أوردرات 30 يوم', 'n'], ['بونص التعيينات دي (ج)', 'n'], ['اتصرف (ج)', 'n']],
+            M.slice().reverse().map(function (x) { return [x.label, x.apps, x.all, x.ref, x.share + '%', x.conv + '%', x.o30 === null ? '—' : x.o30, '<span class="gold">' + money(x.bonus) + '</span>', money(x.paid)]; }), { name: 'شهر-قصاد-شهر' }) + '</section>' +
+      '</div>';
+  }
+  function bindCompare() {
+    bindFilters();
+    var sc = scoped(), buckets = ['1', '2', '3', '4', '5', '6+'];
+    var dist = function (list) { var b = list.filter(function (r) { return r.batch; }), c = buckets.map(function () { return 0; }); b.forEach(function (r) { c[Math.min(r.batch, 6) - 1]++; }); return c.map(function (n) { return b.length ? pct(n, b.length) : 0; }); };
+    chart('cBatch', { type: 'bar', data: { labels: buckets.map(function (b) { return 'باتش ' + b; }), datasets: [
+      { label: 'من ترشيح', data: dist(sc.allHires.filter(function (r) { return r.ownerKey; })), backgroundColor: css('--s2'), borderRadius: 4, maxBarThickness: 26 },
+      { label: 'من غير ترشيح', data: dist(sc.allHires.filter(function (r) { return !r.ownerKey; })), backgroundColor: css('--s1'), borderRadius: 4, maxBarThickness: 26 }] },
+      options: { plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + c.raw + '%'; } } } }, scales: { x: { grid: { display: false }, ticks: { color: css('--muted') }, reverse: true }, y: { beginAtZero: true, grid: { color: css('--line') }, ticks: { color: css('--muted'), callback: function (v) { return v + '%'; } }, position: 'right' } } } });
+    var M = monthStats();
+    chart('cMonths', { type: 'bar', data: { labels: M.map(function (x) { return x.label; }), datasets: [
+      { label: 'ترشيحات', data: M.map(function (x) { return x.apps; }), backgroundColor: css('--s1'), borderRadius: 4, maxBarThickness: 20 },
+      { label: 'تعيينات من ترشيحات', data: M.map(function (x) { return x.ref; }), backgroundColor: css('--s2'), borderRadius: 4, maxBarThickness: 20 },
+      { label: 'تعيينات من غير ترشيح', data: M.map(function (x) { return x.all - x.ref; }), backgroundColor: css('--s3'), borderRadius: 4, maxBarThickness: 20 }] } });
   }
 
   function viewSV() {
@@ -2238,11 +2389,11 @@ if (typeof module !== 'undefined' && module.exports) {
     var top = named[0];
     var totalRef = rows.reduce(function (s, r) { return s + r.refHires; }, 0);
     var tbl = rider ? table(
-      [['SV'], ['كل التعيينات', 'n'], ['من ترشيحات', 'n'], ['نسبة الترشيحات', 'n'], ['متوسط أوردرات', 'n'], ['وصلوا أول شريحة', 'n'], ['With SP', 'n'], ['البونص (ج)', 'n'], ['تكلفة / تعيين', 'n']],
-      rows.map(function (r) { return ['<b>' + esc(r.sv) + '</b>', r.hires, r.refHires, pct(r.refHires, r.hires) + '%', r.refHires ? r.avgOrders : '—', r.refHires ? pct(r.reached, r.refHires) + '%' : '—', r.spKnown ? pct(r.spOn, r.spKnown) + '%' : '—', '<span class="gold">' + money(r.bonus) + '</span>', r.refHires ? money(Math.round(r.bonus / r.refHires)) : '—']; }),
-      { empty: 'مفيش تعيينات في الفترة.' }) : table(
-      [['SV المرشِّحين'], ['مرشِّحين نشطين', 'n'], ['ترشيحات', 'n'], ['اتعيّنوا', 'n'], ['تحويل', 'n'], ['متوسط أوردرات', 'n'], ['البونص (ج)', 'n']],
-      rows.map(function (r) { return ['<b>' + esc(r.sv) + '</b>', r.referrers, r.apps, r.refHires, r.apps ? pct(r.appHired, r.apps) + '%' : '—', r.refHires ? r.avgOrders : '—', '<span class="gold">' + money(r.bonus) + '</span>']; }),
+      [['SV'], ['كل التعيينات', 'n'], ['من ترشيحات', 'n'], ['نسبة الترشيحات', 'n'], ['متوسط أوردرات', 'n'], ['وصلوا أول شريحة', 'n'], ['With SP', 'n'], ['متوسط الباتش', 'n'], ['البونص (ج)', 'n'], ['تكلفة / تعيين', 'n']],
+      rows.map(function (r) { return ['<b>' + esc(r.sv) + '</b>', r.hires, r.refHires, pct(r.refHires, r.hires) + '%', r.refHires ? r.avgOrders : '—', r.refHires ? pct(r.reached, r.refHires) + '%' : '—', r.spKnown ? pct(r.spOn, r.spKnown) + '%' : '—', r.avgBatch === null ? '—' : r.avgBatch, '<span class="gold">' + money(r.bonus) + '</span>', r.refHires ? money(Math.round(r.bonus / r.refHires)) : '—']; }),
+      { name: 'السوبرفايزرز', empty: 'مفيش تعيينات في الفترة.' }) : table(
+      [['SV المرشِّحين'], ['مرشِّحين نشطين', 'n'], ['ترشيحات', 'n'], ['اتعيّنوا', 'n'], ['تحويل', 'n'], ['متوسط أوردرات', 'n'], ['متوسط الباتش', 'n'], ['البونص (ج)', 'n']],
+      rows.map(function (r) { return ['<b>' + esc(r.sv) + '</b>', r.referrers, r.apps, r.refHires, r.apps ? pct(r.appHired, r.apps) + '%' : '—', r.refHires ? r.avgOrders : '—', r.avgBatch === null ? '—' : r.avgBatch, '<span class="gold">' + money(r.bonus) + '</span>']; }),
       { empty: 'مفيش ترشيحات من طيارين داخليين في الفترة.' });
     return head('السوبرفايزرز', 'مين بيستلم تعيينات أكتر من الترشيحات، وطياريه بيشتغلوا قد إيه — ومين فريقه بيرشّح أكتر') + filterBar() +
       '<div class="filters"><div class="seg" role="group" aria-label="زاوية العرض"><button data-svv="rider" aria-pressed="' + rider + '">فرق الطيارين الجداد</button><button data-svv="ref" aria-pressed="' + !rider + '">فرق المرشِّحين</button></div>' +
@@ -2292,14 +2443,25 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 
   /* ─────────────── Generic table ─────────────── */
+  var EXPORTS = {}, EXPORT_N = 0;
+  var tmpDiv = document.createElement('div');
+  function plain(v) { if (typeof v === 'number') return v; tmpDiv.innerHTML = String(v === null || v === undefined ? '' : v).replace(/<div/g, ' <div'); return tmpDiv.textContent.replace(/\s+/g, ' ').trim(); }
+  function exportBtn(id) { return '<button class="btn btn-ghost btn-sm" data-export="' + id + '" title="تنزيل الجدول ده كملف Excel (CSV)">' + icon('dl') + 'Excel</button>'; }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-export]'); if (!b) return;
+    var x = EXPORTS[b.dataset.export]; if (!x) return;
+    csv(x.name, [x.head].concat(x.rows)); toast('اتنزّل ✓');
+  });
   var sortState = {};
   function table(cols, rows, opt) {
     opt = opt || {};
     if (!rows.length) return '<div class="empty">' + (opt.empty || 'مفيش بيانات.') + '</div>';
     var page = opt.page || 0, shown = page ? rows.slice(0, page) : rows;
+    var xid = 't' + (++EXPORT_N);
+    EXPORTS[xid] = { name: opt.name || 'تقرير', head: cols.map(function (c) { return c[0]; }), rows: rows.map(function (r) { return r.map(plain); }) };
     return '<div class="tbl-wrap"><table><thead><tr>' + cols.map(function (c) { return '<th>' + c[0] + '</th>'; }).join('') + '</tr></thead><tbody>' +
       shown.map(function (r) { return '<tr>' + r.map(function (v, i) { return '<td class="' + (cols[i][1] || '') + '">' + v + '</td>'; }).join('') + '</tr>'; }).join('') +
-      '</tbody></table></div>' + (page && rows.length > page ? '<div class="pager">بيعرض ' + page + ' من ' + rows.length + '</div>' : '');
+      '</tbody></table></div><div class="pager"><span>' + (page && rows.length > page ? 'بيعرض ' + page + ' من ' + rows.length : rows.length + ' صف') + '</span>' + exportBtn(xid) + '</div>';
   }
 
   /* A sortable, paged list bound to real records. */
@@ -2315,14 +2477,17 @@ if (typeof module !== 'undefined' && module.exports) {
     var per = 50, pages = Math.max(1, Math.ceil(sorted.length / per)); st.page = Math.min(st.page, pages - 1);
     var slice = sorted.slice(st.page * per, st.page * per + per);
     if (!items.length) return '<div class="empty">' + (opt.empty || 'مفيش نتايج.') + '</div>';
+    var pick = opt.pick || S.picked;
+    var xc = cols.filter(function (c) { return c.t; });
+    EXPORTS[id] = { name: opt.name || id, head: xc.map(function (c) { return c.t; }), rows: sorted.map(function (x) { return xc.map(function (c) { return c.x ? c.x(x) : plain(c.v(x)); }); }) };
     return '<div class="tbl-wrap"><table data-list="' + id + '"><thead><tr>' +
       (opt.select ? '<th style="width:32px"><input type="checkbox" data-all aria-label="تحديد الكل"></th>' : '') +
       cols.map(function (c) { return '<th data-sort="' + (c.k || '') + '" aria-sort="' + (st.k === c.k ? (st.dir > 0 ? 'ascending' : 'descending') : 'none') + '">' + c.t + '</th>'; }).join('') + '</tr></thead><tbody>' +
       slice.map(function (x) {
-        return '<tr class="' + (opt.open ? 'clickable' : '') + '" data-id="' + esc(opt.id(x)) + '">' + (opt.select ? '<td><input type="checkbox" data-pick value="' + esc(opt.id(x)) + '"' + (S.picked && S.picked[opt.id(x)] ? ' checked' : '') + ' aria-label="تحديد"></td>' : '') +
+        return '<tr class="' + (opt.open ? 'clickable' : '') + '" data-id="' + esc(opt.id(x)) + '">' + (opt.select ? '<td><input type="checkbox" data-pick value="' + esc(opt.id(x)) + '"' + (pick[opt.id(x)] ? ' checked' : '') + ' aria-label="تحديد"></td>' : '') +
           cols.map(function (c) { return '<td class="' + (c.c || '') + '">' + c.v(x) + '</td>'; }).join('') + '</tr>';
       }).join('') + '</tbody></table></div>' +
-      '<div class="pager"><span>' + sorted.length + ' نتيجة</span>' + (pages > 1 ? '<span><button class="btn btn-ghost btn-sm" data-page="-1"' + (st.page ? '' : ' disabled') + '>السابق</button> ' + (st.page + 1) + ' / ' + pages + ' <button class="btn btn-ghost btn-sm" data-page="1"' + (st.page < pages - 1 ? '' : ' disabled') + '>التالي</button></span>' : '') + '</div>';
+      '<div class="pager"><span>' + sorted.length + ' نتيجة</span><span>' + exportBtn(id) + '</span>' + (pages > 1 ? '<span><button class="btn btn-ghost btn-sm" data-page="-1"' + (st.page ? '' : ' disabled') + '>السابق</button> ' + (st.page + 1) + ' / ' + pages + ' <button class="btn btn-ghost btn-sm" data-page="1"' + (st.page < pages - 1 ? '' : ' disabled') + '>التالي</button></span>' : '') + '</div>';
   }
   function bindList(id, opt) {
     var t = root.querySelector('[data-list="' + id + '"]'); if (!t) return;
@@ -2330,8 +2495,9 @@ if (typeof module !== 'undefined' && module.exports) {
     root.querySelectorAll('[data-page]').forEach(function (b) { b.onclick = function () { sortState[id].page += +b.dataset.page; render(); }; });
     if (opt.open) t.querySelectorAll('tr.clickable').forEach(function (tr) { tr.onclick = function (e) { if (e.target.closest('input,a,button')) return; opt.open(tr.dataset.id); }; });
     if (opt.select) {
-      t.querySelectorAll('[data-pick]').forEach(function (c) { c.onchange = function () { S.picked[c.value] = c.checked; if (!c.checked) delete S.picked[c.value]; render(); }; });
-      var all = t.querySelector('[data-all]'); if (all) all.onchange = function () { t.querySelectorAll('[data-pick]').forEach(function (c) { if (all.checked) S.picked[c.value] = true; else delete S.picked[c.value]; }); render(); };
+      var pick = opt.pick || S.picked;
+      t.querySelectorAll('[data-pick]').forEach(function (c) { c.onchange = function () { pick[c.value] = c.checked; if (!c.checked) delete pick[c.value]; render(); }; });
+      var all = t.querySelector('[data-all]'); if (all) all.onchange = function () { t.querySelectorAll('[data-pick]').forEach(function (c) { if (all.checked) pick[c.value] = true; else delete pick[c.value]; }); render(); };
     }
   }
 
@@ -2372,7 +2538,7 @@ if (typeof module !== 'undefined' && module.exports) {
         { t: 'اتقدم', k: 'submitted', c: 'n', v: function (a) { return fmt(a.submitted); } },
         { t: 'الحالة', k: 'stage', v: function (a) { return (a.codeArrived ? '<span class="pill gold">كوده وصل ⏳</span>' : '<span class="pill ' + (STATUS_PILL[a.status] || 'dim') + '">' + esc(a.status) + '</span>') + (a.nudge ? '<div class="flag" style="color:var(--gold)">⏳ ' + a.daysWaiting + ' يوم</div>' : ''); } },
         { t: 'ملاحظة', k: 'note', v: function (a) { return '<span class="muted">' + esc(a.note).slice(0, 60) + '</span>'; } }
-      ], items, { id: function (a) { return a.row; }, sort: 'submitted', select: can('applicants.edit'), open: openApplicant, empty: 'مفيش مرشحين بالفلتر ده.' });
+      ], items, { name: 'المرشحين', id: function (a) { return a.row; }, sort: 'submitted', select: can('applicants.edit'), open: openApplicant, empty: 'مفيش مرشحين بالفلتر ده.' });
   }
   function bindApplicants() {
     var f = S.af, deb;
@@ -2446,8 +2612,9 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 
   /* ─────────────── Riders & bonus ─────────────── */
-  var PAY = { due: ['مستحق', 'gold'], pending: ['بيتحسب', 'blue'], paid: ['اتصرف ✓', 'green'], none: ['مفيش بونص', 'dim'] };
-  S.rf = { tab: 'due', q: '' };
+  var PAY = { due: ['مستحق — مستني الاعتماد', 'gold'], approved: ['معتمد — مستني الصرف', 'blue'], pending: ['بيتحسب', 'dim'], paid: ['اتصرف ✓', 'green'], none: ['مفيش بونص', 'dim'] };
+  S.rf = { tab: 'due', q: '' }; S.rpick = {};
+  function approvedRows(code) { return S.data.payouts.filter(function (p) { return p.status === 'approved' && p.riderCode === code; }); }
   function ridersFiltered() {
     var f = S.rf, q = f.q.toLowerCase();
     return S.data.riders.filter(function (r) {
@@ -2459,36 +2626,46 @@ if (typeof module !== 'undefined' && module.exports) {
   }
   function viewRiders() {
     var d = S.data, f = S.rf;
-    var tabs = [['due', 'مستحق للصرف'], ['pending', 'بيتحسب'], ['paid', 'اتصرف'], ['none', 'مفيش بونص'], ['all', 'الكل']];
+    var tabs = [['due', 'مستني اعتماد'], ['approved', 'معتمد ومستني صرف'], ['pending', 'بيتحسب'], ['paid', 'اتصرف'], ['none', 'مفيش بونص'], ['all', 'الكل']];
     var due = d.riders.filter(function (r) { return r.payStatus === 'due'; });
-    return head('الطيارين والبونص', 'كل طيار اتعين من ترشيح: أوردراته، شريحته، وبونصه — وسجّل الصرف من هنا', '<button class="btn btn-ghost" id="expR">' + icon('dl') + 'كشف صرف Excel</button>') +
-      '<div class="kpis k3">' + kpi('مستحق دلوقتي', money(due.reduce(function (s, r) { return s + r.bonus - r.paid; }, 0)), 'gold', '<span class="delta">' + due.length + ' طيار · ج</span>') +
+    var apr = d.payouts.filter(function (p) { return p.status === 'approved'; });
+    var done = d.payouts.filter(function (p) { return p.status !== 'approved'; });
+    var picked = Object.keys(S.rpick).filter(function (c) { return due.some(function (r) { return r.code === c; }); });
+    var pickedSum = due.filter(function (r) { return S.rpick[r.code]; }).reduce(function (s, r) { return s + r.bonus - r.paid - r.approved; }, 0);
+    return head('الطيارين والبونص', 'الصرف على خطوتين: المدير يعتمد المستحق ← الحسابات تصرف وتسجّل', '<button class="btn btn-ghost" id="expR">' + icon('dl') + 'كشف صرف Excel</button>') +
+      '<div class="kpis">' + kpi('مستني اعتماد', money(due.reduce(function (s, r) { return s + r.bonus - r.paid - r.approved; }, 0)), 'gold', '<span class="delta">' + due.length + ' طيار · ج</span>') +
+        kpi('معتمد ومستني صرف', money(apr.reduce(function (s, p) { return s + p.amount; }, 0)), '', '<span class="delta">' + apr.length + ' عملية · ج</span>') +
         kpi('بيتحسب', money(d.riders.filter(function (r) { return r.payStatus === 'pending' && r.ownerKey; }).reduce(function (s, r) { return s + r.bonus; }, 0)), '', '<span class="delta">جنيه لحد النهارده</span>') +
-        kpi('اتصرف', money(d.payouts.reduce(function (s, p) { return s + p.amount; }, 0)), '', '<span class="delta">' + d.payouts.length + ' عملية صرف · ج</span>') + '</div>' +
+        kpi('اتصرف', money(done.reduce(function (s, p) { return s + p.amount; }, 0)), '', '<span class="delta">' + done.length + ' عملية صرف · ج</span>') + '</div>' +
+      (f.tab === 'due' && picked.length && can('payouts.approve') ? '<div class="bulk"><b>' + picked.length + ' متحددين · ' + money(pickedSum) + ' ج</b><button class="btn btn-gold btn-sm" id="approveSel">اعتمد المحددين</button><button class="btn btn-ghost btn-sm" id="clearSel">إلغاء التحديد</button></div>' : '') +
       '<div class="filters"><div class="seg">' + tabs.map(function (t) { var n = t[0] === 'all' ? d.riders.length : d.riders.filter(function (r) { return r.ownerKey && r.payStatus === t[0]; }).length;
         return '<button data-rtab="' + t[0] + '" aria-pressed="' + (f.tab === t[0]) + '">' + t[1] + ' (' + n + ')</button>'; }).join('') + '</div>' +
       '<input type="search" id="rq" placeholder="بحث بالاسم أو الكود أو المرشِّح" value="' + esc(f.q) + '"></div>' +
       list('riders', [
         { t: 'الطيار', k: 'name', v: function (r) { return '<b>' + esc(cleanName(r.name)) + '</b><div class="muted ltr" style="font-size:11px">#' + esc(r.code) + '</div>' + (r.flags.length ? '<div class="flag">⚠ ' + r.flags.map(function (x) { return d.flagLabels[x]; }).join('، ') + '</div>' : ''); } },
         { t: 'SV', k: 'sv', v: function (r) { return esc(r.sv || '—') + (r.sp === false ? '<div class="flag">No SP</div>' : ''); } },
+        { t: 'باتش', k: 'batch', c: 'n', v: function (r) { return r.batch ? '<span class="pill ' + (r.batch <= 2 ? 'green' : r.batch <= 4 ? 'blue' : 'red') + '">' + r.batch + '</span>' : '<span class="muted">—</span>'; } },
         { t: 'المرشِّح', k: 'ownerName', v: function (r) { return r.ownerKey ? esc(cleanName(r.ownerName) || r.ownerKey) + '<div class="muted" style="font-size:11px">' + (r.source === 'talabat' ? 'كود طلبات' : 'استمارة') + '</div>' : '<span class="muted">—</span>'; } },
         { t: 'اتعين', k: 'hireDate', c: 'n', v: function (r) { return fmt(r.hireDate) + (r.started === false ? '<div class="flag" style="color:var(--gold)">لسه ما بدأش</div>' : r.daysToStart !== null && r.daysToStart !== undefined ? '<div class="muted" style="font-size:10px">بدأ بعد ' + r.daysToStart + ' يوم</div>' : ''); } },
         { t: 'أوردرات', k: 'orders', c: 'n', v: function (r) { return money(r.orders) + (r.ordersSource === 'manual' ? '<div class="muted" style="font-size:10px">يدوي</div>' : ''); } },
         { t: 'البونص', k: 'bonus', c: 'n', v: function (r) { return '<span class="gold">' + money(r.bonus) + '</span>' + (r.extra ? '<div class="muted" style="font-size:10px">منها ' + r.extra + ' حملة</div>' : ''); } },
         { t: 'آخر يوم', k: 'lastDay', c: 'n', v: function (r) { return fmt(r.lastDay) + (r.state === 'active' ? '<div class="muted" style="font-size:11px">باقي ' + r.daysLeft + ' يوم</div>' : ''); } },
         { t: 'الصرف', k: 'payStatus', v: function (r) { var p = PAY[r.payStatus] || PAY.none; return '<span class="pill ' + p[1] + '">' + p[0] + '</span>'; } },
-        { t: '', v: function (r) { return r.payStatus === 'due' && can('payouts.edit') ? '<button class="btn btn-gold btn-sm" data-pay="' + esc(r.code) + '">سجّل صرف</button>' : ''; } }
-      ], ridersFiltered(), { id: function (r) { return r.code; }, sort: 'payoutDate', dir: 1, open: openRider, empty: 'مفيش طيارين هنا.' });
+        { t: '', v: function (r) { return r.payStatus === 'approved' && can('payouts.edit') ? '<button class="btn btn-gold btn-sm" data-pay="' + esc(r.code) + '">سجّل الصرف</button>' : r.payStatus === 'due' && can('payouts.approve') ? '<button class="btn btn-ghost btn-sm" data-approve="' + esc(r.code) + '">اعتمد</button>' : ''; } }
+      ], ridersFiltered(), { name: 'الطيارين-والبونص', id: function (r) { return r.code; }, sort: 'payoutDate', dir: 1, open: openRider, select: f.tab === 'due' && can('payouts.approve'), pick: S.rpick, empty: 'مفيش طيارين هنا.' });
   }
   function bindRiders() {
     root.querySelectorAll('[data-rtab]').forEach(function (b) { b.onclick = function () { S.rf.tab = b.dataset.rtab; sortState.riders = null; render(); }; });
     var deb; document.getElementById('rq').oninput = function (e) { clearTimeout(deb); deb = setTimeout(function () { S.rf.q = e.target.value; render(); var i = document.getElementById('rq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
     root.querySelectorAll('[data-pay]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); openPay(b.dataset.pay); }; });
-    bindList('riders', { open: openRider });
+    root.querySelectorAll('[data-approve]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); approveCodes([b.dataset.approve]); }; });
+    var as = document.getElementById('approveSel'); if (as) as.onclick = function () { approveCodes(Object.keys(S.rpick)); };
+    var cs = document.getElementById('clearSel'); if (cs) cs.onclick = function () { S.rpick = {}; render(); };
+    bindList('riders', { open: openRider, select: S.rf.tab === 'due' && can('payouts.approve'), pick: S.rpick });
     document.getElementById('expR').onclick = function () {
-      csv('كشف-البونص', [['كود الطيار', 'اسم الطيار', 'المنطقة', 'تاريخ التعيين', 'آخر يوم', 'أوردرات', 'البونص', 'منها حملة', 'اتصرف', 'الباقي', 'الحالة', 'المرشِّح', 'كود/رقم المرشِّح', 'موبايل المرشِّح']].concat(ridersFiltered().map(function (r) {
+      csv('كشف-البونص', [['كود الطيار', 'اسم الطيار', 'المنطقة', 'تاريخ التعيين', 'آخر يوم', 'أوردرات', 'البونص', 'منها حملة', 'معتمد', 'اتصرف', 'الباقي', 'الحالة', 'المرشِّح', 'كود/رقم المرشِّح', 'موبايل المرشِّح']].concat(ridersFiltered().map(function (r) {
         var u = S.data.usersByKey[r.ownerKey] || {};
-        return [r.code, cleanName(r.name), r.zone, iso(r.hireDate), iso(r.lastDay), r.orders, r.bonus, r.extra, r.paid, r.bonus - r.paid, (PAY[r.payStatus] || PAY.none)[0], cleanName(r.ownerName), r.ownerKey, u.phone || ''];
+        return [r.code, cleanName(r.name), r.zone, iso(r.hireDate), iso(r.lastDay), r.orders, r.bonus, r.extra, r.approved, r.paid, r.bonus - r.paid, (PAY[r.payStatus] || PAY.none)[0], cleanName(r.ownerName), r.ownerKey, u.phone || ''];
       })));
     };
   }
@@ -2501,23 +2678,44 @@ if (typeof module !== 'undefined' && module.exports) {
       '<div class="kv"><span>البونص</span><span class="gold">' + money(r.bonus) + ' ج' + (r.extra ? ' (منها ' + r.extra + ' حملة: ' + esc(r.campaigns.join('، ')) + ')' : '') + '</span></div>' +
       '<div class="kv"><span>اتصرف</span><span>' + money(r.paid) + ' ج</span></div>' +
       '<div class="kv"><span>المرشِّح</span><span>' + esc(cleanName(r.ownerName) || r.ownerKey || '—') + (u.phone ? ' · <span class="ltr">' + esc(u.phone) + '</span>' : '') + '</span></div></div>' +
-      (r.payouts && r.payouts.length ? '<div class="card"><h2>عمليات الصرف</h2>' + r.payouts.map(function (p) { return '<div class="kv"><span>' + fmt(p.paidAt, true) + ' — ' + esc(p.method) + (p.reference ? ' (' + esc(p.reference) + ')' : '') + '</span><span>' + money(p.amount) + ' ج</span></div>'; }).join('') + '</div>' : '') +
-      (r.payStatus === 'due' && can('payouts.edit') ? '<button class="btn btn-gold" id="payNow">سجّل صرف ' + money(r.bonus - r.paid) + ' ج</button>' : '') +
+      (r.batch ? '<div class="kv"><span>الباتش التشغيلي</span><span>' + r.batch + '</span></div>' : '') +
+      (r.orders30 !== null && r.orders30 !== undefined ? '<div class="kv"><span>أوردرات آخر 30 يوم</span><span>' + money(r.orders30) + '</span></div>' : '') +
+      (r.payouts && r.payouts.length ? '<div class="card"><h2>عمليات الصرف</h2>' + r.payouts.map(function (p) { return '<div class="kv"><span>' + (p.approved ? 'اعتمده ' + esc(p.approvedBy) + ' ' + fmt(p.approvedAt, true) + ' — مستني الصرف' : fmt(p.paidAt, true) + ' — ' + esc(p.method) + (p.reference ? ' (' + esc(p.reference) + ')' : '')) + '</span><span>' + money(p.amount) + ' ج</span></div>'; }).join('') + '</div>' : '') +
+      (r.payStatus === 'due' && can('payouts.approve') ? '<button class="btn btn-gold" id="aprNow">اعتمد صرف ' + money(r.bonus - r.paid - r.approved) + ' ج</button>' : '') +
+      (r.payStatus === 'approved' && can('payouts.edit') ? '<button class="btn btn-gold" id="payNow">سجّل الصرف ' + money(r.approved) + ' ج</button>' : '') +
       (u.phone && r.payStatus === 'paid' ? '<a class="btn btn-wa" target="_blank" rel="noopener" href="' + wa(u.phone, 'أهلاً ' + cleanName(u.name).split(' ')[0] + ' 👋 اتصرفلك بونص ' + money(r.paid) + ' ج عن ' + cleanName(r.name) + '. شكراً إنك جزء من Full Speed 💚') + '">' + icon('wa') + 'بلّغ المرشِّح إن الفلوس اتصرفت</a>' : ''));
     var pn = o.querySelector('#payNow'); if (pn) pn.onclick = function () { openPay(code); };
+    var an = o.querySelector('#aprNow'); if (an) an.onclick = function () { approveCodes([code]); };
   }
-  function openPay(code) {
+  function approveCodes(codes) {
+    var d = S.data, rs = d.riders.filter(function (r) { return codes.indexOf(r.code) !== -1 && r.payStatus === 'due'; });
+    if (!rs.length) return;
+    var sum = rs.reduce(function (s, r) { return s + r.bonus - r.paid - r.approved; }, 0);
+    var o = overlay(dhead('اعتماد صرف ' + rs.length + ' طيار', 'إجمالي ' + money(sum) + ' ج — بعد الاعتماد الحسابات تقدر تصرف وتسجّل') +
+      '<div class="tbl-wrap" style="max-height:260px;overflow:auto"><table><tbody>' + rs.map(function (r) { return '<tr><td>' + esc(cleanName(r.name)) + ' <span class="muted ltr">#' + esc(r.code) + '</span></td><td class="muted">' + esc(cleanName(r.ownerName) || r.ownerKey) + '</td><td class="n gold">' + money(r.bonus - r.paid - r.approved) + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+      '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-gold" id="yes">اعتمد ' + money(sum) + ' ج</button><button class="btn btn-ghost" data-close>رجوع</button></div>', true);
+    o.querySelector('#yes').onclick = async function (e) {
+      busy(e.target, true); var res = await call('adminApprovePayouts', { codes: rs.map(function (r) { return r.code; }) }); busy(e.target, false);
+      if (!res.ok) return;
+      S.rpick = {}; closeOverlay(); toast('اتعتمد ' + res.data.approved + ' طيار ✓'); load(true);
+    };
+  }
+  function openPay(code, id) {
     var d = S.data, r = d.riders.filter(function (x) { return x.code === code; })[0]; if (!r) return;
-    var left = r.bonus - r.paid, u = d.usersByKey[r.ownerKey] || {};
+    var rows = approvedRows(code); if (id) rows = rows.filter(function (p) { return p.id === id; });
+    var po = rows[0]; if (!po) { toast('لازم المدير يعتمد الصرف الأول'); return; }
+    var u = d.usersByKey[r.ownerKey] || {};
     var o = overlay(dhead('تسجيل صرف بونص', esc(cleanName(r.name)) + ' ← ' + esc(cleanName(r.ownerName) || r.ownerKey)) +
-      '<form id="payF" style="display:grid;gap:10px" novalidate><div class="grid2"><div class="field"><label>المبلغ (ج)</label><input name="amount" type="number" min="1" value="' + left + '"></div>' +
-      '<div class="field"><label>طريقة الصرف</label><select name="method">' + d.payoutMethods.map(function (m) { return '<option>' + m + '</option>'; }).join('') + '</select></div></div>' +
+      '<form id="payF" style="display:grid;gap:10px" novalidate>' +
+      '<div class="kv"><span>المبلغ المعتمد</span><span class="gold">' + money(po.amount) + ' ج</span></div>' +
+      '<div class="kv"><span>اعتمده</span><span>' + esc(po.approvedBy || '—') + ' · ' + fmt(po.approvedAt, true) + '</span></div>' +
+      '<div class="field"><label>طريقة الصرف</label><select name="method">' + d.payoutMethods.map(function (m) { return '<option>' + m + '</option>'; }).join('') + '</select></div>' +
       '<div class="field"><label>رقم العملية / المرجع (اختياري)</label><input name="reference"></div>' +
       '<div class="field"><label>ملاحظة (اختياري)</label><input name="note"></div>' +
-      '<p class="muted" style="margin:0;font-size:12px">المستحق ' + money(r.bonus) + ' ج — اتصرف قبل كده ' + money(r.paid) + ' ج. ' + (u.phone ? 'موبايل المرشِّح: <span class="ltr">' + esc(u.phone) + '</span>' : '') + '</p>' +
+      (u.phone ? '<p class="muted" style="margin:0;font-size:12px">موبايل المرشِّح: <span class="ltr">' + esc(u.phone) + '</span></p>' : '') +
       '<button class="btn btn-gold" type="submit" style="min-height:42px">تأكيد الصرف</button></form>', true);
     o.querySelector('#payF').onsubmit = async function (e) {
-      e.preventDefault(); var fd = formData(e.target); fd.code = code; var b = e.target.querySelector('[type=submit]'); busy(b, true);
+      e.preventDefault(); var fd = formData(e.target); fd.id = po.id; var b = e.target.querySelector('[type=submit]'); busy(b, true);
       var res = await call('adminRecordPayout', fd); busy(b, false);
       if (!res.ok) { showErrors(e.target, res.fields); return; }
       closeOverlay(); toast('اتسجل الصرف ✓'); load(true);
@@ -2527,25 +2725,29 @@ if (typeof module !== 'undefined' && module.exports) {
   /* ─────────────── Payouts log ─────────────── */
   function viewPayouts() {
     var d = S.data;
-    var byM = {}; d.payouts.forEach(function (p) { var k = p.method || 'أخرى'; byM[k] = (byM[k] || 0) + p.amount; });
-    return head('سجل الصرف', 'كل عملية صرف اتسجلت، مين سجلها وإمتى', '<button class="btn btn-ghost" id="expP">' + icon('dl') + 'تصدير</button>') +
-      '<div class="kpis">' + kpi('إجمالي المصروف', money(d.payouts.reduce(function (s, p) { return s + p.amount; }, 0)), 'gold', '<span class="delta">جنيه</span>') +
+    var byM = {}, done = d.payouts.filter(function (p) { return p.status !== 'approved'; }), apr = d.payouts.filter(function (p) { return p.status === 'approved'; });
+    done.forEach(function (p) { var k = p.method || 'أخرى'; byM[k] = (byM[k] || 0) + p.amount; });
+    return head('سجل الصرف', 'كل اعتماد وكل عملية صرف — مين عملها وإمتى', '<button class="btn btn-ghost" id="expP">' + icon('dl') + 'تصدير</button>') +
+      '<div class="kpis">' + kpi('إجمالي المصروف', money(done.reduce(function (s, p) { return s + p.amount; }, 0)), 'gold', '<span class="delta">جنيه</span>') +
+        kpi('معتمد ومستني صرف', money(apr.reduce(function (s, p) { return s + p.amount; }, 0)), '', '<span class="delta">' + apr.length + ' عملية · ج</span>') +
         Object.keys(byM).map(function (k) { return kpi(k, money(byM[k]), '', '<span class="delta">جنيه</span>'); }).join('') + '</div>' +
       list('payouts', [
-        { t: 'التاريخ', k: 'paidAt', c: 'n', v: function (p) { return fmt(p.paidAt, true); } },
+        { t: 'التاريخ', k: 'paidAt', c: 'n', v: function (p) { return fmt(p.paidAt || p.approvedAt, true); }, x: function (p) { var dd = day(p.paidAt || p.approvedAt); return dd ? iso(dd) : ''; } },
+        { t: 'الحالة', k: 'status', v: function (p) { return p.status === 'approved' ? '<span class="pill blue">معتمد</span>' : '<span class="pill green">اتصرف</span>'; } },
         { t: 'الطيار', k: 'riderName', v: function (p) { return esc(cleanName(p.riderName)) + '<div class="muted ltr" style="font-size:11px">#' + esc(p.riderCode) + '</div>'; } },
         { t: 'المبلغ', k: 'amount', c: 'n', v: function (p) { return '<span class="gold">' + money(p.amount) + '</span>'; } },
         { t: 'الطريقة', k: 'method', v: function (p) { return esc(p.method) + (p.reference ? '<div class="muted" style="font-size:11px">' + esc(p.reference) + '</div>' : ''); } },
-        { t: 'سجّلها', k: 'paidBy', v: function (p) { return esc(p.paidBy); } },
+        { t: 'اعتمدها / صرفها', k: 'paidBy', v: function (p) { return esc(p.approvedBy || '—') + ' / ' + esc(p.paidBy || '—'); } },
         { t: 'ملاحظة', k: 'note', v: function (p) { return '<span class="muted">' + esc(p.note) + '</span>'; } },
-        { t: '', v: function (p) { return can('payouts.edit') ? '<button class="btn btn-danger btn-sm" data-undo="' + esc(p.id) + '">إلغاء</button>' : ''; } }
-      ], d.payouts, { id: function (p) { return p.id; }, sort: 'paidAt', empty: 'لسه مفيش صرف متسجل.' });
+        { t: '', v: function (p) { return (p.status === 'approved' && can('payouts.edit') ? '<button class="btn btn-gold btn-sm" data-payid="' + esc(p.id) + '" data-code="' + esc(p.riderCode) + '">صرف</button> ' : '') + (can('payouts.edit') ? '<button class="btn btn-danger btn-sm" data-undo="' + esc(p.id) + '">إلغاء</button>' : ''); } }
+      ], d.payouts, { name: 'سجل-الصرف', id: function (p) { return p.id; }, sort: 'paidAt', empty: 'لسه مفيش صرف متسجل.' });
   }
   function bindPayouts() {
     bindList('payouts', {});
-    document.getElementById('expP').onclick = function () { csv('سجل-الصرف', [['التاريخ', 'كود الطيار', 'الطيار', 'المبلغ', 'الطريقة', 'المرجع', 'سجّلها', 'ملاحظة']].concat(S.data.payouts.map(function (p) { return [p.paidAt ? iso(p.paidAt) : '', p.riderCode, cleanName(p.riderName), p.amount, p.method, p.reference, p.paidBy, p.note]; }))); };
+    root.querySelectorAll('[data-payid]').forEach(function (b) { b.onclick = function () { openPay(b.dataset.code, b.dataset.payid); }; });
+    document.getElementById('expP').onclick = function () { csv('سجل-الصرف', [['الحالة', 'اتعتمد', 'اعتمده', 'اتصرف', 'صرفه', 'كود الطيار', 'الطيار', 'المبلغ', 'الطريقة', 'المرجع', 'ملاحظة']].concat(S.data.payouts.map(function (p) { return [p.status === 'approved' ? 'معتمد' : 'اتصرف', p.approvedAt ? iso(p.approvedAt) : '', p.approvedBy, p.paidAt ? iso(p.paidAt) : '', p.paidBy, p.riderCode, cleanName(p.riderName), p.amount, p.method, p.reference, p.note]; }))); };
     root.querySelectorAll('[data-undo]').forEach(function (b) { b.onclick = function () {
-      var o = overlay(dhead('إلغاء عملية الصرف؟', 'هتتمسح من السجل والطيار يرجع "مستحق"') + '<div style="display:flex;gap:8px"><button class="btn btn-danger" id="yes">أيوه، ألغيها</button><button class="btn btn-ghost" data-close>لأ</button></div>', true);
+      var o = overlay(dhead('إلغاء عملية الصرف؟', 'هتتمسح من السجل والطيار يرجع "مستني اعتماد"') + '<div style="display:flex;gap:8px"><button class="btn btn-danger" id="yes">أيوه، ألغيها</button><button class="btn btn-ghost" data-close>لأ</button></div>', true);
       o.querySelector('#yes').onclick = async function () { var res = await call('adminDeletePayout', { id: b.dataset.undo }); if (res.ok) { closeOverlay(); toast('اتلغت ✓'); load(true); } };
     }; });
   }
@@ -2559,7 +2761,7 @@ if (typeof module !== 'undefined' && module.exports) {
       '<div class="filters"><input type="search" id="uq" placeholder="بحث بالاسم أو الكود أو الموبايل" value="' + esc(f.q) + '">' +
       '<select id="ut"><option value="">الكل</option><option value="internal"' + (f.type === 'internal' ? ' selected' : '') + '>طيارين داخليين</option><option value="external"' + (f.type === 'external' ? ' selected' : '') + '>شركاء</option><option value="unreg"' + (f.type === 'unreg' ? ' selected' : '') + '>بيرشحوا بكود طلبات ومافعّلوش البرنامج</option></select></div>' +
       list('users', [
-        { t: 'الاسم', k: 'name', v: function (u) { return '<b>' + esc(cleanName(u.name) || '—') + '</b>' + (u.status === 'blocked' ? ' <span class="pill red">موقوف</span>' : '') + (!u.registered ? ' <span class="pill dim">مش مفعّل</span>' : ''); } },
+        { t: 'الاسم', k: 'name', v: function (u) { return '<b>' + esc(cleanName(u.name) || '—') + '</b>' + (u.status === 'blocked' ? ' <span class="pill red">موقوف</span>' : '') + (!u.registered ? ' <span class="pill dim">مش مفعّل</span>' : '') + (u.left ? ' <span class="pill red" title="No Contract في Headcount — بونصه لسه بيتصرف">ساب</span>' : ''); } },
         { t: 'النوع', k: 'type', v: function (u) { return u.type === 'external' ? 'شريك' : 'طيار'; } },
         { t: 'الكود / الموبايل', k: 'key', c: 'n', v: function (u) { return '<span class="ltr">' + esc(u.type === 'external' ? u.phone : u.code) + '</span>'; } },
         { t: 'ترشيحات', k: 'applicants', c: 'n', v: function (u) { return u.applicants; } },
@@ -2567,7 +2769,7 @@ if (typeof module !== 'undefined' && module.exports) {
         { t: 'بونص (ج)', k: 'bonus', c: 'n', v: function (u) { return '<span class="gold">' + money(u.bonus) + '</span>'; } },
         { t: 'مستحق', k: 'due', c: 'n', v: function (u) { return u.due ? money(u.due) : '—'; } },
         { t: 'آخر دخول', k: 'lastLogin', c: 'n', v: function (u) { return u.lastLogin ? fmt(u.lastLogin) : '—'; } }
-      ], items, { id: function (u) { return u.key; }, sort: 'hires', open: openUser, empty: 'مفيش نتايج.' });
+      ], items, { name: 'المرشِّحين', id: function (u) { return u.key; }, sort: 'hires', open: openUser, empty: 'مفيش نتايج.' });
   }
   function bindUsers() {
     var deb; document.getElementById('uq').oninput = function (e) { clearTimeout(deb); deb = setTimeout(function () { S.uf.q = e.target.value; render(); var i = document.getElementById('uq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
@@ -2745,7 +2947,7 @@ if (typeof module !== 'undefined' && module.exports) {
         { t: 'العملية', k: 'action', v: function (x) { return '<b>' + esc(x.action) + '</b>'; } },
         { t: 'على', k: 'target', v: function (x) { return esc(x.target); } },
         { t: 'قبل ← بعد', v: function (x) { return (x.before || x.after) ? '<span class="muted">' + esc(x.before || '—') + '</span> ← ' + esc(x.after || '—') : ''; } }
-      ], items, { id: function (x) { return x.at; }, empty: 'لسه مفيش تعديلات.' });
+      ], items, { name: 'سجل-التعديلات', id: function (x) { return x.at; }, empty: 'لسه مفيش تعديلات.' });
   }
   function bindAudit() {
     var deb; document.getElementById('auq').oninput = function (e) { clearTimeout(deb); deb = setTimeout(function () { S.auq = e.target.value; render(); var i = document.getElementById('auq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
@@ -2762,8 +2964,8 @@ if (typeof module !== 'undefined' && module.exports) {
     };
   }
 
-  var VIEWS = { overview: viewOverview, analytics: viewAnalytics, sv: viewSV, applicants: viewApplicants, riders: viewRiders, payouts: viewPayouts, users: viewUsers, alerts: viewAlerts, campaigns: viewCampaigns, settings: viewSettings, team: viewTeam, audit: viewAudit };
-  var BINDERS = { overview: bindOverview, analytics: bindAnalytics, sv: bindSV, applicants: bindApplicants, riders: bindRiders, payouts: bindPayouts, users: bindUsers, alerts: bindAlerts, campaigns: bindCampaigns, settings: bindSettings, team: bindTeam, audit: bindAudit };
+  var VIEWS = { overview: viewOverview, analytics: viewAnalytics, compare: viewCompare, sv: viewSV, applicants: viewApplicants, riders: viewRiders, payouts: viewPayouts, users: viewUsers, alerts: viewAlerts, campaigns: viewCampaigns, settings: viewSettings, team: viewTeam, audit: viewAudit };
+  var BINDERS = { overview: bindOverview, analytics: bindAnalytics, compare: bindCompare, sv: bindSV, applicants: bindApplicants, riders: bindRiders, payouts: bindPayouts, users: bindUsers, alerts: bindAlerts, campaigns: bindCampaigns, settings: bindSettings, team: bindTeam, audit: bindAudit };
 
   /* ─────────────── Start ─────────────── */
   (async function () {

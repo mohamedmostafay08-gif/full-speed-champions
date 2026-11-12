@@ -38,7 +38,7 @@
     var skill = rnd();
     refs.push({ key: code, type: 'internal', weight: skill < .25 ? 6 : skill < .6 ? 2.5 : 1, quality: .2 + rnd() * .5, phone: ph });
     var hz = zone();
-    headcount.push({ code: code, name: nm, zone: hz, supervisor: svFor(hz).name, manager: 'Full Speed', phone: ph, vehicle: pick(['Bike', 'Bike', 'Bicycle']), active: 'Active' });
+    headcount.push({ code: code, name: nm, zone: hz, supervisor: svFor(hz).name, manager: 'Full Speed', phone: ph, vehicle: pick(['Bike', 'Bike', 'Bicycle']), active: i === 9 || i === 17 ? 'No Contract' : 'Active', spStatus: 'With SP', batch: int(1, 5) });
     if (rnd() < .85) users.push({ type: 'internal', code: code, name: nm, phone: ph, refId: '', status: 'active', created: ago(int(60, 120)), lastLogin: ago(int(0, 14)) });
   }
   for (var j = 0; j < 6; j++) {
@@ -72,6 +72,7 @@
         var tenure = diffDays(hire, today), spOn = perDay > 0 && rnd() > Math.min(.6, tenure / 160 + (1.2 - sv.q) * .25);
         hiring.push({ _row: hiring.length + 2, hireDate: hire, code: code2, zone: z, name: name(3) + ' _FULL SPEED', phone: p, status: perDay && tenure > 1 ? 'Active' : 'Inactive', sv: sv.name, sp: spOn ? 'With SP' : 'No SP', vehicle: veh });
         riders.push({ _row: riders.length + 2, code: code2, referralCode: ref.type === 'internal' ? ref.key : COMPANY });
+        headcount.push({ code: code2, name: name(3), zone: z, supervisor: sv.name, manager: 'Full Speed', phone: p, vehicle: veh, active: 'Active', spStatus: spOn ? 'With SP' : 'No SP', batch: perDay ? Math.max(1, Math.min(7, Math.round(6.2 - perDay / 4 + (rnd() - .5) * 2))) : '' });
         for (var x = hire; x < today; x = addDays(x, 1)) if (perDay) daily.push({ date: x, code: code2, orders: Math.max(0, Math.round(perDay + (rnd() - .5) * 8)) });
       }
     }
@@ -80,7 +81,10 @@
   for (var u2 = 0; u2 < 70; u2++) {
     var c3 = String(riderCode += int(3, 40)), h3 = ago(int(0, 90));
     var z3 = zone();
-    hiring.push({ _row: hiring.length + 2, hireDate: h3, code: c3, zone: z3, name: name(3) + ' _FULL SPEED', phone: phone(), status: 'Inactive', sv: svFor(z3).name, sp: rnd() < .8 ? 'With SP' : 'No SP', vehicle: 'Bike' });
+    var sv3 = svFor(z3), pd3 = rnd() < .18 ? 0 : (3 + rnd() * 13) * sv3.q, t3 = diffDays(h3, today), sp3 = pd3 > 0 && rnd() > Math.min(.7, t3 / 130 + .1);
+    hiring.push({ _row: hiring.length + 2, hireDate: h3, code: c3, zone: z3, name: name(3) + ' _FULL SPEED', phone: phone(), status: pd3 && t3 > 1 ? 'Active' : 'Inactive', sv: sv3.name, sp: sp3 ? 'With SP' : 'No SP', vehicle: pick(['Bike', 'Bike', 'Bicycle', 'Walker']) });
+    headcount.push({ code: c3, name: name(3), zone: z3, supervisor: sv3.name, manager: 'Full Speed', phone: '', vehicle: 'Bike', active: 'Active', spStatus: sp3 ? 'With SP' : 'No SP', batch: pd3 ? Math.max(1, Math.min(7, Math.round(7 - pd3 / 3.5 + (rnd() - .5) * 2))) : '' });
+    for (var x3 = h3; x3 < today; x3 = addDays(x3, 1)) if (pd3) daily.push({ date: x3, code: c3, orders: Math.max(0, Math.round(pd3 + (rnd() - .5) * 8)) });
   }
   // A few things the alerts page should catch
   var cheater = refs[3];
@@ -95,7 +99,12 @@
   (function () {
     var w = world(), methods = ['فودافون كاش', 'كاش', 'إنستاباي', 'مع المرتب'];
     buildAdminData(w, users).riders.filter(function (r) { return r.payStatus === 'due' && r.payoutDate < ago(5) && rnd() < .8; }).forEach(function (r) {
-      payouts.push({ id: 'PO-' + r.code, riderCode: r.code, amount: r.bonus, method: pick(methods), reference: rnd() < .5 ? 'TX' + int(100000, 999999) : '', note: '', paidBy: pick(['منى (حسابات)', 'المدير']), paidAt: addDays(r.payoutDate, int(1, 4)) });
+      var at = addDays(r.payoutDate, int(1, 4));
+      payouts.push({ id: 'PO-' + r.code, riderCode: r.code, amount: r.bonus, method: pick(methods), reference: rnd() < .5 ? 'TX' + int(100000, 999999) : '', note: '', paidBy: pick(['منى (حسابات)', 'المدير']), paidAt: at, status: 'اتصرف', approvedBy: 'المدير', approvedAt: addDays(at, -1) });
+    });
+    // A few approved and waiting for finance
+    buildAdminData(world(), users).riders.filter(function (r) { return r.payStatus === 'due'; }).slice(0, 4).forEach(function (r) {
+      payouts.push({ id: 'PO-A' + r.code, riderCode: r.code, amount: r.bonus - r.paid, method: '', reference: '', note: '', paidBy: '', paidAt: null, status: 'معتمد', approvedBy: 'المدير', approvedAt: ago(1) });
     });
   })();
 
@@ -144,12 +153,17 @@
       return ok({ done: done, skipped: 0 });
     },
     adminEditApplicant: function (p) { var a = applicants.filter(function (x) { return x._row === +p.row; })[0]; Object.keys(p.fields || {}).forEach(function (k) { if (a && p.fields[k]) a[k] = p.fields[k]; }); log('عدّل بيانات مرشح', a ? a.name : ''); return ok(); },
+    adminApprovePayouts: function (p) {
+      var rs = buildAdminData(world(), users).riders.filter(function (x) { return (p.codes || []).indexOf(x.code) !== -1 && x.payStatus === 'due'; }), total = 0;
+      rs.forEach(function (r) { var amt = r.bonus - r.paid - r.approved; total += amt; payouts.push({ id: 'PO-' + Date.now() + r.code, riderCode: r.code, amount: amt, method: '', reference: '', note: '', paidBy: '', paidAt: null, status: 'معتمد', approvedBy: 'المدير', approvedAt: today }); });
+      log('اعتمد صرف بونص', rs.length + ' طيار', '', total + ' ج'); return ok({ approved: rs.length, total: total, skipped: (p.codes || []).length - rs.length });
+    },
+    adminRefreshReports: function () { log('حدّث تاب التقارير', ''); return ok(); },
     adminRecordPayout: function (p) {
-      var r = buildAdminData(world(), users).riders.filter(function (x) { return x.code === p.code; })[0];
-      if (!r) return { ok: false, error: 'الطيار ده مش موجود.' };
-      if (r.paid + Number(p.amount) > r.bonus) return { ok: false, error: 'المبلغ أكبر من المستحق (' + r.bonus + ' ج).', fields: { amount: 'أكبر من المستحق.' } };
-      payouts.push({ id: 'PO-' + Date.now(), riderCode: p.code, amount: Number(p.amount), method: p.method, reference: p.reference, note: p.note, paidBy: 'المدير', paidAt: today });
-      log('سجّل صرف بونص', cleanText(r.name) + ' #' + r.code, '', p.amount + ' ج — ' + p.method); return ok();
+      var po = payouts.filter(function (x) { return x.id === p.id && /معتمد/.test(x.status); })[0];
+      if (!po) return { ok: false, error: 'لازم المدير يعتمد الصرف الأول.' };
+      po.method = p.method; po.reference = p.reference; po.note = p.note; po.paidBy = 'منى (حسابات)'; po.paidAt = today; po.status = 'اتصرف';
+      log('سجّل صرف بونص', po.riderCode, 'معتمد', po.amount + ' ج — ' + p.method); return ok({ id: po.id });
     },
     adminDeletePayout: function (p) { payouts = payouts.filter(function (x) { return x.id !== p.id; }); log('لغى صرف بونص', p.id); return ok(); },
     adminUserAction: function (p) {
