@@ -117,7 +117,7 @@ test('daily orders beat the manual column and drive the bonus', () => {
 
 test('candidate validation: new to Full Speed, adult, valid ID', () => {
   const w = world();
-  const base = { fullName: 'محمود علي حسن', mobile: '01099999999', nationalId: '29805050100015', address: 'المعادي', zone: 'Maadi', idExpiry: '2030-01-01' };
+  const base = { fullName: 'محمود علي حسن', mobile: '01099999999', nationalId: '29805050100015', address: 'المعادي', zone: 'Maadi', idExpiry: '2030-01-01', vehicle: 'عجلة' };
   assert.equal(L.validateCandidate(base, w).ok, true);
   assert.equal(L.validateCandidate(base, w).clean.birthDate.getFullYear(), 1998);
 
@@ -129,7 +129,7 @@ test('candidate validation: new to Full Speed, adult, valid ID', () => {
   assert.match(sameId.errors.nationalId, /مترشح قبل كده/);
   const minor = L.validateCandidate({ ...base, nationalId: '31001010100017' }, w);
   assert.match(minor.errors.nationalId, /18/);
-  const expired = L.validateCandidate({ ...base, idExpiry: '2025-01-01' }, w);
+  const expired = L.validateCandidate({ ...base, idExpiry: '2025-01-01', vehicle: 'عجلة' }, w);
   assert.match(expired.errors.idExpiry, /منتهية/);
 });
 

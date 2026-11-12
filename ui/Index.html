@@ -767,6 +767,14 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
         '<p>' + (urgent.daysLeft === 0 ? 'النهارده آخر يوم يتحسب.' : 'باقي ' + plural(urgent.daysLeft, 'يوم واحد', 'أيام') + ' بس.') + ' رسالة منك ممكن تفرق.</p></div></div>' +
         (urgent.phone ? '<a class="btn btn-wa btn-sm" href="' + wa(urgent.phone, encourageMsg(urgent)) + '" target="_blank" rel="noopener">' + icon('wa') + 'شجّعه على واتساب</a>' : '') + '</section>';
     }
+    var waiting = d.pipeline.filter(function (p) { return p.codeArrived; });
+    if (waiting.length) {
+      var w0 = waiting[0];
+      return '<section class="card coach warn"><div class="coach-head"><span class="coach-ico">' + icon('bolt') + '</span><div>' +
+        '<h3>' + (waiting.length === 1 ? esc(first(w0.name)) + ' كوده وصل ولسه ما بدأش' : waiting.length + ' مرشحين كودهم وصل ولسه ما بدأوش') + '</h3>' +
+        '<p>كل يوم من غير شغل بيضيع من الشهرين بتوع البونص. كلّمهم ينزلوا يعملوا أول أوردر.</p></div></div>' +
+        '<button type="button" class="btn btn-gold btn-sm" data-go-view="pipeline">كلّمهم دلوقتي</button></section>';
+    }
     if (t.nudges) {
       return '<section class="card coach warn"><div class="coach-head"><span class="coach-ico">' + icon('bell') + '</span><div>' +
         '<h3>' + plural(t.nudges, 'مرشح واحد محتاج', 'مرشحين محتاجين') + ' متابعة</h3>' +
@@ -852,7 +860,7 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
     var tiers = S.dash.season.tiers, top = tiers[tiers.length - 1], max = top.orders;
     var pct = Math.min(100, r.orders / max * 100);
     var ticks = tiers.map(function (x) { return '<b style="inset-inline-start:' + (x.orders / max * 100) + '%"></b>'; }).join('');
-    var st = r.payStatus === 'paid' ? ['✓ اتصرف', 'green'] : (STATE[r.state] || STATE.active);
+    var st = r.payStatus === 'paid' ? ['✓ اتصرف', 'green'] : r.started === false ? ['كوده وصل — لسه ما بدأش', 'gold'] : (STATE[r.state] || STATE.active);
     var urgent = r.state === 'active' && r.daysLeft <= 7;
     var goal;
     if (r.payStatus === 'paid') goal = '<span>اتصرفلك <b class="gold">' + money(r.paid) + ' ج</b> عن ' + esc(first(r.name)) + ' 🎉</span>';
@@ -911,6 +919,13 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
       return '<div class="' + cls + '">' + esc(s.replace('تم حضور ', '')) + '</div>';
     }).join('') + '</div>';
     var pill = a.status === 'اشتغل' ? 'green' : a.rejected ? 'red' : a.status === 'جديد' ? 'dim' : 'blue';
+    if (a.codeArrived) {
+      var go = 'أهلاً ' + first(a.name) + ' 👋 كودك وصل من طلبات! انزل اعمل أول أوردر النهارده عشان تبدأ 🚀 — ' + first(S.dash.user.name);
+      return '<article class="slip"><div class="slip-head"><div><h3 class="slip-name">' + esc(a.name) + '</h3><div class="slip-meta"><span>اتقدم ' + fmtDay(a.submitted) + '</span><span>' + esc(a.zone) + '</span></div></div>' +
+        '<span class="pill gold">كوده وصل ⏳</span></div>' + stepper +
+        '<div class="note warn"><span><b>كوده وصل' + (a.hiredDate ? ' يوم ' + fmtDay(a.hiredDate) : '') + '</b> ولسه ما عملش أول أوردر. كلّمه ينزل — البونص بيتحسب من يوم التعيين.</span>' +
+        (a.phone ? '<a class="btn btn-wa btn-sm" href="' + wa(a.phone, go) + '" target="_blank" rel="noopener">' + icon('wa') + 'قوله ينزل</a>' : '') + '</div>' + note + '</article>';
+    }
     var me = first(S.dash.user.name);
     var msg = 'أهلاً ' + first(a.name) + '، أنا ' + me + ' من Full Speed 👋 طلبك عندنا "' + a.status + '". لو محتاج مساعدة تكمل الورق كلمني، عايزين ننزّلك الشغل بسرعة 🚀';
     var nudge = a.nudge ? '<div class="note warn"><span><b>محتاج متابعة:</b> بقاله ' + plural(a.daysWaiting, 'يوم', 'يوم') + ' على "' + esc(a.status) + '".</span>' +
@@ -1041,8 +1056,9 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
       '<div class="field"><label for="c-nid">الرقم القومي</label><input id="c-nid" name="nationalId" class="ltr" inputmode="numeric" maxlength="14" enterkeyhint="next" placeholder="14 رقم" required><span class="derived" id="nidOut"></span></div>' +
       '<div class="field"><label for="c-zone">منطقة الشغل</label><select id="c-zone" name="zone" required>' + opts + '</select></div>' +
       '<div class="field"><label for="c-address">العنوان</label><input id="c-address" name="address" enterkeyhint="next" placeholder="المحافظة - المنطقة - الشارع" required></div>' +
+      '<div class="field"><label for="c-veh">هيشتغل بإيه؟</label><select id="c-veh" name="vehicle" required><option value="">اختار…</option><option>موتوسيكل</option><option>عجلة</option><option>مشي</option></select></div>' +
       '<div class="row2"><div class="field"><label for="c-idexp">انتهاء البطاقة</label><input id="c-idexp" name="idExpiry" type="date" required></div>' +
-      '<div class="field"><label for="c-licexp">انتهاء الرخصة</label><input id="c-licexp" name="licenseExpiry" type="date"><span class="hint">مش مطلوبة للعجلة</span></div></div>' +
+      '<div class="field"><label for="c-licexp">انتهاء الرخصة</label><input id="c-licexp" name="licenseExpiry" type="date"><span class="hint" id="licHint">مطلوبة للموتوسيكل بس</span></div></div>' +
       '<div class="field"><label for="c-plate">رقم اللوحة</label><input id="c-plate" name="plate" enterkeyhint="done" placeholder="سيبها فاضية لو عجلة"></div>';
   }
 
@@ -1051,6 +1067,11 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
     if (mob) mob.addEventListener('input', function () {
       mob.value = mob.value.replace(/\D/g, '').slice(0, 11);
       mob.closest('.field').classList.toggle('ok', /^01[0125]\d{8}$/.test(mob.value));
+    });
+    var veh = root.querySelector('[name=vehicle]'), lic = root.querySelector('[name=licenseExpiry]'), lh = root.querySelector('#licHint');
+    if (veh && lic) veh.addEventListener('change', function () {
+      var moto = veh.value === 'موتوسيكل'; lic.required = moto;
+      if (lh) lh.textContent = moto ? 'مطلوبة ولازم تكون سارية' : 'مش مطلوبة';
     });
     if (!nid) return;
     nid.addEventListener('input', function () {

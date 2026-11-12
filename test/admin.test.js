@@ -205,7 +205,56 @@ test('Hiring tracker: official hire date, SV, SP; old riders are not referrals',
   // A new candidate whose phone is already a hire is refused; a Headcount-only phone is not
   const zt = env.api('login', { type: 'internal', code: '4722422', password: 'ziad2026' });
   assert.equal(zt.ok, true, zt.error);
-  const form = { fullName: 'محمود علي حسن', mobile: '01012345678', nationalId: '29805050100015', address: 'x', zone: 'Haram', idExpiry: '2030-01-01' };
+  const form = { fullName: 'محمود علي حسن', mobile: '01012345678', nationalId: '29805050100015', address: 'x', zone: 'Haram', idExpiry: '2030-01-01', vehicle: 'عجلة' };
   assert.match(env.api('submitCandidate', { token: zt.data.token, form }).error, /مسجل عندنا/);
   assert.equal(env.api('submitCandidate', { token: zt.data.token, form: { ...form, mobile: '01099988877', nationalId: '29606060100012' } }).error, undefined); // only in Headcount → allowed
+});
+
+test('rules from the Q&A: self-referral, rejected re-referral, motorcycle licence, Inactive/Active', () => {
+  const tabs = sheet();
+  tabs['Hiring tracker'] = [
+    ['Dates', 'Rider ID', 'Zones', 'Rider Name:_', 'Phone Number:_', 'Status', 'SV', 'Has SP ?', 'Vehicle'],
+    ['11/10/2026', 5037565, 'Maadi', 'Mahmoud Ashraf', 1151307016, 'Active', 'Ali Sayed Maadi', 'With SP', 'Bicycle'],
+    ['11/9/2026', 5031339, 'Nasr city', 'Belal Mohamed', 1220211045, 'Inactive', 'Raafat', 'With SP', 'Bike']
+  ];
+  tabs['Normal Riders Handle'][2][6] = '';                         // Belal: no orders yet
+  tabs['New Applicants'].push(['11/6/2026 10:00:00', 4722422, 'مرفوض من زياد', 1033334444, 29907070100011, 'x', 'Maadi', '', '', '', '', 'مرفوض', 'البطاقة منتهية', '']);
+  const env = makeEnv(tabs);
+  env.ctx.setupFullSpeed();
+  const ziad = env.api('login', { type: 'internal', code: '4722422', password: 'ziad2026' }).data;
+  const partner = env.api('login', { type: 'external', code: '01144077041', password: 'partner99' }).data;
+  const base = { fullName: 'محمود علي حسن', mobile: '01077778888', nationalId: '29805050100015', address: 'x', zone: 'Maadi', idExpiry: '2030-01-01', vehicle: 'عجلة' };
+
+  // self-referral is refused
+  assert.match(env.api('submitCandidate', { token: ziad.token, form: { ...base, mobile: '01148005931' } }).error, /نفسك/);
+  // motorcycle needs a valid licence
+  assert.match(env.api('submitCandidate', { token: ziad.token, form: { ...base, vehicle: 'موتوسيكل' } }).error, /الرخصة/);
+  assert.match(env.api('submitCandidate', { token: ziad.token, form: { ...base, vehicle: 'موتوسيكل', licenseExpiry: '2025-01-01' } }).error, /منتهية/);
+  // a rejected candidate: only the original referrer can submit them again
+  const again = { ...base, fullName: 'مرفوض من زياد تاني', mobile: '01033334444', nationalId: '29907070100011' };
+  assert.match(env.api('submitCandidate', { token: partner.token, form: again }).error, /هو بس/);
+  assert.equal(env.api('submitCandidate', { token: ziad.token, form: again }).ok, true);
+
+  // Inactive in the tracker: code arrived, not started → not "اشتغل" yet, sync leaves the sheet alone
+  const p = env.api('session', { token: partner.token }).data.dashboard.pipeline.find((x) => x.name === 'بلال محمد احمد');
+  assert.equal(p.status, 'قيد التعيين');
+  assert.equal(p.codeArrived, true);
+  env.ctx.syncApplicants();
+  const apps = env.sheets['New Applicants'], h = apps.rows[0];
+  assert.notEqual(apps.rows[1][h.indexOf('الحالة')], 'اشتغل');
+  // …and the referrer's bonus clock still runs from the hire date
+  assert.equal(env.api('session', { token: partner.token }).data.dashboard.team[0].hireDate, '2026-11-09');
+});
+
+test('a referral must be made on or before the hire day', () => {
+  const tabs = sheet();
+  tabs['Hiring tracker'] = [
+    ['Dates', 'Rider ID', 'Zones', 'Rider Name:_', 'Phone Number:_', 'Status', 'SV', 'Has SP ?', 'Vehicle'],
+    ['11/2/2026', 5031339, 'Nasr city', 'Belal Mohamed', 1220211045, 'Active', 'Raafat', 'With SP', 'Bike']
+  ];
+  // the partner's application for Belal is dated 3 Nov — a day after his hire
+  const env = makeEnv(tabs);
+  env.ctx.setupFullSpeed();
+  const partner = env.api('login', { type: 'external', code: '01144077041', password: 'partner99' }).data;
+  assert.equal(partner.dashboard.team.length, 0);
 });

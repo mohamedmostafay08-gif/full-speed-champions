@@ -117,7 +117,7 @@ test('session restore, candidate submission, duplicate block, logout', () => {
   const { token } = env.api('activate', { type: 'internal', code: '4722422', phone: '01148005931', password: 'Ziad2026' }).data;
   assert.equal(env.api('session', { token }).ok, true);
 
-  const form = { fullName: 'محمود علي حسن', mobile: '01099999999', nationalId: '29805050100015', address: '=HYPERLINK("x")', zone: 'Maadi', idExpiry: '2030-01-01' };
+  const form = { fullName: 'محمود علي حسن', mobile: '01099999999', nationalId: '29805050100015', address: '=HYPERLINK("x")', zone: 'Maadi', idExpiry: '2030-01-01', vehicle: 'عجلة' };
   const sub = env.api('submitCandidate', { token, form });
   assert.equal(sub.ok, true, sub.error);
   const apps = env.sheets['New Applicants'];
@@ -148,7 +148,7 @@ test('public ?ref= form: valid code works, unknown ref refused, partner ref hide
   assert.equal(env.api('bootstrap', { ref: '999' }).data.referrer.valid, false);
 
   const refId = env.sheets['FS Users'].rows[2][4];
-  const form = { fullName: 'سارة محمود علي', mobile: '01555555555', nationalId: '30001010100015', address: 'الهرم', zone: 'Haram', idExpiry: '2031-01-01' };
+  const form = { fullName: 'سارة محمود علي', mobile: '01555555555', nationalId: '30001010100015', address: 'الهرم', zone: 'Haram', idExpiry: '2031-01-01', vehicle: 'عجلة' };
   const res = env.api('publicApply', { ref: refId, form });
   assert.equal(res.ok, true, res.error);
   const apps = env.sheets['New Applicants'];

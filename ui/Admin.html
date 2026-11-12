@@ -526,6 +526,8 @@ td .gold { color: var(--gold); font-weight: 700; }
     var ending = d.riders.filter(function (r) { return r.state === 'active' && r.daysLeft <= 7 && r.ownerKey; });
     if (stuck.length) out.push(['warn', stuck.length + ' مرشح واقفين على نفس الحالة ' + d.season.nudgeAfterDays + ' أيام أو أكتر', 'applicants']);
     if (due.length) out.push(['warn', due.length + ' طيار بونصهم مستحق ومستني الصرف (' + money(due.reduce(function (s, r) { return s + r.bonus - r.paid; }, 0)) + ' ج)', 'riders']);
+    var idle = d.riders.filter(function (r) { return r.ownerKey && r.started === false && r.daysSinceHire >= 3; });
+    if (idle.length) out.push(['warn', idle.length + ' طيار كودهم وصل من 3 أيام أو أكتر ولسه ما بدأوش', 'alerts']);
     if (ending.length) out.push(['', ending.length + ' طيار مدة البونص بتاعتهم بتخلص خلال أسبوع — فرصة تشجعهم', 'riders']);
     if (flags) out.push(['bad', flags + ' تنبيه محتاج مراجعة (تلاعب أو تكرار)', 'alerts']);
     if (!out.length) return '<p class="muted" style="margin:0">كله تمام ✓</p>';
@@ -601,6 +603,7 @@ td .gold { color: var(--gold); font-weight: 700; }
       '<div class="kpis">' +
         kpi('تكلفة البونص لكل تعيين', money(cost), 'gold', '<span class="delta">جنيه في المتوسط (' + paidHires.length + ' من ' + sc.hires.length + ' فتحوا بونص)</span>') +
         kpi('تكلفة البونص لكل أوردر', orders ? (bonus / orders).toFixed(2) : '—', '', '<span class="delta">جنيه لكل أوردر عمله طيار من ترشيح — كل ما يقل، البونص أكفأ</span>') +
+        kpi('من وصول الكود لأول أوردر', (function () { var xs = sc.hires.map(function (r) { return r.daysToStart; }).filter(function (x) { return x !== null && x !== undefined; }); return xs.length ? Math.round(median(xs)) + ' يوم' : '—'; })(), '', '<span class="delta">الوسيط — ' + sc.hires.filter(function (r) { return r.started === false; }).length + ' لسه ما بدأوش</span>') +
         kpi('تعيينات متوقعة الـ30 يوم الجاية', fc.hires30, '', '<span class="delta">على معدل آخر 4 أسابيع</span>') +
         kpi('بونص هيستحق خلال 30 يوم', money(fc.due30), 'gold', '<span class="delta">' + fc.dueCount + ' طيار · وممكن يزيد ' + money(fc.upside) + ' ج لو وصلوا الشريحة الجاية</span>') +
       '</div>' +
@@ -861,7 +864,7 @@ td .gold { color: var(--gold); font-weight: 700; }
         { t: 'المنطقة', k: 'zone', v: function (a) { return esc(a.zone); } },
         { t: 'المرشِّح', k: 'refName', v: function (a) { return esc(cleanName(a.refName) || a.refKey) + '<div class="muted" style="font-size:11px">' + (a.refType === 'external' ? 'شريك' : 'طيار') + '</div>'; } },
         { t: 'اتقدم', k: 'submitted', c: 'n', v: function (a) { return fmt(a.submitted); } },
-        { t: 'الحالة', k: 'stage', v: function (a) { return '<span class="pill ' + (STATUS_PILL[a.status] || 'dim') + '">' + esc(a.status) + '</span>' + (a.nudge ? '<div class="flag" style="color:var(--gold)">⏳ ' + a.daysWaiting + ' يوم</div>' : ''); } },
+        { t: 'الحالة', k: 'stage', v: function (a) { return (a.codeArrived ? '<span class="pill gold">كوده وصل ⏳</span>' : '<span class="pill ' + (STATUS_PILL[a.status] || 'dim') + '">' + esc(a.status) + '</span>') + (a.nudge ? '<div class="flag" style="color:var(--gold)">⏳ ' + a.daysWaiting + ' يوم</div>' : ''); } },
         { t: 'ملاحظة', k: 'note', v: function (a) { return '<span class="muted">' + esc(a.note).slice(0, 60) + '</span>'; } }
       ], items, { id: function (a) { return a.row; }, sort: 'submitted', select: can('applicants.edit'), open: openApplicant, empty: 'مفيش مرشحين بالفلتر ده.' });
   }
@@ -963,7 +966,7 @@ td .gold { color: var(--gold); font-weight: 700; }
         { t: 'الطيار', k: 'name', v: function (r) { return '<b>' + esc(cleanName(r.name)) + '</b><div class="muted ltr" style="font-size:11px">#' + esc(r.code) + '</div>' + (r.flags.length ? '<div class="flag">⚠ ' + r.flags.map(function (x) { return d.flagLabels[x]; }).join('، ') + '</div>' : ''); } },
         { t: 'SV', k: 'sv', v: function (r) { return esc(r.sv || '—') + (r.sp === false ? '<div class="flag">No SP</div>' : ''); } },
         { t: 'المرشِّح', k: 'ownerName', v: function (r) { return r.ownerKey ? esc(cleanName(r.ownerName) || r.ownerKey) + '<div class="muted" style="font-size:11px">' + (r.source === 'talabat' ? 'كود طلبات' : 'استمارة') + '</div>' : '<span class="muted">—</span>'; } },
-        { t: 'اتعين', k: 'hireDate', c: 'n', v: function (r) { return fmt(r.hireDate); } },
+        { t: 'اتعين', k: 'hireDate', c: 'n', v: function (r) { return fmt(r.hireDate) + (r.started === false ? '<div class="flag" style="color:var(--gold)">لسه ما بدأش</div>' : r.daysToStart !== null && r.daysToStart !== undefined ? '<div class="muted" style="font-size:10px">بدأ بعد ' + r.daysToStart + ' يوم</div>' : ''); } },
         { t: 'أوردرات', k: 'orders', c: 'n', v: function (r) { return money(r.orders) + (r.ordersSource === 'manual' ? '<div class="muted" style="font-size:10px">يدوي</div>' : ''); } },
         { t: 'البونص', k: 'bonus', c: 'n', v: function (r) { return '<span class="gold">' + money(r.bonus) + '</span>' + (r.extra ? '<div class="muted" style="font-size:10px">منها ' + r.extra + ' حملة</div>' : ''); } },
         { t: 'آخر يوم', k: 'lastDay', c: 'n', v: function (r) { return fmt(r.lastDay) + (r.state === 'active' ? '<div class="muted" style="font-size:11px">باقي ' + r.daysLeft + ' يوم</div>' : ''); } },
@@ -1099,7 +1102,7 @@ td .gold { color: var(--gold); font-weight: 700; }
     d.applicants.forEach(function (a) { a.flags.forEach(function (f) { rows.push({ kind: f, who: a.name, ref: cleanName(a.refName) || a.refKey, date: a.submitted, open: ['app', a.row] }); }); });
     d.riders.forEach(function (r) { r.flags.forEach(function (f) { rows.push({ kind: f, who: cleanName(r.name), ref: cleanName(r.ownerName) || r.ownerKey, date: r.hireDate, open: ['rider', r.code] }); }); });
     var groups = {}; rows.forEach(function (r) { groups[r.kind] = (groups[r.kind] || 0) + 1; });
-    var help = { self: 'المرشِّح رشّح رقمه هو. غالباً عايز ياخد البونص على نفسه.', burst: '5 ترشيحات أو أكتر من نفس الشخص في يوم واحد. راجع إنهم ناس حقيقيين.', dupe: 'نفس الموبايل أو الرقم القومي اترشح أكتر من مرة.', known: 'الرقم ده متعيّن عندنا قبل تاريخ ترشيحه، فمش جديد ومالوش بونص.', suspended: 'طيار من ترشيح حالته No SP (موقوف) في Hiring tracker.', quiet: 'اتعين من أسبوعين أو أكتر ومعملش ولا أوردر.' };
+    var help = { self: 'المرشِّح رشّح رقمه هو. غالباً عايز ياخد البونص على نفسه.', burst: '5 ترشيحات أو أكتر من نفس الشخص في يوم واحد. راجع إنهم ناس حقيقيين.', dupe: 'نفس الموبايل أو الرقم القومي اترشح أكتر من مرة.', known: 'الرقم ده متعيّن عندنا قبل تاريخ ترشيحه، فمش جديد ومالوش بونص.', suspended: 'طيار من ترشيح حالته No SP (موقوف) في Hiring tracker.', notStarted: 'كوده وصل (Inactive) وعدّى 3 أيام من غير ما يعمل أول أوردر — البونص بيضيع عليه.', quiet: 'اتعين من أسبوعين أو أكتر ومعملش ولا أوردر.' };
     return head('التنبيهات', 'حالات محتاجة مراجعة: تلاعب محتمل، تكرار، أو طيارين اتعيّنوا ومش بيشتغلوا') +
       '<div class="kpis">' + Object.keys(d.flagLabels).map(function (k) { return kpi(d.flagLabels[k], groups[k] || 0, groups[k] ? 'gold' : '', '<span class="delta">' + help[k] + '</span>'); }).join('') + '</div>' +
       list('alerts', [

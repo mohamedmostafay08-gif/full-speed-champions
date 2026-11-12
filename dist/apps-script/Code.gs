@@ -135,12 +135,12 @@ function resolveRef_(ref) {
   if (/^P[0-9A-F]{8}$/.test(ref)) {
     var u = findUserByRefId_(ref);
     if (!u || u.status === 'blocked') return null;
-    return { type: 'external', key: u.phone, name: u.name, talabatLink: cfg.TALABAT_REF_BASE + cfg.COMPANY_REF_CODE };
+    return { type: 'external', key: u.phone, phone: u.phone, name: u.name, talabatLink: cfg.TALABAT_REF_BASE + cfg.COMPANY_REF_CODE };
   }
   var code = cleanCode(ref);
   var who = world.ridersByCode[code] || world.headcountByCode[code];
   if (!who) return null;
-  return { type: 'internal', key: code, name: who.name, talabatLink: cfg.TALABAT_REF_BASE + code };
+  return { type: 'internal', key: code, phone: who.phone || '', name: who.name, talabatLink: cfg.TALABAT_REF_BASE + code };
 }
 
 /** Internal rider: is this Talabat code ours, and what phone do we have for it? */
@@ -276,8 +276,9 @@ function changePassword_(p) {
 
 function ownerFor_(user) {
   var cfg = loadConfig_();
-  if (user.type === 'external') return { type: 'external', key: user.phone, talabatLink: cfg.TALABAT_REF_BASE + cfg.COMPANY_REF_CODE };
-  return { type: 'internal', key: user.code, talabatLink: cfg.TALABAT_REF_BASE + user.code };
+  if (user.type === 'external') return { type: 'external', key: user.phone, phone: user.phone, talabatLink: cfg.TALABAT_REF_BASE + cfg.COMPANY_REF_CODE };
+  var w = loadWorld_(), r = w.ridersByCode[user.code] || w.headcountByCode[user.code] || {};
+  return { type: 'internal', key: user.code, phone: user.phone || r.phone || '', talabatLink: cfg.TALABAT_REF_BASE + user.code };
 }
 
 function submitCandidate_(p) {
@@ -300,7 +301,7 @@ function publicApply_(p) {
 function saveCandidate_(form, owner, after) {
   return withLock_(function () {
     invalidate_();
-    var check = validateCandidate(form, loadWorld_());
+    var check = validateCandidate(form, loadWorld_(), owner);
     if (!check.ok) return fail_(check.errors[Object.keys(check.errors)[0]], check.errors);
     appendApplicant_(check.clean, owner);
     log_('candidate', owner.type + ' ' + String(owner.key).slice(-4));

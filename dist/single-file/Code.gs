@@ -109,6 +109,7 @@ var COLUMNS = {
     idExpiry: ['انتهاء البطاقة'],
     birthDate: ['تاريخ الميلاد'],
     plate: ['اللوحة'],
+    vehicle: ['نوع المركبة'],
     status: ['الحالة'],
     note: ['ملاحظات الإدارة'],
     link: ['لينك الترشيح'],
@@ -118,9 +119,9 @@ var COLUMNS = {
     hiredDate: ['تاريخ التعيين الفعلي']
   },
   DAILY_ORDERS: {
-    date: ['التاريخ', 'Date'],
-    code: ['كود المندوب', 'Rider Code', 'Code'],
-    orders: ['أوردرات مكتملة', 'Completed Orders', 'Orders']
+    date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم'],
+    code: ['كود المندوب', 'Rider Code', 'Rider ID', 'Code', 'ID', 'الكود'],
+    orders: ['أوردرات مكتملة', 'Completed Orders', 'Orders', 'Completed', 'عدد الأوردرات', 'الأوردرات', 'Order Count']
   },
   USERS: {
     type: ['Type'],
@@ -703,6 +704,7 @@ function buildWorld(raw, cfg, today) {
     r.vehicle = cleanText(h.vehicle) || r.vehicle;
     r.sv = cleanText(h.sv) || r.sv;
     r.status = cleanText(h.status);
+    r.statusKey = headerKey(h.status);
     var sp = headerKey(h.sp);
     r.sp = sp ? (/^with/.test(sp) || sp === 'yes' ? true : /^no/.test(sp) ? false : null) : null;
   });
@@ -750,6 +752,15 @@ function buildWorld(raw, cfg, today) {
     var code = cleanCode(d.code), date = parseSheetDate(d.date, opts);
     if (!code || !date) return;
     (dailyOrders[code] = dailyOrders[code] || []).push({ date: date, orders: Number(d.orders) || 0 });
+  });
+
+  // Started = Active in Hiring tracker, or at least one order. Not in the
+  // tracker at all (older hires) = assume started.
+  riders.forEach(function (r) {
+    var orders = (dailyOrders[r.code] || []).some(function (d) { return d.orders > 0; }) || r.orders > 0;
+    var firstOrder = (dailyOrders[r.code] || []).filter(function (d) { return d.orders > 0; }).sort(function (a, b) { return a.date - b.date; })[0];
+    r.firstOrderDate = firstOrder ? firstOrder.date : null;
+    r.started = r.inTracker ? (/^active/.test(r.statusKey || '') || orders) : true;
   });
 
   var ridersByPhone = {}, ridersByCode = {}, headcountByCode = {};
@@ -840,6 +851,8 @@ function evaluateRider(r, world) {
     state: ev.state, daysLeft: ev.daysLeft, ordersToNext: ev.ordersToNext, progress: ev.progress,
     nextBonus: ev.nextTier ? ev.nextTier.bonus + camp.extra : null, nextOrders: ev.nextTier ? ev.nextTier.orders : null,
     ordersSource: ev.ordersSource,
+    started: r.started !== false, firstOrderDate: r.firstOrderDate || null,
+    daysSinceHire: r.hireDate ? diffDays(r.hireDate, world.today) : null,
     paid: paid, payStatus: payStatus, payouts: payouts
   };
 }
@@ -873,12 +886,11 @@ function riderOwner(rider, world) {
 }
 
 /**
- * An application only counts for a hire that came after it (a day of slack
- * for same-day paperwork). Someone hired before they were "referred" was
+ * An application only counts if it was made on or before the hire day. Someone hired before they were "referred" was
  * already ours — no referral, no bonus.
  */
 function appliedBeforeHire(app, rider) {
-  return !app.timestamp || !rider.hireDate || app.timestamp <= addDays(rider.hireDate, 1);
+  return !app.timestamp || !rider.hireDate || app.timestamp <= rider.hireDate;
 }
 
 /** The rider a candidate became, if their phone was hired after the application. */
@@ -917,14 +929,14 @@ function buildDashboard(world, user) {
     .filter(function (a) { return appOwnerKey(a.refCode) === key && a.timestamp && a.timestamp >= start; })
     .map(function (a) {
       var hired = hiredFrom(a, world);
-      var status = hired ? STATUS_HIRED : (a.status || STATUSES[0]);
+      var status = hired ? (hired.started ? STATUS_HIRED : 'قيد التعيين') : (a.status || STATUSES[0]);
       var since = a.statusUpdated || a.timestamp;
       var waiting = diffDays(since, today);
       return {
         name: a.name, phone: a.phone, zone: a.zone, note: a.note,
         submitted: a.timestamp, status: status, rawStatus: a.rawStatus,
         stage: stageIndex(status), rejected: status === STATUS_REJECTED,
-        hiredCode: hired ? hired.code : '', hiredDate: hired ? hired.hireDate : null,
+        hiredCode: hired ? hired.code : '', hiredDate: hired ? hired.hireDate : null, codeArrived: !!(hired && !hired.started), codeArrived: !!(hired && !hired.started),
         daysWaiting: waiting,
         nudge: status !== STATUS_HIRED && status !== STATUS_REJECTED && waiting >= cfg.NUDGE_AFTER_DAYS
       };
@@ -998,6 +1010,7 @@ var FLAG_LABELS = {
   dupe: 'نفس الرقم أو الرقم القومي متكرر',
   known: 'كان متعيّن عندنا قبل ما يترشح',
   suspended: 'موقوف (No SP)',
+  notStarted: 'كوده وصل ومابدأش (3 أيام+)',
   quiet: 'اتعين ومش بيشتغل'
 };
 
@@ -1060,6 +1073,8 @@ function buildAdminData(world, users) {
     e.flags = [];
     if (e.state === 'active' && diffDays(r.hireDate, today) >= 14 && e.orders === 0) e.flags.push('quiet');
     if (owner && r.sp === false) e.flags.push('suspended');
+    if (owner && !r.started && diffDays(r.hireDate, today) >= 3) e.flags.push('notStarted');
+    e.daysToStart = r.firstOrderDate && r.hireDate ? Math.max(0, diffDays(r.hireDate, r.firstOrderDate)) : null;
     if (p) {
       p.hires++; p.orders += e.orders; p.bonus += e.bonus; p.paid += e.paid;
       if (e.state === 'active' || e.state === 'upcoming') p.active++;
@@ -1081,7 +1096,7 @@ function buildAdminData(world, users) {
     var key = appOwnerKey(a.refCode);
     var p = person(key);
     var hired = hiredFrom(a, world);
-    var status = hired ? STATUS_HIRED : (a.status || STATUSES[0]);
+    var status = hired ? (hired.started ? STATUS_HIRED : 'قيد التعيين') : (a.status || STATUSES[0]);
     var since = a.statusUpdated || a.timestamp;
     var waiting = since ? diffDays(since, today) : 0;
     var flags = [];
@@ -1096,7 +1111,7 @@ function buildAdminData(world, users) {
       name: a.name, phone: a.phone, nationalId: a.nationalId, zone: a.zone,
       status: status, sheetStatus: a.rawStatus, note: a.note, statusUpdated: a.statusUpdated,
       daysWaiting: waiting, stage: stageIndex(status),
-      hiredCode: hired ? hired.code : '', hiredDate: hired ? hired.hireDate : null,
+      hiredCode: hired ? hired.code : '', hiredDate: hired ? hired.hireDate : null, codeArrived: !!(hired && !hired.started),
       nudge: status !== STATUS_HIRED && status !== STATUS_REJECTED && waiting >= cfg.NUDGE_AFTER_DAYS,
       flags: flags
     };
@@ -1137,7 +1152,7 @@ function findNewlyHired(world) {
   var out = [];
   world.applicants.forEach(function (a) {
     var r = hiredFrom(a, world);
-    if (!r) return;
+    if (!r || !r.started) return;
     if (a.status === STATUS_HIRED && a.hiredCode === r.code) return;
     out.push({ row: a.row, code: r.code, hireDate: r.hireDate });
   });
@@ -1150,32 +1165,53 @@ function findNewlyHired(world) {
  * Validates a candidate form. Returns { ok, errors: {field: message}, clean }.
  * world is needed for the "new to Full Speed" rule.
  */
-function validateCandidate(form, world) {
+var VEHICLES = ['موتوسيكل', 'عجلة', 'مشي'];
+
+/**
+ * Validates a candidate form. Returns { ok, errors: {field: message}, clean }.
+ * owner = { key, phone } of the person referring (for self-referral and the
+ * "rejected candidates can only be re-referred by the same person" rule).
+ */
+function validateCandidate(form, world, owner) {
+  owner = owner || {};
   var errors = {};
   var name = cleanText(form.fullName).replace(/\s+/g, ' ');
   var phone = canonicalPhone(form.mobile);
   var nid = parseNationalId(form.nationalId);
+  var vehicle = cleanText(form.vehicle);
 
   if (name.split(' ').length < 3) errors.fullName = 'اكتب الاسم ثلاثي على الأقل زي البطاقة.';
   if (!phone) errors.mobile = 'رقم موبايل مصري صحيح (11 رقم يبدأ بـ 010 أو 011 أو 012 أو 015).';
+  else if (owner.phone && canonicalPhone(owner.phone) === phone) errors.mobile = 'مينفعش ترشّح نفسك — الترشيح لحد تاني عايز يشتغل.';
   if (!nid) errors.nationalId = 'الرقم القومي غلط — راجع الـ 14 رقم.';
-  else {
-    var age = ageOn(nid.birthDate, world.today);
-    if (age < 18) errors.nationalId = 'السن أقل من 18 سنة حسب الرقم القومي.';
-  }
+  else if (ageOn(nid.birthDate, world.today) < 18) errors.nationalId = 'السن أقل من 18 سنة حسب الرقم القومي.';
   if (!cleanText(form.address)) errors.address = 'العنوان مطلوب.';
   if (!cleanText(form.zone)) errors.zone = 'اختار منطقة الشغل.';
+  if (VEHICLES.indexOf(vehicle) === -1) errors.vehicle = 'اختار هيشتغل بإيه (موتوسيكل، عجلة، مشي).';
   var idExp = parseSheetDate(form.idExpiry);
   if (!idExp) errors.idExpiry = 'تاريخ انتهاء البطاقة مطلوب.';
   else if (idExp < world.today) errors.idExpiry = 'البطاقة منتهية.';
+  var licExp = parseSheetDate(form.licenseExpiry);
+  if (vehicle === 'موتوسيكل') {
+    if (!licExp) errors.licenseExpiry = 'الرخصة مطلوبة للموتوسيكل.';
+    else if (licExp < world.today) errors.licenseExpiry = 'الرخصة منتهية.';
+  }
 
   if (!Object.keys(errors).length) {
-    var dupes = findDuplicates({ phone: phone, nationalId: nid.id }, identityIndexFor(world));
-    if (dupes.length) {
-      var d = dupes[0];
-      var where = d.source === TABS.APPLICANTS ? 'مترشح قبل كده في البرنامج' : 'مسجل عندنا في Full Speed قبل كده';
-      errors[d.field === 'phone' ? 'mobile' : 'nationalId'] =
-        (d.field === 'phone' ? 'رقم الموبايل ده ' : 'الرقم القومي ده ') + where + ' — الترشيح لازم يكون لحد جديد.';
+    // Already hired at any time → not new to Full Speed.
+    var hired = world.ridersByPhone[phone];
+    if (hired) errors.mobile = 'رقم الموبايل ده مسجل عندنا في Full Speed قبل كده — الترشيح لازم يكون لحد جديد.';
+    else {
+      // Applied before: blocked, unless every earlier application was rejected
+      // and it is the same referrer trying again.
+      var earlier = world.applicants.filter(function (a) { return (a.phone && a.phone === phone) || (a.nationalId && a.nationalId === nid.id); });
+      var reopen = earlier.length && earlier.every(function (a) { return a.status === STATUS_REJECTED && appOwnerKey(a.refCode) === owner.key; });
+      if (earlier.length && !reopen) {
+        var byPhone = earlier.some(function (a) { return a.phone === phone; });
+        var allRejected = earlier.every(function (a) { return a.status === STATUS_REJECTED; });
+        errors[byPhone ? 'mobile' : 'nationalId'] = (byPhone ? 'رقم الموبايل ده ' : 'الرقم القومي ده ') +
+          (allRejected ? 'اترفض قبل كده من ترشيح شخص تاني — هو بس اللي يقدر يرشّحه تاني.' : 'مترشح قبل كده في البرنامج — الترشيح لازم يكون لحد جديد.');
+      }
     }
   }
 
@@ -1185,9 +1221,9 @@ function validateCandidate(form, world) {
     clean: {
       name: name, phone: phone, nationalId: nid ? nid.id : '',
       birthDate: nid ? nid.birthDate : null,
-      address: cleanText(form.address), zone: cleanText(form.zone),
-      licenseExpiry: parseSheetDate(form.licenseExpiry), idExpiry: idExp,
-      plate: cleanText(form.plate) || 'عجلة / بدون لوحة'
+      address: cleanText(form.address), zone: cleanText(form.zone), vehicle: vehicle,
+      licenseExpiry: licExp, idExpiry: idExp,
+      plate: cleanText(form.plate) || (vehicle === 'موتوسيكل' ? '' : 'بدون لوحة')
     }
   };
 }
@@ -1206,7 +1242,7 @@ if (typeof module !== 'undefined' && module.exports) {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
     cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
     buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, buildDashboard: buildDashboard,
-    findNewlyHired: findNewlyHired, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
+    findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
   };
 }
 
@@ -1349,6 +1385,7 @@ function appendApplicant_(clean, owner) {
   put('idExpiry', fmt(clean.idExpiry));
   put('birthDate', fmt(clean.birthDate));
   put('plate', safeCell(clean.plate));
+  put('vehicle', clean.vehicle || '');
   put('status', STATUSES[0]);
   put('link', owner.talabatLink);
   put('refType', owner.type === 'external' ? 'شريك خارجي' : 'طيار داخلي');
@@ -1989,12 +2026,12 @@ function resolveRef_(ref) {
   if (/^P[0-9A-F]{8}$/.test(ref)) {
     var u = findUserByRefId_(ref);
     if (!u || u.status === 'blocked') return null;
-    return { type: 'external', key: u.phone, name: u.name, talabatLink: cfg.TALABAT_REF_BASE + cfg.COMPANY_REF_CODE };
+    return { type: 'external', key: u.phone, phone: u.phone, name: u.name, talabatLink: cfg.TALABAT_REF_BASE + cfg.COMPANY_REF_CODE };
   }
   var code = cleanCode(ref);
   var who = world.ridersByCode[code] || world.headcountByCode[code];
   if (!who) return null;
-  return { type: 'internal', key: code, name: who.name, talabatLink: cfg.TALABAT_REF_BASE + code };
+  return { type: 'internal', key: code, phone: who.phone || '', name: who.name, talabatLink: cfg.TALABAT_REF_BASE + code };
 }
 
 /** Internal rider: is this Talabat code ours, and what phone do we have for it? */
@@ -2130,8 +2167,9 @@ function changePassword_(p) {
 
 function ownerFor_(user) {
   var cfg = loadConfig_();
-  if (user.type === 'external') return { type: 'external', key: user.phone, talabatLink: cfg.TALABAT_REF_BASE + cfg.COMPANY_REF_CODE };
-  return { type: 'internal', key: user.code, talabatLink: cfg.TALABAT_REF_BASE + user.code };
+  if (user.type === 'external') return { type: 'external', key: user.phone, phone: user.phone, talabatLink: cfg.TALABAT_REF_BASE + cfg.COMPANY_REF_CODE };
+  var w = loadWorld_(), r = w.ridersByCode[user.code] || w.headcountByCode[user.code] || {};
+  return { type: 'internal', key: user.code, phone: user.phone || r.phone || '', talabatLink: cfg.TALABAT_REF_BASE + user.code };
 }
 
 function submitCandidate_(p) {
@@ -2154,7 +2192,7 @@ function publicApply_(p) {
 function saveCandidate_(form, owner, after) {
   return withLock_(function () {
     invalidate_();
-    var check = validateCandidate(form, loadWorld_());
+    var check = validateCandidate(form, loadWorld_(), owner);
     if (!check.ok) return fail_(check.errors[Object.keys(check.errors)[0]], check.errors);
     appendApplicant_(check.clean, owner);
     log_('candidate', owner.type + ' ' + String(owner.key).slice(-4));

@@ -134,6 +134,7 @@ function appendApplicant_(clean, owner) {
   put('idExpiry', fmt(clean.idExpiry));
   put('birthDate', fmt(clean.birthDate));
   put('plate', safeCell(clean.plate));
+  put('vehicle', clean.vehicle || '');
   put('status', STATUSES[0]);
   put('link', owner.talabatLink);
   put('refType', owner.type === 'external' ? 'شريك خارجي' : 'طيار داخلي');

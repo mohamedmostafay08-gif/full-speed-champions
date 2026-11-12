@@ -107,6 +107,7 @@ var COLUMNS = {
     idExpiry: ['انتهاء البطاقة'],
     birthDate: ['تاريخ الميلاد'],
     plate: ['اللوحة'],
+    vehicle: ['نوع المركبة'],
     status: ['الحالة'],
     note: ['ملاحظات الإدارة'],
     link: ['لينك الترشيح'],
@@ -116,9 +117,9 @@ var COLUMNS = {
     hiredDate: ['تاريخ التعيين الفعلي']
   },
   DAILY_ORDERS: {
-    date: ['التاريخ', 'Date'],
-    code: ['كود المندوب', 'Rider Code', 'Code'],
-    orders: ['أوردرات مكتملة', 'Completed Orders', 'Orders']
+    date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم'],
+    code: ['كود المندوب', 'Rider Code', 'Rider ID', 'Code', 'ID', 'الكود'],
+    orders: ['أوردرات مكتملة', 'Completed Orders', 'Orders', 'Completed', 'عدد الأوردرات', 'الأوردرات', 'Order Count']
   },
   USERS: {
     type: ['Type'],
