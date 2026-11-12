@@ -68,7 +68,18 @@
   }
 
   var session = null;
-  var dash = function () { return wire(buildDashboard(world(), session)); };
+  // Fictional competitors so the monthly ranking has something to show.
+  function demoBoard(d) {
+    var mine = d.team.filter(function (r) { var h = new Date(r.hireDate); return h.getMonth() === today.getMonth() && h.getFullYear() === today.getFullYear(); }).length;
+    var rows = [['كريم', 9], ['منة', 7], ['يوسف', 6], ['حسام', 5], ['نور', 4], ['عمرو', 3], ['سلمى', 2], ['مازن', 2], ['هادي', 1]].map(function (x) { return { name: x[0], hires: x[1], me: false }; });
+    if (mine) rows.push({ name: String(d.user.name || 'إنت').split(' ')[0], hires: mine, me: true });
+    rows.sort(function (a, b) { return b.hires - a.hires || (a.me ? -1 : 1); });
+    var rank = 0, prev = null; rows.forEach(function (r, i) { if (r.hires !== prev) { rank = i + 1; prev = r.hires; } r.rank = rank; });
+    var me = rows.filter(function (r) { return r.me; })[0], above = me ? rows.filter(function (r) { return r.rank < me.rank; }).pop() : null;
+    return { month: new Date(today.getFullYear(), today.getMonth(), 1), total: rows.length, top: rows.slice(0, 10),
+      me: me ? { rank: me.rank, hires: me.hires, toNext: above ? above.hires - me.hires + 1 : 0 } : { rank: null, hires: 0, toNext: 1 } };
+  }
+  var dash = function () { var d = buildDashboard(world(), session); d.leaderboard = demoBoard(d); return wire(d); };
   var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
 
   function save(form, owner) {

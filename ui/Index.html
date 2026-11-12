@@ -211,6 +211,22 @@ h2.section .count { font: 600 12px var(--f-body); color: var(--muted); }
 .stat .num { font-size: 32px; display: block; }
 .stat span:last-child { font-size: 12px; color: var(--muted); }
 
+.board { display: grid; gap: 10px; }
+.board-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.board-list li { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 12px; background: var(--bg-2, var(--surface)); border: 1px solid var(--line); font-size: 14px; }
+.board-list li.podium { border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
+.board-list li.me { background: var(--green-soft); border-color: var(--green); font-weight: 700; }
+.board-list .rk { font: 800 16px var(--f-display); text-align: center; color: var(--muted); }
+.board-list .podium .rk { font-size: 20px; }
+.board-list .nm small { color: var(--green-hi); font-weight: 600; }
+.board-list .hz { font-size: 12px; color: var(--muted); }
+.board-list .hz b { font: 800 16px var(--f-display); color: var(--ink); }
+.board-more summary { cursor: pointer; text-align: center; font-size: 13px; font-weight: 600; color: var(--green-hi); padding: 4px; list-style: none; }
+.board-more summary::-webkit-details-marker { display: none; }
+.board-more[open] summary { margin-bottom: 6px; }
+.board-me { text-align: center; font-size: 13px; padding: 8px; border-radius: 12px; background: var(--green-soft); border: 1px dashed var(--green); }
+.board-line { margin: 0; text-align: center; font-size: 13px; color: var(--muted); }
+.board-line b { color: var(--ink); }
 .badges { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .badge { display: grid; justify-items: center; gap: 6px; text-align: center; font-size: 11px; line-height: 1.35; color: var(--dim); }
 .badge i { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; border: 2px dashed var(--line-2); font-style: normal; font-size: 22px; filter: grayscale(1); opacity: .55; }
@@ -807,6 +823,24 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
       }).join('') + '</div></section>';
   }
 
+  /* This month's ranking: first names and hires only — never money. */
+  function leaderboard(d) {
+    var lb = d.leaderboard; if (!lb || !lb.top || !lb.top.length) return '';
+    var me = lb.me || {}, medal = ['🥇', '🥈', '🥉'];
+    var month = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { month: 'long' }).format(new Date(lb.month));
+    var line = me.rank === 1 ? 'إنت الأول الشهر ده 🏆 حافظ على مكانك!'
+      : me.rank ? 'إنت في المركز <b>' + me.rank + '</b> — ' + plural(me.toNext, 'تعيين واحد', 'تعيينات') + ' كمان وتطلع لقدام 💪'
+      : 'أول طيار من ترشيحك يتعين الشهر ده يدخّلك الترتيب 🚀';
+    function row(r) {
+      return '<li class="' + (r.me ? 'me' : '') + (r.rank <= 3 ? ' podium' : '') + '"><span class="rk">' + (r.rank <= 3 ? medal[r.rank - 1] : r.rank) + '</span><span class="nm">' + esc(r.name) + (r.me ? ' <small>(إنت)</small>' : '') + '</span><span class="hz"><b>' + r.hires + '</b> ' + (r.hires === 1 ? 'تعيين' : 'تعيينات') + '</span></li>';
+    }
+    return '<section class="card board"><h2 class="section">أبطال ' + esc(month) + '<span class="count">ترتيب بعدد التعيينات</span></h2>' +
+      '<ol class="board-list">' + lb.top.slice(0, 5).map(row).join('') + '</ol>' +
+      (lb.top.length > 5 ? '<details class="board-more"><summary>' + (lb.top.slice(5).some(function (r) { return r.me; }) ? 'مكانك والباقي' : 'باقي الترتيب') + '</summary><ol class="board-list">' + lb.top.slice(5).map(row).join('') + '</ol></details>' : '') +
+      (me.rank && me.rank > 10 ? '<div class="board-me">المركز ' + me.rank + ' · ' + me.hires + ' تعيين</div>' : '') +
+      '<p class="board-line">' + line + '</p></section>';
+  }
+
   function viewHome() {
     var d = S.dash, t = d.totals;
     if (!d.team.length && !d.pipeline.length) return onboarding(d);
@@ -834,7 +868,7 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
         '<div class="stat"><span class="num" data-count="' + t.orders + '">0</span><span>أوردر مكتمل</span></div>' +
         '<div class="stat"><span class="num" data-count="' + t.applicants + '">0</span><span>مرشح</span></div>' +
       '</div>' +
-      badges(d) +
+      badges(d) + leaderboard(d) +
       '<h2 class="section">فريقك<span class="count">من ' + fmtDay(d.season.start) + ' · ' + plural(d.team.length, 'طيار واحد', 'طيار') + '</span></h2>' +
       '<div class="list">' + team + '</div>';
   }
