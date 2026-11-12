@@ -395,8 +395,9 @@ function riderOwner(rider, world) {
  * An application only counts if it was made on or before the hire day. Someone hired before they were "referred" was
  * already ours — no referral, no bonus.
  */
+/** Compared by calendar day: an application at 9 PM on the hire day still counts. */
 function appliedBeforeHire(app, rider) {
-  return !app.timestamp || !rider.hireDate || app.timestamp <= rider.hireDate;
+  return !app.timestamp || !rider.hireDate || dateOnly(app.timestamp) <= dateOnly(rider.hireDate);
 }
 
 /** The rider a candidate became, if their phone was hired after the application. */
@@ -941,7 +942,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
     cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
-    buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, hiredFrom: hiredFrom, buildDashboard: buildDashboard, buildLeaderboard: buildLeaderboard,
+    buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, hiredFrom: hiredFrom, appliedBeforeHire: appliedBeforeHire, buildDashboard: buildDashboard, buildLeaderboard: buildLeaderboard,
     findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildReportTables: buildReportTables, buildDataCheck: buildDataCheck, buildDailySummary: buildDailySummary, dailySummaryText: dailySummaryText, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
   };
 }

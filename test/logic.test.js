@@ -202,3 +202,8 @@ test('application matched by phone in Headcount, or by the typed code', () => {
   assert.equal(app.matchedCode, '5037565');
   assert.equal(L.hiredFrom(app, w).code, '5037565');
 });
+
+test('application later on the hire day still counts (compared by day, not hour)', () => {
+  assert.equal(L.appliedBeforeHire({ timestamp: new Date(2026, 10, 7, 21, 58) }, { hireDate: D(2026, 11, 7) }), true);
+  assert.equal(L.appliedBeforeHire({ timestamp: new Date(2026, 10, 8, 0, 5) }, { hireDate: D(2026, 11, 7) }), false);
+});
