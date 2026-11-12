@@ -45,7 +45,7 @@ var TABS = {
   RIDERS: 'Normal Riders Handle',     // Talabat export: the referral code of each hire
   HEADCOUNT: 'Headcount',             // IMPORTRANGE — read only, never written
   APPLICANTS: 'New Applicants',       // candidates submitted through the program
-  DAILY_ORDERS: 'Daily Orders',       // date | rider code | completed orders
+  DAILY_ORDERS: 'Daily Orders',       // one row per rider per work day: Date | rider_id | Completed Deliveries
   USERS: 'FS Users',
   SESSIONS: 'FS Sessions',
   CONFIG: 'FS Config',
@@ -124,7 +124,7 @@ var COLUMNS = {
     hiredDate: ['تاريخ التعيين الفعلي']
   },
   DAILY_ORDERS: {
-    date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم', 'Hire Date', 'تاريخ التعيين'],
+    date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم', 'Work Date'],
     code: ['كود المندوب', 'Rider Code', 'Rider ID', 'rider_id', 'Code', 'ID', 'الكود'],
     orders: ['أوردرات مكتملة', 'Completed Deliveries', 'Deliveries', 'Completed Orders', 'Orders', 'Completed', 'عدد الأوردرات', 'الأوردرات', 'Order Count']
   },
@@ -757,24 +757,25 @@ function buildWorld(raw, cfg, today) {
     };
   });
 
-  // Daily orders tab: one row per rider with the TOTAL completed orders so far
-  // (the sheet is replaced on every update). Its date column is ignored — the
-  // hire date comes from Hiring tracker only. A repeated code keeps the larger total.
+  // Daily orders tab: one row per rider per work day (Date = the day worked,
+  // rider_id, Completed Deliveries). A rider's orders = the sum of their rows
+  // inside the bonus window. Empty cells count as 0.
   var dailyOrders = {}, orderTotals = {};
   (raw.dailyOrders || []).forEach(function (d) {
-    var code = cleanCode(d.code); if (!code) return;
+    var code = cleanCode(d.code), date = parseSheetDate(d.date, opts);
+    if (!code || !date) return;
     var n = Math.max(0, Math.floor(Number(String(d.orders).replace(/[^\d.]/g, '')) || 0));
-    orderTotals[code] = Math.max(orderTotals[code] || 0, n);
-  });
-  riders.forEach(function (r) {
-    if (orderTotals[r.code] !== undefined) { r.orders = orderTotals[r.code]; r.ordersFromTab = true; }
+    (dailyOrders[code] = dailyOrders[code] || []).push({ date: date, orders: n });
+    orderTotals[code] = (orderTotals[code] || 0) + n;
   });
 
   // Started = Active in Hiring tracker, or at least one order. Not in the
   // tracker at all (older hires) = assume started.
   riders.forEach(function (r) {
-    r.firstOrderDate = null;
-    r.started = r.inTracker ? (/^active/.test(r.statusKey || '') || r.orders > 0) : true;
+    var days = dailyOrders[r.code] || [];
+    var firstOrder = days.filter(function (d) { return d.orders > 0; }).sort(function (a, b) { return a.date - b.date; })[0];
+    r.firstOrderDate = firstOrder ? firstOrder.date : null;
+    r.started = r.inTracker ? (/^active/.test(r.statusKey || '') || !!firstOrder || r.orders > 0) : true;
   });
 
   var ridersByPhone = {}, ridersByCode = {}, headcountByCode = {};
@@ -892,7 +893,7 @@ function evaluateRider(r, world) {
     orders: ev.orders, tierBonus: ev.bonus, extra: camp.extra, campaigns: camp.names, bonus: total,
     state: ev.state, daysLeft: ev.daysLeft, ordersToNext: ev.ordersToNext, progress: ev.progress,
     nextBonus: ev.nextTier ? ev.nextTier.bonus + camp.extra : null, nextOrders: ev.nextTier ? ev.nextTier.orders : null,
-    ordersSource: r.ordersFromTab ? 'tab' : ev.ordersSource,
+    ordersSource: ev.ordersSource,
     started: r.started !== false, firstOrderDate: r.firstOrderDate || null,
     daysSinceHire: r.hireDate ? diffDays(r.hireDate, world.today) : null,
     paid: paid, approved: approved, payStatus: payStatus, payouts: payouts, ordersPerDay: perDay, batch: r.batch || null
@@ -2489,6 +2490,7 @@ var ADMIN_ACTIONS_ = {
   adminRefreshReports: adminRefreshReports_,
   adminSendReport: adminSendReport_,
   adminDataCheck: adminDataCheck_,
+  adminRider: adminRider_,
   adminDeletePayout: adminDeletePayout_,
   adminUserAction: adminUserAction_,
   adminSaveSettings: adminSaveSettings_,
@@ -3103,12 +3105,22 @@ function dailySummaryHtml_(s, dateLabel, link) {
     (link ? '<p style="margin-top:18px"><a href="' + link + '" style="background:#187A31;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">افتح لوحة الإدارة</a></p>' : '') + '</div>';
 }
 
+/** One rider's daily orders, for the full rider page. */
+function adminRider_(p) {
+  return asAdmin_(p, null, function () {
+    var code = cleanCode(p.code), world = loadWorld_();
+    if (!world.ridersByCode[code]) return fail_('الطيار ده مش موجود.');
+    var days = (world.dailyOrders[code] || []).slice().sort(function (a, b) { return a.date - b.date; });
+    return ok_({ code: code, daily: days.map(function (d) { return { date: d.date, orders: d.orders }; }) });
+  });
+}
+
 /** Data check page: every tab's recognised columns, and how applications became counted hires. */
 function adminDataCheck_(p) {
   return asAdmin_(p, null, function () {
     invalidate_();
     var want = [['HIRING', 'تاريخ التعيين، الكود، الموبايل، SV، SP'], ['HEADCOUNT', 'الكود، الموبايل، SPV، Active، SP، Batch'], ['APPLICANTS', 'المرشحين اللي اترشحوا من البرنامج'],
-      ['DAILY_ORDERS', 'كود المندوب + إجمالي الأوردرات'], ['RIDERS', 'كود طلبات (Referral Code) — احتياطي لو استمارة من غير كود']];
+      ['DAILY_ORDERS', 'تاريخ الشغل + كود المندوب + أوردرات اليوم'], ['RIDERS', 'كود طلبات (Referral Code) — احتياطي لو استمارة من غير كود']];
     var tabs = want.map(function (w) {
       var sh = tab_(TABS[w[0]]), vals = values_(TABS[w[0]]), head = vals[0] || [], map = mapHeaders(head, COLUMNS[w[0]]), cols = {};
       Object.keys(map).forEach(function (f) { cols[f] = map[f] === -1 ? null : String(head[map[f]]); });

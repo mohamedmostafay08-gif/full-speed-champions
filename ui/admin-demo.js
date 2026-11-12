@@ -93,10 +93,7 @@
 
   var campaigns = [{ id: 'C-MAADI', name: 'أسبوع المعادي', start: ago(10), end: addDays(today, 4), zone: 'Maadi', extra: 500, active: 'نعم' }];
   var payouts = [];
-  // The real Daily orders tab holds one running total per rider.
-  var totals = {};
-  daily.forEach(function (d) { totals[d.code] = (totals[d.code] || 0) + d.orders; });
-  var orderRows = Object.keys(totals).map(function (c) { return { code: c, orders: totals[c] }; });
+  var orderRows = daily; // one row per rider per work day, like the real tab
   var world = function () { return buildWorld({ hiring: hiring, riders: riders, headcount: headcount, applicants: applicants, dailyOrders: orderRows, campaigns: campaigns, payouts: payouts }, cfg, today); };
 
   // Pay most of what was due more than a week ago, so the payouts log has history.
@@ -164,11 +161,12 @@
     },
     adminRefreshReports: function () { log('حدّث تاب التقارير', ''); return ok(); },
     adminDataCheck: function () {
-      var use = { HIRING: 'تاريخ التعيين، الكود، الموبايل، SV، SP', HEADCOUNT: 'الكود، الموبايل، SPV، Active، SP، Batch', APPLICANTS: 'المرشحين اللي اترشحوا من البرنامج', DAILY_ORDERS: 'كود المندوب + إجمالي الأوردرات', RIDERS: 'كود طلبات (Referral Code) — احتياطي' };
+      var use = { HIRING: 'تاريخ التعيين، الكود، الموبايل، SV، SP', HEADCOUNT: 'الكود، الموبايل، SPV، Active، SP، Batch', APPLICANTS: 'المرشحين اللي اترشحوا من البرنامج', DAILY_ORDERS: 'تاريخ الشغل + كود المندوب + أوردرات اليوم', RIDERS: 'كود طلبات (Referral Code) — احتياطي' };
       var n = { HIRING: hiring.length, HEADCOUNT: headcount.length, APPLICANTS: applicants.length, DAILY_ORDERS: orderRows.length, RIDERS: riders.length };
-      var tabs = Object.keys(use).map(function (k) { var cols = {}; Object.keys(COLUMNS[k]).forEach(function (f) { cols[f] = k === 'DAILY_ORDERS' && f === 'date' ? null : COLUMNS[k][f][0]; }); return { key: k, name: TABS[k], found: true, rows: n[k], use: use[k], columns: cols }; });
+      var tabs = Object.keys(use).map(function (k) { var cols = {}; Object.keys(COLUMNS[k]).forEach(function (f) { cols[f] = COLUMNS[k][f][0]; }); return { key: k, name: TABS[k], found: true, rows: n[k], use: use[k], columns: cols }; });
       return ok(wire(buildDataCheck(world(), tabs)));
     },
+    adminRider: function (p) { return ok({ code: p.code, daily: wire(daily.filter(function (d) { return d.code === p.code; }).map(function (d) { return { date: d.date, orders: d.orders }; })) }); },
     adminSendReport: function () { return ok({ result: ['نسخة تجريبية — مفيش حاجة اتبعتت فعلاً'] }); },
     adminRecordPayout: function (p) {
       var po = payouts.filter(function (x) { return x.id === p.id && /معتمد/.test(x.status); })[0];

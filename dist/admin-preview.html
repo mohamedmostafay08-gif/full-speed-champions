@@ -344,7 +344,7 @@ var TABS = {
   RIDERS: 'Normal Riders Handle',     // Talabat export: the referral code of each hire
   HEADCOUNT: 'Headcount',             // IMPORTRANGE — read only, never written
   APPLICANTS: 'New Applicants',       // candidates submitted through the program
-  DAILY_ORDERS: 'Daily Orders',       // date | rider code | completed orders
+  DAILY_ORDERS: 'Daily Orders',       // one row per rider per work day: Date | rider_id | Completed Deliveries
   USERS: 'FS Users',
   SESSIONS: 'FS Sessions',
   CONFIG: 'FS Config',
@@ -423,7 +423,7 @@ var COLUMNS = {
     hiredDate: ['تاريخ التعيين الفعلي']
   },
   DAILY_ORDERS: {
-    date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم', 'Hire Date', 'تاريخ التعيين'],
+    date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم', 'Work Date'],
     code: ['كود المندوب', 'Rider Code', 'Rider ID', 'rider_id', 'Code', 'ID', 'الكود'],
     orders: ['أوردرات مكتملة', 'Completed Deliveries', 'Deliveries', 'Completed Orders', 'Orders', 'Completed', 'عدد الأوردرات', 'الأوردرات', 'Order Count']
   },
@@ -1050,24 +1050,25 @@ function buildWorld(raw, cfg, today) {
     };
   });
 
-  // Daily orders tab: one row per rider with the TOTAL completed orders so far
-  // (the sheet is replaced on every update). Its date column is ignored — the
-  // hire date comes from Hiring tracker only. A repeated code keeps the larger total.
+  // Daily orders tab: one row per rider per work day (Date = the day worked,
+  // rider_id, Completed Deliveries). A rider's orders = the sum of their rows
+  // inside the bonus window. Empty cells count as 0.
   var dailyOrders = {}, orderTotals = {};
   (raw.dailyOrders || []).forEach(function (d) {
-    var code = cleanCode(d.code); if (!code) return;
+    var code = cleanCode(d.code), date = parseSheetDate(d.date, opts);
+    if (!code || !date) return;
     var n = Math.max(0, Math.floor(Number(String(d.orders).replace(/[^\d.]/g, '')) || 0));
-    orderTotals[code] = Math.max(orderTotals[code] || 0, n);
-  });
-  riders.forEach(function (r) {
-    if (orderTotals[r.code] !== undefined) { r.orders = orderTotals[r.code]; r.ordersFromTab = true; }
+    (dailyOrders[code] = dailyOrders[code] || []).push({ date: date, orders: n });
+    orderTotals[code] = (orderTotals[code] || 0) + n;
   });
 
   // Started = Active in Hiring tracker, or at least one order. Not in the
   // tracker at all (older hires) = assume started.
   riders.forEach(function (r) {
-    r.firstOrderDate = null;
-    r.started = r.inTracker ? (/^active/.test(r.statusKey || '') || r.orders > 0) : true;
+    var days = dailyOrders[r.code] || [];
+    var firstOrder = days.filter(function (d) { return d.orders > 0; }).sort(function (a, b) { return a.date - b.date; })[0];
+    r.firstOrderDate = firstOrder ? firstOrder.date : null;
+    r.started = r.inTracker ? (/^active/.test(r.statusKey || '') || !!firstOrder || r.orders > 0) : true;
   });
 
   var ridersByPhone = {}, ridersByCode = {}, headcountByCode = {};
@@ -1185,7 +1186,7 @@ function evaluateRider(r, world) {
     orders: ev.orders, tierBonus: ev.bonus, extra: camp.extra, campaigns: camp.names, bonus: total,
     state: ev.state, daysLeft: ev.daysLeft, ordersToNext: ev.ordersToNext, progress: ev.progress,
     nextBonus: ev.nextTier ? ev.nextTier.bonus + camp.extra : null, nextOrders: ev.nextTier ? ev.nextTier.orders : null,
-    ordersSource: r.ordersFromTab ? 'tab' : ev.ordersSource,
+    ordersSource: ev.ordersSource,
     started: r.started !== false, firstOrderDate: r.firstOrderDate || null,
     daysSinceHire: r.hireDate ? diffDays(r.hireDate, world.today) : null,
     paid: paid, approved: approved, payStatus: payStatus, payouts: payouts, ordersPerDay: perDay, batch: r.batch || null
@@ -1883,10 +1884,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
   var campaigns = [{ id: 'C-MAADI', name: 'أسبوع المعادي', start: ago(10), end: addDays(today, 4), zone: 'Maadi', extra: 500, active: 'نعم' }];
   var payouts = [];
-  // The real Daily orders tab holds one running total per rider.
-  var totals = {};
-  daily.forEach(function (d) { totals[d.code] = (totals[d.code] || 0) + d.orders; });
-  var orderRows = Object.keys(totals).map(function (c) { return { code: c, orders: totals[c] }; });
+  var orderRows = daily; // one row per rider per work day, like the real tab
   var world = function () { return buildWorld({ hiring: hiring, riders: riders, headcount: headcount, applicants: applicants, dailyOrders: orderRows, campaigns: campaigns, payouts: payouts }, cfg, today); };
 
   // Pay most of what was due more than a week ago, so the payouts log has history.
@@ -1954,11 +1952,12 @@ if (typeof module !== 'undefined' && module.exports) {
     },
     adminRefreshReports: function () { log('حدّث تاب التقارير', ''); return ok(); },
     adminDataCheck: function () {
-      var use = { HIRING: 'تاريخ التعيين، الكود، الموبايل، SV، SP', HEADCOUNT: 'الكود، الموبايل، SPV، Active، SP، Batch', APPLICANTS: 'المرشحين اللي اترشحوا من البرنامج', DAILY_ORDERS: 'كود المندوب + إجمالي الأوردرات', RIDERS: 'كود طلبات (Referral Code) — احتياطي' };
+      var use = { HIRING: 'تاريخ التعيين، الكود، الموبايل، SV، SP', HEADCOUNT: 'الكود، الموبايل، SPV، Active، SP، Batch', APPLICANTS: 'المرشحين اللي اترشحوا من البرنامج', DAILY_ORDERS: 'تاريخ الشغل + كود المندوب + أوردرات اليوم', RIDERS: 'كود طلبات (Referral Code) — احتياطي' };
       var n = { HIRING: hiring.length, HEADCOUNT: headcount.length, APPLICANTS: applicants.length, DAILY_ORDERS: orderRows.length, RIDERS: riders.length };
-      var tabs = Object.keys(use).map(function (k) { var cols = {}; Object.keys(COLUMNS[k]).forEach(function (f) { cols[f] = k === 'DAILY_ORDERS' && f === 'date' ? null : COLUMNS[k][f][0]; }); return { key: k, name: TABS[k], found: true, rows: n[k], use: use[k], columns: cols }; });
+      var tabs = Object.keys(use).map(function (k) { var cols = {}; Object.keys(COLUMNS[k]).forEach(function (f) { cols[f] = COLUMNS[k][f][0]; }); return { key: k, name: TABS[k], found: true, rows: n[k], use: use[k], columns: cols }; });
       return ok(wire(buildDataCheck(world(), tabs)));
     },
+    adminRider: function (p) { return ok({ code: p.code, daily: wire(daily.filter(function (d) { return d.code === p.code; }).map(function (d) { return { date: d.date, orders: d.orders }; })) }); },
     adminSendReport: function () { return ok({ result: ['نسخة تجريبية — مفيش حاجة اتبعتت فعلاً'] }); },
     adminRecordPayout: function (p) {
       var po = payouts.filter(function (x) { return x.id === p.id && /معتمد/.test(x.status); })[0];
@@ -2974,6 +2973,7 @@ if (typeof module !== 'undefined' && module.exports) {
     var an = o.querySelector('#aprNow'); if (an) an.onclick = function () { approveCodes([code]); };
   }
   /* ─────────────── Full rider profile ─────────────── */
+  S.daily = {};
   function openProfile(code) { S.back = S.view; S.riderCode = code; S.view = 'rider'; render(); scrollTo(0, 0); }
   function viewRider() {
     var d = S.data, r = d.riders.filter(function (x) { return x.code === S.riderCode; })[0];
@@ -2998,6 +2998,8 @@ if (typeof module !== 'undefined' && module.exports) {
         tiers.map(function (t) { var on = r.orders >= t.orders; return '<div class="rung' + (on ? ' on' : '') + '" title="' + t.orders + ' أوردر"><b>' + money(t.bonus) + '</b><span>' + money(t.orders) + '</span></div>'; }).join('') +
         '</div><div class="ladder-bar"><i style="width:' + Math.min(100, r.orders / top * 100) + '%"></i></div></section>' +
       '<div class="charts" style="margin-top:12px">' +
+        '<section class="card wide"><h2>الأوردرات يوم بيوم<small>العمود = أوردرات اليوم · الخط = المجموع</small></h2>' + legend([['أوردرات اليوم', css('--s1')], ['المجموع', css('--gold')]]) +
+          '<div class="chart-box tall" id="dailyBox"><div class="sk" style="height:100%"></div><canvas id="cDaily" role="img" aria-label="أوردرات الطيار يوم بيوم" hidden></canvas></div></section>' +
         '<section class="card"><h2>الرحلة</h2><ol class="timeline">' + steps.map(function (st) { return '<li><b>' + st[1] + '</b><span class="muted">' + (st[0] ? fmt(st[0], true) : '') + (st[2] ? ' · ' + st[2] : '') + '</span></li>'; }).join('') + '</ol></section>' +
         '<section class="card"><h2>المرشِّح</h2>' + (r.ownerKey ? '<div class="kv"><span>الاسم</span><span>' + esc(cleanName(r.ownerName) || r.ownerKey) + (u.left ? ' <span class="pill red">ساب</span>' : '') + '</span></div>' +
           '<div class="kv"><span>النوع</span><span>' + (r.ownerType === 'external' ? 'شريك خارجي' : 'طيار داخلي') + '</span></div>' +
@@ -3008,6 +3010,22 @@ if (typeof module !== 'undefined' && module.exports) {
   }
   function bindRider() {
     document.getElementById('back').onclick = function () { S.view = S.back && S.back !== 'rider' ? S.back : 'riders'; render(); };
+    var code = S.riderCode, draw = function (days) {
+      var box = document.getElementById('dailyBox'); if (!box || S.riderCode !== code) return;
+      var r = S.data.riders.filter(function (x) { return x.code === code; })[0];
+      var list = days.map(function (x) { return { d: day(x.date), n: Number(x.orders) || 0 }; }).filter(function (x) { return x.d && (!r.hireDate || x.d >= r.hireDate); });
+      if (!list.length) { box.innerHTML = '<div class="empty">مفيش أوردرات للطيار ده في Daily Orders لسه.</div>'; return; }
+      box.querySelector('.sk').remove(); box.querySelector('canvas').hidden = false;
+      var cum = 0, inWin = function (x) { return !r.lastDay || x.d <= r.lastDay; };
+      chart('cDaily', { data: { labels: list.map(function (x) { return fmt(x.d); }), datasets: [
+        { type: 'bar', label: 'أوردرات اليوم', data: list.map(function (x) { return x.n; }), backgroundColor: list.map(function (x) { return inWin(x) ? css('--s1') : css('--line-2'); }), borderRadius: 3, maxBarThickness: 14, yAxisID: 'y' },
+        { type: 'line', label: 'المجموع في مدة البونص', data: list.map(function (x) { if (inWin(x)) cum += x.n; return cum; }), borderColor: css('--gold'), backgroundColor: css('--gold'), borderWidth: 2, pointRadius: 0, tension: .2, yAxisID: 'y2' }] },
+        options: { scales: { x: { grid: { display: false }, ticks: { color: css('--muted'), maxTicksLimit: 12 }, reverse: true },
+          y: { beginAtZero: true, grid: { color: css('--line') }, ticks: { color: css('--muted'), precision: 0 }, position: 'right', title: { display: true, text: 'في اليوم', color: css('--muted') } },
+          y2: { beginAtZero: true, grid: { display: false }, ticks: { color: css('--gold') }, position: 'left', title: { display: true, text: 'المجموع', color: css('--gold') } } } } });
+    };
+    if (S.daily[code]) draw(S.daily[code]);
+    else call('adminRider', { code: code }).then(function (res) { if (res.ok) { S.daily[code] = res.data.daily; draw(res.data.daily); } });
   }
 
   /* ─────────────── Data check ─────────────── */
@@ -3039,7 +3057,7 @@ if (typeof module !== 'undefined' && module.exports) {
         kpi('من ترشيح ومالهمش أوردرات', c.noOrders.length, '', '<span class="delta">كودهم مش في Daily orders</span>') + '</div>' +
       tabs +
       '<section class="card"><h2>المرشحين اللي اتعيّنوا<small>صف بصف من New Applicants</small></h2>' +
-        table([['الصف', 'n'], ['المرشح'], ['Referral Code'], ['الكود'], ['اتلقى عن طريق'], ['تاريخ التعيين', 'n'], ['أوردرات', 'n'], ['اتحسب؟']],
+        table([['الصف', 'n'], ['المرشح'], ['Referral Code'], ['الكود'], ['اتلقى عن طريق'], ['تاريخ التعيين', 'n'], ['أوردرات (كل الأيام)', 'n'], ['اتحسب؟']],
           c.hired.map(function (x) { return [x.row, esc(x.name), '<span class="ltr">' + esc(x.refCode || '—') + '</span>', '<span class="ltr">' + esc(x.code) + '</span>', esc(x.by),
             x.hireDate ? fmt(day(x.hireDate), true) : '<span class="flag">مش في Hiring tracker</span>', x.orders === null ? '<span class="muted">—</span>' : money(x.orders),
             x.counted ? '<span class="pill green">اتحسب</span>' : '<span class="pill dim">' + (!x.hireDate ? 'مستني تاريخ التعيين' : 'قبل البرنامج أو مفيش مرشِّح') + '</span>']; }),

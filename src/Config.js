@@ -43,7 +43,7 @@ var TABS = {
   RIDERS: 'Normal Riders Handle',     // Talabat export: the referral code of each hire
   HEADCOUNT: 'Headcount',             // IMPORTRANGE — read only, never written
   APPLICANTS: 'New Applicants',       // candidates submitted through the program
-  DAILY_ORDERS: 'Daily Orders',       // date | rider code | completed orders
+  DAILY_ORDERS: 'Daily Orders',       // one row per rider per work day: Date | rider_id | Completed Deliveries
   USERS: 'FS Users',
   SESSIONS: 'FS Sessions',
   CONFIG: 'FS Config',
@@ -122,7 +122,7 @@ var COLUMNS = {
     hiredDate: ['تاريخ التعيين الفعلي']
   },
   DAILY_ORDERS: {
-    date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم', 'Hire Date', 'تاريخ التعيين'],
+    date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم', 'Work Date'],
     code: ['كود المندوب', 'Rider Code', 'Rider ID', 'rider_id', 'Code', 'ID', 'الكود'],
     orders: ['أوردرات مكتملة', 'Completed Deliveries', 'Deliveries', 'Completed Orders', 'Orders', 'Completed', 'عدد الأوردرات', 'الأوردرات', 'Order Count']
   },

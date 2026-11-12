@@ -107,9 +107,11 @@ test('pipeline: nudges after 3 days, pre-season applications hidden', () => {
   assert.equal(fresh.note, 'محتاج صورة البطاقة');
 });
 
-test('Daily orders total beats the manual column and drives the bonus', () => {
-  // One row per rider with the running total; a stale duplicate never adds up.
-  const rows = [['8-Nov', '5037565', 320], ['8-Nov', '5037565', 150]];
+test('Daily orders: one row per work day, summed inside the bonus window; beats the manual column', () => {
+  const rows = [];
+  for (let i = 0; i < 20; i++) rows.push([C.addDays(D(2026, 11, 8), i), '5037565', 16]);
+  rows.push([D(2026, 11, 7), '5037565', 99]);        // before the hire day: ignored
+  rows.push([D(2026, 11, 9), '5037565', '']);        // empty cell = 0
   const dash = L.buildDashboard(world(D(2026, 11, 28), rows), { type: 'internal', code: '1948971' });
   assert.equal(dash.team[0].orders, 320);
   assert.equal(dash.team[0].bonus, 800);
