@@ -83,7 +83,8 @@ var COLUMNS = {
     vehicle: ['Vehicle', 'المركبة'],
     orders: ['Orders', 'الأوردرات'],
     referralCode: ['Referral Code', 'مرشح بواسطة (الكود)', 'مرشح بواسطة'],
-    referralName: ['Referral Name']
+    referralName: ['Referral Name'],
+    batch: ['Batch NO', 'Batch']
   },
   HEADCOUNT: {
     code: ['Code'],
@@ -93,7 +94,9 @@ var COLUMNS = {
     manager: ['Manger', 'Manager'],
     phone: ['Phone'],
     vehicle: ['Vehicle'],
-    active: ['Active ?', 'Active']
+    active: ['Active ?', 'Active'],
+    spStatus: ['SP Status'],
+    batch: ['Batch NO', 'Batch']
   },
   APPLICANTS: {
     timestamp: ['Timestamp', 'تاريخ التقديم'],
@@ -139,7 +142,7 @@ var COLUMNS = {
   PAYOUTS: {
     id: ['Payout ID'], riderCode: ['Rider Code'], riderName: ['Rider Name'], ownerKey: ['Referrer'],
     ownerName: ['Referrer Name'], amount: ['Amount'], method: ['Method'], reference: ['Reference'],
-    note: ['Note'], paidBy: ['Paid By'], paidAt: ['Paid At']
+    note: ['Note'], paidBy: ['Paid By'], paidAt: ['Paid At'], status: ['Status'], approvedBy: ['Approved By'], approvedAt: ['Approved At']
   },
   CAMPAIGNS: {
     id: ['Campaign ID'], name: ['Name'], start: ['Start'], end: ['End'], zone: ['Zone'], extra: ['Extra Bonus'], active: ['Active']
@@ -175,6 +178,7 @@ var ROLES = {
 var PERMISSIONS = {
   'applicants.edit': ['owner', 'recruiter'],
   'users.edit': ['owner', 'recruiter'],
+  'payouts.approve': ['owner'],
   'payouts.edit': ['owner', 'finance'],
   'campaigns.edit': ['owner'],
   'settings.edit': ['owner'],

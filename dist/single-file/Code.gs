@@ -85,7 +85,8 @@ var COLUMNS = {
     vehicle: ['Vehicle', 'المركبة'],
     orders: ['Orders', 'الأوردرات'],
     referralCode: ['Referral Code', 'مرشح بواسطة (الكود)', 'مرشح بواسطة'],
-    referralName: ['Referral Name']
+    referralName: ['Referral Name'],
+    batch: ['Batch NO', 'Batch']
   },
   HEADCOUNT: {
     code: ['Code'],
@@ -95,7 +96,9 @@ var COLUMNS = {
     manager: ['Manger', 'Manager'],
     phone: ['Phone'],
     vehicle: ['Vehicle'],
-    active: ['Active ?', 'Active']
+    active: ['Active ?', 'Active'],
+    spStatus: ['SP Status'],
+    batch: ['Batch NO', 'Batch']
   },
   APPLICANTS: {
     timestamp: ['Timestamp', 'تاريخ التقديم'],
@@ -141,7 +144,7 @@ var COLUMNS = {
   PAYOUTS: {
     id: ['Payout ID'], riderCode: ['Rider Code'], riderName: ['Rider Name'], ownerKey: ['Referrer'],
     ownerName: ['Referrer Name'], amount: ['Amount'], method: ['Method'], reference: ['Reference'],
-    note: ['Note'], paidBy: ['Paid By'], paidAt: ['Paid At']
+    note: ['Note'], paidBy: ['Paid By'], paidAt: ['Paid At'], status: ['Status'], approvedBy: ['Approved By'], approvedAt: ['Approved At']
   },
   CAMPAIGNS: {
     id: ['Campaign ID'], name: ['Name'], start: ['Start'], end: ['End'], zone: ['Zone'], extra: ['Extra Bonus'], active: ['Active']
@@ -177,6 +180,7 @@ var ROLES = {
 var PERMISSIONS = {
   'applicants.edit': ['owner', 'recruiter'],
   'users.edit': ['owner', 'recruiter'],
+  'payouts.approve': ['owner'],
   'payouts.edit': ['owner', 'finance'],
   'campaigns.edit': ['owner'],
   'settings.edit': ['owner'],
@@ -718,6 +722,7 @@ function buildWorld(raw, cfg, today) {
     r.vehicle = r.vehicle || cleanText(n.vehicle);
     r.orders = cleanText(n.orders) === '' ? null : Number(n.orders) || 0;
     r.referralCode = cleanCode(n.referralCode);
+    var nb = parseInt(n.batch, 10); if (nb > 0) r.batch = nb;
   });
   var riders = order.map(function (c) { return byCode[c]; });
 
@@ -725,7 +730,10 @@ function buildWorld(raw, cfg, today) {
     return {
       code: cleanCode(h.code), name: cleanText(h.name), zone: cleanText(h.zone),
       supervisor: cleanText(h.supervisor), manager: cleanText(h.manager),
-      phone: canonicalPhone(h.phone), vehicle: cleanText(h.vehicle), active: cleanText(h.active)
+      phone: canonicalPhone(h.phone), vehicle: cleanText(h.vehicle), active: cleanText(h.active),
+      left: /no\s*contract/i.test(cleanText(h.active)),
+      sp: (function (v) { v = headerKey(v); return v ? (/^with/.test(v) ? true : /^no/.test(v) ? false : null) : null; })(h.spStatus),
+      batch: parseInt(h.batch, 10) > 0 ? parseInt(h.batch, 10) : null
     };
   }).filter(function (h) { return h.code; });
 
@@ -769,7 +777,13 @@ function buildWorld(raw, cfg, today) {
     if (r.phone && !ridersByPhone[r.phone]) ridersByPhone[r.phone] = r;
   });
   headcount.forEach(function (h) { headcountByCode[h.code] = h; });
-  riders.forEach(function (r) { if (!r.sv && headcountByCode[r.code]) r.sv = headcountByCode[r.code].supervisor; });
+  riders.forEach(function (r) {
+    var h = headcountByCode[r.code];
+    if (!h) return;
+    if (!r.sv) r.sv = h.supervisor;
+    if (h.sp !== null && h.sp !== undefined) r.sp = h.sp;      // Headcount is the reference for SP
+    if (!r.batch && h.batch) r.batch = h.batch;
+  });
 
   // Earliest application per phone decides who referred that person.
   var appsByPhone = {};
@@ -792,7 +806,8 @@ function buildWorld(raw, cfg, today) {
     (payoutsByCode[code] = payoutsByCode[code] || []).push({
       id: cleanText(p.id), amount: Number(String(p.amount).replace(/[^\d.]/g, '')) || 0,
       method: cleanText(p.method), reference: cleanText(p.reference), note: cleanText(p.note),
-      paidBy: cleanText(p.paidBy), paidAt: parseSheetDate(p.paidAt, opts), row: p._row
+      paidBy: cleanText(p.paidBy), paidAt: parseSheetDate(p.paidAt, opts), row: p._row,
+      approved: /معتمد|approved/i.test(cleanText(p.status)), approvedBy: cleanText(p.approvedBy), approvedAt: parseSheetDate(p.approvedAt, opts)
     });
   });
 
@@ -840,10 +855,18 @@ function evaluateRider(r, world) {
   });
   var camp = ev.bonus > 0 ? campaignExtra(r, world) : { extra: 0, names: [] };
   var payouts = (world.payoutsByCode && world.payoutsByCode[r.code]) || [];
-  var paid = payouts.reduce(function (s, p) { return s + p.amount; }, 0);
+  var paid = payouts.filter(function (p) { return !p.approved; }).reduce(function (s, p) { return s + p.amount; }, 0);
+  var approved = payouts.filter(function (p) { return p.approved; }).reduce(function (s, p) { return s + p.amount; }, 0);
   var total = ev.bonus + camp.extra;
   var finished = ev.state === 'maxed' || ev.state === 'closed';
-  var payStatus = paid > 0 && paid >= total ? 'paid' : total <= 0 ? (finished ? 'none' : 'pending') : finished ? 'due' : 'pending';
+  var payStatus = paid > 0 && paid >= total ? 'paid' : total <= 0 ? (finished ? 'none' : 'pending') : !finished ? 'pending' : paid + approved >= total ? 'approved' : 'due';
+  // Orders in the first 30 days (only once the rider has had 30 days) — a fair
+  // way to compare riders hired on different dates.
+  var d30 = null, days = world.dailyOrders[r.code];
+  if (days && days.length && r.hireDate && diffDays(r.hireDate, world.today) >= 30) {
+    var end = addDays(r.hireDate, 30);
+    d30 = days.filter(function (x) { return x.date >= r.hireDate && x.date < end; }).reduce(function (s2, x) { return s2 + (Number(x.orders) || 0); }, 0);
+  }
   return {
     code: r.code, name: r.name, zone: r.zone, phone: r.phone, vehicle: r.vehicle,
     hireDate: ev.hireDate, lastDay: ev.lastDay, payoutDate: ev.payoutDate,
@@ -853,7 +876,7 @@ function evaluateRider(r, world) {
     ordersSource: ev.ordersSource,
     started: r.started !== false, firstOrderDate: r.firstOrderDate || null,
     daysSinceHire: r.hireDate ? diffDays(r.hireDate, world.today) : null,
-    paid: paid, payStatus: payStatus, payouts: payouts
+    paid: paid, approved: approved, payStatus: payStatus, payouts: payouts, orders30: d30, batch: r.batch || null
   };
 }
 
@@ -952,7 +975,7 @@ function buildDashboard(world, user) {
     if (t.state === 'active' || t.state === 'upcoming') { totals.active++; totals.pending += t.bonus; }
     if (t.state === 'maxed') totals.maxed++;
     if (t.state === 'closed') totals.closed++;
-    if (t.payStatus === 'due') totals.payable += t.bonus - t.paid;
+    if (t.payStatus === 'due' || t.payStatus === 'approved') totals.payable += t.bonus - t.paid;
     totals.paid += t.paid;
     if (t.bonus > 0 && t.payStatus !== 'paid' && t.payoutDate >= today && (!nextPayout || t.payoutDate < nextPayout)) nextPayout = t.payoutDate;
   });
@@ -1031,6 +1054,7 @@ function buildAdminData(world, users) {
     people[key] = {
       key: key, type: u.type, code: u.code, name: u.name, phone: u.phone, refId: u.refId || '',
       status: u.status || 'active', registered: true, created: u.created || null, lastLogin: u.lastLogin || null,
+      left: u.type === 'internal' && !!(world.headcountByCode[u.code] && world.headcountByCode[u.code].left),
       applicants: 0, hires: 0, active: 0, bonus: 0, paid: 0, due: 0, orders: 0
     };
   });
@@ -1041,7 +1065,7 @@ function buildAdminData(world, users) {
       var phone = canonicalPhone(key);
       people[key] = {
         key: key, type: phone ? 'external' : 'internal', code: phone ? '' : key, name: r.name || '', phone: phone || r.phone || '',
-        refId: '', status: 'active', registered: false, created: null, lastLogin: null,
+        refId: '', status: 'active', registered: false, created: null, lastLogin: null, left: !!(world.headcountByCode[key] && world.headcountByCode[key].left),
         applicants: 0, hires: 0, active: 0, bonus: 0, paid: 0, due: 0, orders: 0
       };
     }
@@ -1078,7 +1102,7 @@ function buildAdminData(world, users) {
     if (p) {
       p.hires++; p.orders += e.orders; p.bonus += e.bonus; p.paid += e.paid;
       if (e.state === 'active' || e.state === 'upcoming') p.active++;
-      if (e.payStatus === 'due') p.due += e.bonus - e.paid;
+      if (e.payStatus === 'due' || e.payStatus === 'approved') p.due += e.bonus - e.paid;
     }
     return e;
   });
@@ -1122,10 +1146,11 @@ function buildAdminData(world, users) {
     world.payoutsByCode[code].forEach(function (p) {
       var r = world.ridersByCode[code] || {};
       payouts.push({ id: p.id, riderCode: code, riderName: r.name || '', amount: p.amount, method: p.method,
-        reference: p.reference, note: p.note, paidBy: p.paidBy, paidAt: p.paidAt });
+        reference: p.reference, note: p.note, paidBy: p.paidBy, paidAt: p.paidAt,
+        status: p.approved ? 'approved' : 'paid', approvedBy: p.approvedBy, approvedAt: p.approvedAt });
     });
   });
-  payouts.sort(function (a, b) { return (b.paidAt || 0) - (a.paidAt || 0); });
+  payouts.sort(function (a, b) { return (b.paidAt || b.approvedAt || 0) - (a.paidAt || a.approvedAt || 0); });
 
   return {
     today: today,
@@ -1140,6 +1165,63 @@ function buildAdminData(world, users) {
     svs: Object.keys(world.riders.reduce(function (m, r) { if (r.sv) m[r.sv] = 1; return m; }, world.headcount.reduce(function (m, h) { if (h.supervisor) m[h.supervisor] = 1; return m; }, {}))).sort(),
     zones: Object.keys(world.riders.concat(world.headcount).reduce(function (m, r) { if (r.zone) m[r.zone] = 1; return m; }, {})).sort()
   };
+}
+
+/* ──────────────────────────── Reports ─────────────────────────────── */
+
+/**
+ * Summary tables for the "FS Reports" tab, from buildAdminData output.
+ * Returns [{ title, header: [...], rows: [[...]] }].
+ */
+function buildReportTables(data) {
+  var avg = function (a) { return a.length ? Math.round(a.reduce(function (s, x) { return s + x; }, 0) / a.length) : ''; };
+  var pct = function (a, b) { return b ? Math.round(a / b * 100) + '%' : ''; };
+  var t1 = data.season.tiers[0].orders;
+  var referred = data.riders.filter(function (r) { return r.ownerKey; });
+
+  function group(list, keyFn) { var g = {}; list.forEach(function (x) { var k = keyFn(x) || 'غير محدد'; (g[k] = g[k] || []).push(x); }); return g; }
+
+  var bySv = group(data.riders, function (r) { return r.sv; });
+  var svRows = Object.keys(bySv).sort().map(function (k) {
+    var all = bySv[k], ref = all.filter(function (r) { return r.ownerKey; });
+    return [k, all.length, ref.length, pct(ref.length, all.length), avg(ref.map(function (r) { return r.orders; })),
+      pct(ref.filter(function (r) { return r.orders >= t1; }).length, ref.length), avg(ref.filter(function (r) { return r.batch; }).map(function (r) { return r.batch; })),
+      ref.reduce(function (s, r) { return s + r.bonus; }, 0)];
+  });
+
+  var apps = data.applicants.filter(function (a) { return a.submitted && a.submitted >= data.season.start; });
+  var byZone = group(apps, function (a) { return a.zone; });
+  var zoneRows = Object.keys(byZone).sort().map(function (k) {
+    var a = byZone[k], hired = a.filter(function (x) { return x.status === STATUS_HIRED; }).length;
+    return [k, a.length, hired, pct(hired, a.length), a.filter(function (x) { return x.status === STATUS_REJECTED; }).length];
+  });
+
+  var refRows = data.users.filter(function (u) { return u.applicants || u.hires; })
+    .sort(function (a, b) { return b.hires - a.hires || b.applicants - a.applicants; })
+    .map(function (u) { return [u.name, u.type === 'external' ? 'شريك' : 'طيار', u.type === 'external' ? u.phone : u.code, u.applicants, u.hires, u.bonus, u.paid, u.due, u.left ? 'ساب' : '']; });
+
+  var byMonth = {};
+  function m(d) { return d ? d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) : ''; }
+  apps.forEach(function (a) { var k = m(a.submitted); byMonth[k] = byMonth[k] || { apps: 0, hires: 0, bonus: 0, paid: 0 }; byMonth[k].apps++; });
+  referred.forEach(function (r) { var k = m(r.hireDate); byMonth[k] = byMonth[k] || { apps: 0, hires: 0, bonus: 0, paid: 0 }; byMonth[k].hires++; byMonth[k].bonus += r.bonus; byMonth[k].paid += r.paid; });
+  var monthRows = Object.keys(byMonth).filter(Boolean).sort().map(function (k) { var x = byMonth[k]; return [k, x.apps, x.hires, x.bonus, x.paid]; });
+
+  var cmp = function (label, list) {
+    var w30 = list.filter(function (r) { return r.orders30 !== null && r.orders30 !== undefined; });
+    var sp = list.filter(function (r) { return r.sp === true || r.sp === false; });
+    return [label, list.length, avg(w30.map(function (r) { return r.orders30; })), avg(list.filter(function (r) { return r.batch; }).map(function (r) { return r.batch; })),
+      pct(sp.filter(function (r) { return r.sp; }).length, sp.length)];
+  };
+
+  return [
+    { title: 'مقارنة: من ترشيح قصاد من غير ترشيح', header: ['المجموعة', 'تعيينات', 'متوسط أوردرات أول 30 يوم', 'متوسط Batch (1 أقوى)', 'With SP'],
+      rows: [cmp('من ترشيح', referred), cmp('من غير ترشيح', data.riders.filter(function (r) { return !r.ownerKey; })),
+        cmp('ترشيح طيار داخلي', referred.filter(function (r) { return r.ownerType === 'internal'; })), cmp('ترشيح شريك خارجي', referred.filter(function (r) { return r.ownerType === 'external'; }))] },
+    { title: 'حسب الشهر', header: ['الشهر', 'ترشيحات', 'تعيينات من ترشيحات', 'البونص (ج)', 'اتصرف (ج)'], rows: monthRows },
+    { title: 'حسب السوبرفايزر (SV الطيار الجديد)', header: ['SV', 'كل التعيينات', 'من ترشيحات', 'نسبة الترشيحات', 'متوسط أوردرات', 'وصلوا أول شريحة', 'متوسط Batch', 'البونص (ج)'], rows: svRows },
+    { title: 'حسب المنطقة', header: ['المنطقة', 'ترشيحات', 'اشتغلوا', 'تحويل', 'مرفوض'], rows: zoneRows },
+    { title: 'المرشِّحين', header: ['الاسم', 'النوع', 'الكود / الموبايل', 'ترشيحات', 'اتعيّنوا', 'البونص', 'اتصرف', 'مستحق', 'حالته'], rows: refRows }
+  ];
 }
 
 /* ───────────────────────── Applicant sync ─────────────────────────── */
@@ -1242,7 +1324,7 @@ if (typeof module !== 'undefined' && module.exports) {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
     cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
     buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, buildDashboard: buildDashboard,
-    findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
+    findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildReportTables: buildReportTables, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
   };
 }
 
@@ -2214,7 +2296,7 @@ function saveCandidate_(form, owner, after) {
  */
 
 var ADMIN_HEADERS_ = ['Username', 'Name', 'Role', 'Password Hash', 'Status', 'Must Change Password', 'Created', 'Last Login'];
-var PAYOUT_HEADERS_ = ['Payout ID', 'Rider Code', 'Rider Name', 'Referrer', 'Referrer Name', 'Amount', 'Method', 'Reference', 'Note', 'Paid By', 'Paid At'];
+var PAYOUT_HEADERS_ = ['Payout ID', 'Rider Code', 'Rider Name', 'Referrer', 'Referrer Name', 'Amount', 'Method', 'Reference', 'Note', 'Paid By', 'Paid At', 'Status', 'Approved By', 'Approved At'];
 var AUDIT_HEADERS_ = ['الوقت', 'المسؤول', 'العملية', 'على', 'قبل', 'بعد'];
 var CAMPAIGN_HEADERS_ = ['Campaign ID', 'Name', 'Start', 'End', 'Zone', 'Extra Bonus', 'Active'];
 
@@ -2226,7 +2308,9 @@ var ADMIN_ACTIONS_ = {
   adminData: adminData_,
   adminUpdateApplicants: adminUpdateApplicants_,
   adminEditApplicant: adminEditApplicant_,
+  adminApprovePayouts: adminApprovePayouts_,
   adminRecordPayout: adminRecordPayout_,
+  adminRefreshReports: adminRefreshReports_,
   adminDeletePayout: adminDeletePayout_,
   adminUserAction: adminUserAction_,
   adminSaveSettings: adminSaveSettings_,
@@ -2249,6 +2333,8 @@ function setupAdminTabs_() {
     sh.getRange('D2:D').setNumberFormat('@');
     sh.protect().setDescription('سجل صرف البونص — بيتعدل من لوحة الإدارة').setWarningOnly(true);
   });
+  var ps = tab_(TABS.PAYOUTS), ph = ps.getRange(1, 1, 1, Math.max(1, ps.getLastColumn())).getValues()[0];
+  PAYOUT_HEADERS_.forEach(function (h) { if (ph.indexOf(h) === -1) { ph.push(h); ps.getRange(1, ph.length).setValue(h); } });
   ensureTab_(TABS.AUDIT, AUDIT_HEADERS_, function (sh) {
     sh.protect().setDescription('سجل التعديلات — ماينفعش يتعدل').setWarningOnly(true);
   });
@@ -2483,31 +2569,53 @@ function adminEditApplicant_(p) {
 
 /* ──────────────────────────── Payouts ─────────────────────────────── */
 
-function adminRecordPayout_(p) {
-  return asAdmin_(p, 'payouts.edit', function (a) {
-    var amount = Math.round(Number(p.amount) || 0);
-    if (amount <= 0) return fail_('اكتب المبلغ.', { amount: 'المبلغ مطلوب.' });
-    if (PAYOUT_METHODS.indexOf(p.method) === -1) return fail_('اختار طريقة الصرف.', { method: 'مطلوب.' });
+function payoutCol_(sh, header) { return sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].indexOf(header) + 1; }
+
+/** Step 1 (owner): approve what is owed for one or more riders. */
+function adminApprovePayouts_(p) {
+  return asAdmin_(p, 'payouts.approve', function (a) {
+    var codes = (p.codes || []).map(cleanCode).filter(Boolean).slice(0, 300);
+    if (!codes.length) return fail_('اختار طيار واحد على الأقل.');
     return withLock_(function () {
       invalidate_();
-      var world = loadWorld_();
-      var code = cleanCode(p.code);
-      var r = world.ridersByCode[code];
-      if (!r) return fail_('الطيار ده مش موجود.');
-      var owner = riderOwner(r, world);
-      if (!owner || owner === code) return fail_('الطيار ده مش متسجل على حد، مالوش بونص ترشيح.');
-      var ev = evaluateRider(r, world);
-      if (ev.paid + amount > ev.bonus && !(p.allowOver && a.role === 'owner')) {
-        return fail_('المبلغ أكبر من المستحق. المستحق ' + ev.bonus + ' ج واتصرف قبل كده ' + ev.paid + ' ج.', { amount: 'أكبر من المستحق.' });
-      }
-      var data = buildAdminData(world, readUsers_());
-      var ownerRow = data.users.filter(function (u) { return u.key === owner; })[0] || {};
-      var id = 'PO-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyMMdd') + '-' + Utilities.getUuid().slice(0, 4).toUpperCase();
-      tab_(TABS.PAYOUTS).appendRow([id, "'" + code, safeCell(r.name), "'" + owner, safeCell(ownerRow.name || ''), amount, p.method,
-        safeCell(p.reference || ''), safeCell(p.note || ''), a.name, new Date()]);
-      audit_(a, 'سجّل صرف بونص', r.name + ' #' + code, '', amount + ' ج — ' + p.method);
+      var world = loadWorld_(), data = buildAdminData(world, readUsers_());
+      var byCode = {}; data.riders.forEach(function (r) { byCode[r.code] = r; });
+      var sh = tab_(TABS.PAYOUTS), rows = [], total = 0, skipped = 0, now = new Date();
+      codes.forEach(function (code) {
+        var r = byCode[code];
+        if (!r || r.payStatus !== 'due') { skipped++; return; }
+        var amount = r.bonus - r.paid - r.approved;
+        if (amount <= 0) { skipped++; return; }
+        var id = 'PO-' + Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyMMdd') + '-' + Utilities.getUuid().slice(0, 4).toUpperCase();
+        rows.push([id, "'" + code, safeCell(r.name), "'" + r.ownerKey, safeCell(r.ownerName), amount, '', '', '', '', '', 'معتمد', a.name, now]);
+        total += amount;
+      });
+      if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, PAYOUT_HEADERS_.length).setValues(rows);
+      audit_(a, 'اعتمد صرف بونص', rows.length + ' طيار', '', total + ' ج');
       invalidate_();
-      return ok_({ id: id });
+      return ok_({ approved: rows.length, total: total, skipped: skipped });
+    });
+  });
+}
+
+/** Step 2 (finance): mark an approved payout as paid. */
+function adminRecordPayout_(p) {
+  return asAdmin_(p, 'payouts.edit', function (a) {
+    if (PAYOUT_METHODS.indexOf(p.method) === -1) return fail_('اختار طريقة الصرف.', { method: 'مطلوب.' });
+    return withLock_(function () {
+      var sh = tab_(TABS.PAYOUTS), vals = sh.getDataRange().getValues(), h = vals[0];
+      var c = function (name) { return h.indexOf(name); };
+      for (var i = 1; i < vals.length; i++) {
+        if (String(vals[i][0]) !== String(p.id)) continue;
+        if (!/معتمد|approved/i.test(String(vals[i][c('Status')]))) return fail_('العملية دي اتصرفت قبل كده.');
+        var row = i + 1, set = function (name, v) { sh.getRange(row, c(name) + 1).setValue(v); };
+        set('Method', p.method); set('Reference', safeCell(p.reference || '')); set('Note', safeCell(p.note || ''));
+        set('Paid By', a.name); set('Paid At', new Date()); set('Status', 'اتصرف');
+        audit_(a, 'سجّل صرف بونص', vals[i][2] + ' #' + vals[i][1], 'معتمد', vals[i][5] + ' ج — ' + p.method);
+        invalidate_();
+        return ok_({ id: p.id });
+      }
+      return fail_('لازم المدير يعتمد الصرف الأول.');
     });
   });
 }
@@ -2518,7 +2626,7 @@ function adminDeletePayout_(p) {
       var sh = tab_(TABS.PAYOUTS), vals = sh.getDataRange().getValues();
       for (var i = vals.length - 1; i >= 1; i--) {
         if (String(vals[i][0]) === String(p.id)) {
-          audit_(a, 'لغى صرف بونص', vals[i][2] + ' #' + vals[i][1], vals[i][5] + ' ج — ' + vals[i][6], '');
+          audit_(a, /معتمد/.test(String(vals[i][11])) ? 'لغى اعتماد صرف' : 'لغى صرف بونص', vals[i][2] + ' #' + vals[i][1], vals[i][5] + ' ج ' + (vals[i][6] || ''), '');
           sh.deleteRow(i + 1);
           invalidate_();
           return ok_({});
@@ -2716,11 +2824,45 @@ function adminTeam_(p) {
   });
 }
 
+/* ─────────────────────────── FS Reports ───────────────────────────── */
+
+/** Rewrites the "FS Reports" tab with the summary tables. Runs every morning and from the dashboard. */
+function writeReportsTab_() {
+  var data = buildAdminData(loadWorld_(), readUsers_());
+  var tables = buildReportTables(data);
+  var sh = tab_('FS Reports') || ss_().insertSheet('FS Reports');
+  sh.clear();
+  var width = Math.max.apply(null, tables.map(function (t) { return t.header.length; }));
+  var out = [['Full Speed Champions — تقارير', 'آخر تحديث: ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')]];
+  var marks = [];
+  tables.forEach(function (t) {
+    out.push([]); marks.push({ title: out.length + 1, header: out.length + 2 });
+    out.push([t.title]); out.push(t.header);
+    t.rows.forEach(function (r) { out.push(r.map(function (v) { return typeof v === 'string' ? safeCell(v) : v; })); });
+  });
+  out = out.map(function (r) { var x = r.slice(); while (x.length < width) x.push(''); return x; });
+  sh.getRange(1, 1, out.length, width).setValues(out);
+  sh.getRange(1, 1, 1, 2).setFontWeight('bold');
+  marks.forEach(function (m) {
+    sh.getRange(m.title, 1).setFontWeight('bold').setFontSize(12).setFontColor('#187A31');
+    sh.getRange(m.header, 1, 1, width).setFontWeight('bold').setBackground('#E7EEE6');
+  });
+  sh.setFrozenRows(1);
+  return tables.length;
+}
+
+function adminRefreshReports_(p) {
+  return asAdmin_(p, null, function (a) {
+    return withLock_(function () { writeReportsTab_(); audit_(a, 'حدّث تاب التقارير', '', '', ''); return ok_({}); });
+  });
+}
+
 /* ────────────────────────── Daily report ──────────────────────────── */
 
 /** Morning email with yesterday's numbers to the addresses in REPORT_EMAILS. */
 function dailyReport() {
   var cfg = loadConfig_();
+  try { writeReportsTab_(); } catch (e) { log_('error', 'FS Reports: ' + e); }
   var to = String(cfg.REPORT_EMAILS || '').split(/[,\s]+/).filter(function (e) { return /@/.test(e); });
   if (!to.length) return;
   var data = buildAdminData(loadWorld_(), readUsers_());
@@ -2728,7 +2870,7 @@ function dailyReport() {
   var same = function (d) { return d && diffDays(d, yesterday) === 0; };
   var newApps = data.applicants.filter(function (x) { return same(x.submitted); }).length;
   var hires = data.riders.filter(function (r) { return same(r.hireDate) && r.ownerKey; }).length;
-  var due = data.riders.filter(function (r) { return r.payStatus === 'due'; });
+  var due = data.riders.filter(function (r) { return r.payStatus === 'due' || r.payStatus === 'approved'; });
   var dueSum = due.reduce(function (s, r) { return s + r.bonus - r.paid; }, 0);
   var stuck = data.applicants.filter(function (x) { return x.nudge; }).length;
   var flagged = data.applicants.filter(function (x) { return x.flags.length; }).length + data.riders.filter(function (r) { return r.flags.length; }).length;

@@ -98,26 +98,47 @@ test('applicant status + note, rejection needs a reason, audit trail', () => {
   assert.equal(p.note, 'مش عنده رخصة');
 });
 
-test('payouts: cannot overpay, mark paid, rider app shows it, undo', () => {
+test('payouts in two steps: owner approves, finance pays; rider app follows', () => {
   const { env, temp } = ready();
   const token = ownerToken(env, temp);
-  const over = env.api('adminRecordPayout', { token, code: '5037565', amount: 5000, method: 'كاش' });
-  assert.equal(over.ok, false);
-  const pay = env.api('adminRecordPayout', { token, code: '5037565', amount: 3000, method: 'فودافون كاش', reference: 'TX1' });
+  const fin = env.api('adminTeam', { token, action: 'add', username: 'mona', name: 'منى', role: 'finance' });
+  const mona = env.api('adminLogin', { username: 'mona', password: fin.data.temp }).data.token;
+  // finance cannot approve; nothing to pay before approval
+  assert.match(env.api('adminApprovePayouts', { token: mona, codes: ['5037565'] }).error, /صلاحياتك/);
+  // owner approves what is owed (3000) — riders not due are skipped
+  const ap = env.api('adminApprovePayouts', { token, codes: ['5037565', '5032000'] });
+  assert.equal(ap.ok, true, ap.error);
+  assert.equal(ap.data.approved, 1);
+  assert.equal(ap.data.total, 3000);
+  let d = plain(env.api('adminData', { token }).data);
+  assert.equal(d.riders.find((x) => x.code === '5037565').payStatus, 'approved');
+  const po = d.payouts.find((x) => x.status === 'approved');
+  // approving again does nothing (already approved)
+  assert.equal(env.api('adminApprovePayouts', { token, codes: ['5037565'] }).data.approved, 0);
+  // finance pays it
+  const pay = env.api('adminRecordPayout', { token: mona, id: po.id, method: 'فودافون كاش', reference: 'TX1' });
   assert.equal(pay.ok, true, pay.error);
-  const d = plain(env.api('adminData', { token }).data);
+  assert.match(env.api('adminRecordPayout', { token: mona, id: po.id, method: 'كاش' }).error, /اتصرفت/);
+  d = plain(env.api('adminData', { token }).data);
   assert.equal(d.riders.find((x) => x.code === '5037565').payStatus, 'paid');
-  assert.equal(d.payouts[0].amount, 3000);
-  const again = env.api('adminRecordPayout', { token, code: '5037565', amount: 100, method: 'كاش' });
-  assert.equal(again.ok, false);                                // already fully paid
-  const nobody = env.api('adminRecordPayout', { token, code: '5032000', amount: 100, method: 'كاش' });
-  assert.equal(nobody.ok, false);                               // not referred by anyone
   const app = env.api('login', { type: 'internal', code: '4722422', password: 'ziad2026' }).data.dashboard;
   assert.equal(app.totals.paid, 3000);
   assert.equal(app.totals.payable, 0);
   assert.equal(app.team[0].payStatus, 'paid');
-  assert.equal(env.api('adminDeletePayout', { token, id: pay.data.id }).ok, true);
+  // undo → due again
+  assert.equal(env.api('adminDeletePayout', { token, id: po.id }).ok, true);
   assert.equal(plain(env.api('adminData', { token }).data).riders.find((x) => x.code === '5037565').payStatus, 'due');
+  assert.ok(env.sheets['FS Audit'].rows.some((r) => r[2] === 'اعتمد صرف بونص'));
+});
+
+test('FS Reports tab is written with the comparison tables', () => {
+  const { env, temp } = ready();
+  const token = ownerToken(env, temp);
+  assert.equal(env.api('adminRefreshReports', { token }).ok, true);
+  const rows = env.sheets['FS Reports'].rows.map((r) => r[0]);
+  assert.ok(rows.includes('مقارنة: من ترشيح قصاد من غير ترشيح'));
+  assert.ok(rows.includes('حسب السوبرفايزر (SV الطيار الجديد)'));
+  assert.ok(rows.includes('من غير ترشيح'));
 });
 
 test('roles: a recruiter can edit candidates but not pay or change settings', () => {
@@ -127,7 +148,7 @@ test('roles: a recruiter can edit candidates but not pay or change settings', ()
   assert.equal(add.ok, true, add.error);
   const s = env.api('adminLogin', { username: 'sara', password: add.data.temp }).data.token;
   assert.equal(env.api('adminUpdateApplicants', { token: s, items: [{ row: 2 }], status: 'تم التواصل' }).ok, true);
-  assert.match(env.api('adminRecordPayout', { token: s, code: '5037565', amount: 100, method: 'كاش' }).error, /صلاحياتك/);
+  assert.match(env.api('adminApprovePayouts', { token: s, codes: ['5037565'] }).error, /صلاحياتك/);
   assert.match(env.api('adminSaveSettings', { token: s, config: { NUDGE_AFTER_DAYS: 5 } }).error, /صلاحياتك/);
   assert.equal(plain(env.api('adminData', { token: s }).data).team, undefined);
   assert.equal(env.api('adminTeam', { token, action: 'disable', username: 'sara' }).ok, true);

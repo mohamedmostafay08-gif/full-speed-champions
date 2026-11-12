@@ -313,7 +313,8 @@ var COLUMNS = {
     vehicle: ['Vehicle', 'المركبة'],
     orders: ['Orders', 'الأوردرات'],
     referralCode: ['Referral Code', 'مرشح بواسطة (الكود)', 'مرشح بواسطة'],
-    referralName: ['Referral Name']
+    referralName: ['Referral Name'],
+    batch: ['Batch NO', 'Batch']
   },
   HEADCOUNT: {
     code: ['Code'],
@@ -323,7 +324,9 @@ var COLUMNS = {
     manager: ['Manger', 'Manager'],
     phone: ['Phone'],
     vehicle: ['Vehicle'],
-    active: ['Active ?', 'Active']
+    active: ['Active ?', 'Active'],
+    spStatus: ['SP Status'],
+    batch: ['Batch NO', 'Batch']
   },
   APPLICANTS: {
     timestamp: ['Timestamp', 'تاريخ التقديم'],
@@ -369,7 +372,7 @@ var COLUMNS = {
   PAYOUTS: {
     id: ['Payout ID'], riderCode: ['Rider Code'], riderName: ['Rider Name'], ownerKey: ['Referrer'],
     ownerName: ['Referrer Name'], amount: ['Amount'], method: ['Method'], reference: ['Reference'],
-    note: ['Note'], paidBy: ['Paid By'], paidAt: ['Paid At']
+    note: ['Note'], paidBy: ['Paid By'], paidAt: ['Paid At'], status: ['Status'], approvedBy: ['Approved By'], approvedAt: ['Approved At']
   },
   CAMPAIGNS: {
     id: ['Campaign ID'], name: ['Name'], start: ['Start'], end: ['End'], zone: ['Zone'], extra: ['Extra Bonus'], active: ['Active']
@@ -405,6 +408,7 @@ var ROLES = {
 var PERMISSIONS = {
   'applicants.edit': ['owner', 'recruiter'],
   'users.edit': ['owner', 'recruiter'],
+  'payouts.approve': ['owner'],
   'payouts.edit': ['owner', 'finance'],
   'campaigns.edit': ['owner'],
   'settings.edit': ['owner'],
@@ -940,6 +944,7 @@ function buildWorld(raw, cfg, today) {
     r.vehicle = r.vehicle || cleanText(n.vehicle);
     r.orders = cleanText(n.orders) === '' ? null : Number(n.orders) || 0;
     r.referralCode = cleanCode(n.referralCode);
+    var nb = parseInt(n.batch, 10); if (nb > 0) r.batch = nb;
   });
   var riders = order.map(function (c) { return byCode[c]; });
 
@@ -947,7 +952,10 @@ function buildWorld(raw, cfg, today) {
     return {
       code: cleanCode(h.code), name: cleanText(h.name), zone: cleanText(h.zone),
       supervisor: cleanText(h.supervisor), manager: cleanText(h.manager),
-      phone: canonicalPhone(h.phone), vehicle: cleanText(h.vehicle), active: cleanText(h.active)
+      phone: canonicalPhone(h.phone), vehicle: cleanText(h.vehicle), active: cleanText(h.active),
+      left: /no\s*contract/i.test(cleanText(h.active)),
+      sp: (function (v) { v = headerKey(v); return v ? (/^with/.test(v) ? true : /^no/.test(v) ? false : null) : null; })(h.spStatus),
+      batch: parseInt(h.batch, 10) > 0 ? parseInt(h.batch, 10) : null
     };
   }).filter(function (h) { return h.code; });
 
@@ -991,7 +999,13 @@ function buildWorld(raw, cfg, today) {
     if (r.phone && !ridersByPhone[r.phone]) ridersByPhone[r.phone] = r;
   });
   headcount.forEach(function (h) { headcountByCode[h.code] = h; });
-  riders.forEach(function (r) { if (!r.sv && headcountByCode[r.code]) r.sv = headcountByCode[r.code].supervisor; });
+  riders.forEach(function (r) {
+    var h = headcountByCode[r.code];
+    if (!h) return;
+    if (!r.sv) r.sv = h.supervisor;
+    if (h.sp !== null && h.sp !== undefined) r.sp = h.sp;      // Headcount is the reference for SP
+    if (!r.batch && h.batch) r.batch = h.batch;
+  });
 
   // Earliest application per phone decides who referred that person.
   var appsByPhone = {};
@@ -1014,7 +1028,8 @@ function buildWorld(raw, cfg, today) {
     (payoutsByCode[code] = payoutsByCode[code] || []).push({
       id: cleanText(p.id), amount: Number(String(p.amount).replace(/[^\d.]/g, '')) || 0,
       method: cleanText(p.method), reference: cleanText(p.reference), note: cleanText(p.note),
-      paidBy: cleanText(p.paidBy), paidAt: parseSheetDate(p.paidAt, opts), row: p._row
+      paidBy: cleanText(p.paidBy), paidAt: parseSheetDate(p.paidAt, opts), row: p._row,
+      approved: /معتمد|approved/i.test(cleanText(p.status)), approvedBy: cleanText(p.approvedBy), approvedAt: parseSheetDate(p.approvedAt, opts)
     });
   });
 
@@ -1062,10 +1077,18 @@ function evaluateRider(r, world) {
   });
   var camp = ev.bonus > 0 ? campaignExtra(r, world) : { extra: 0, names: [] };
   var payouts = (world.payoutsByCode && world.payoutsByCode[r.code]) || [];
-  var paid = payouts.reduce(function (s, p) { return s + p.amount; }, 0);
+  var paid = payouts.filter(function (p) { return !p.approved; }).reduce(function (s, p) { return s + p.amount; }, 0);
+  var approved = payouts.filter(function (p) { return p.approved; }).reduce(function (s, p) { return s + p.amount; }, 0);
   var total = ev.bonus + camp.extra;
   var finished = ev.state === 'maxed' || ev.state === 'closed';
-  var payStatus = paid > 0 && paid >= total ? 'paid' : total <= 0 ? (finished ? 'none' : 'pending') : finished ? 'due' : 'pending';
+  var payStatus = paid > 0 && paid >= total ? 'paid' : total <= 0 ? (finished ? 'none' : 'pending') : !finished ? 'pending' : paid + approved >= total ? 'approved' : 'due';
+  // Orders in the first 30 days (only once the rider has had 30 days) — a fair
+  // way to compare riders hired on different dates.
+  var d30 = null, days = world.dailyOrders[r.code];
+  if (days && days.length && r.hireDate && diffDays(r.hireDate, world.today) >= 30) {
+    var end = addDays(r.hireDate, 30);
+    d30 = days.filter(function (x) { return x.date >= r.hireDate && x.date < end; }).reduce(function (s2, x) { return s2 + (Number(x.orders) || 0); }, 0);
+  }
   return {
     code: r.code, name: r.name, zone: r.zone, phone: r.phone, vehicle: r.vehicle,
     hireDate: ev.hireDate, lastDay: ev.lastDay, payoutDate: ev.payoutDate,
@@ -1075,7 +1098,7 @@ function evaluateRider(r, world) {
     ordersSource: ev.ordersSource,
     started: r.started !== false, firstOrderDate: r.firstOrderDate || null,
     daysSinceHire: r.hireDate ? diffDays(r.hireDate, world.today) : null,
-    paid: paid, payStatus: payStatus, payouts: payouts
+    paid: paid, approved: approved, payStatus: payStatus, payouts: payouts, orders30: d30, batch: r.batch || null
   };
 }
 
@@ -1174,7 +1197,7 @@ function buildDashboard(world, user) {
     if (t.state === 'active' || t.state === 'upcoming') { totals.active++; totals.pending += t.bonus; }
     if (t.state === 'maxed') totals.maxed++;
     if (t.state === 'closed') totals.closed++;
-    if (t.payStatus === 'due') totals.payable += t.bonus - t.paid;
+    if (t.payStatus === 'due' || t.payStatus === 'approved') totals.payable += t.bonus - t.paid;
     totals.paid += t.paid;
     if (t.bonus > 0 && t.payStatus !== 'paid' && t.payoutDate >= today && (!nextPayout || t.payoutDate < nextPayout)) nextPayout = t.payoutDate;
   });
@@ -1253,6 +1276,7 @@ function buildAdminData(world, users) {
     people[key] = {
       key: key, type: u.type, code: u.code, name: u.name, phone: u.phone, refId: u.refId || '',
       status: u.status || 'active', registered: true, created: u.created || null, lastLogin: u.lastLogin || null,
+      left: u.type === 'internal' && !!(world.headcountByCode[u.code] && world.headcountByCode[u.code].left),
       applicants: 0, hires: 0, active: 0, bonus: 0, paid: 0, due: 0, orders: 0
     };
   });
@@ -1263,7 +1287,7 @@ function buildAdminData(world, users) {
       var phone = canonicalPhone(key);
       people[key] = {
         key: key, type: phone ? 'external' : 'internal', code: phone ? '' : key, name: r.name || '', phone: phone || r.phone || '',
-        refId: '', status: 'active', registered: false, created: null, lastLogin: null,
+        refId: '', status: 'active', registered: false, created: null, lastLogin: null, left: !!(world.headcountByCode[key] && world.headcountByCode[key].left),
         applicants: 0, hires: 0, active: 0, bonus: 0, paid: 0, due: 0, orders: 0
       };
     }
@@ -1300,7 +1324,7 @@ function buildAdminData(world, users) {
     if (p) {
       p.hires++; p.orders += e.orders; p.bonus += e.bonus; p.paid += e.paid;
       if (e.state === 'active' || e.state === 'upcoming') p.active++;
-      if (e.payStatus === 'due') p.due += e.bonus - e.paid;
+      if (e.payStatus === 'due' || e.payStatus === 'approved') p.due += e.bonus - e.paid;
     }
     return e;
   });
@@ -1344,10 +1368,11 @@ function buildAdminData(world, users) {
     world.payoutsByCode[code].forEach(function (p) {
       var r = world.ridersByCode[code] || {};
       payouts.push({ id: p.id, riderCode: code, riderName: r.name || '', amount: p.amount, method: p.method,
-        reference: p.reference, note: p.note, paidBy: p.paidBy, paidAt: p.paidAt });
+        reference: p.reference, note: p.note, paidBy: p.paidBy, paidAt: p.paidAt,
+        status: p.approved ? 'approved' : 'paid', approvedBy: p.approvedBy, approvedAt: p.approvedAt });
     });
   });
-  payouts.sort(function (a, b) { return (b.paidAt || 0) - (a.paidAt || 0); });
+  payouts.sort(function (a, b) { return (b.paidAt || b.approvedAt || 0) - (a.paidAt || a.approvedAt || 0); });
 
   return {
     today: today,
@@ -1362,6 +1387,63 @@ function buildAdminData(world, users) {
     svs: Object.keys(world.riders.reduce(function (m, r) { if (r.sv) m[r.sv] = 1; return m; }, world.headcount.reduce(function (m, h) { if (h.supervisor) m[h.supervisor] = 1; return m; }, {}))).sort(),
     zones: Object.keys(world.riders.concat(world.headcount).reduce(function (m, r) { if (r.zone) m[r.zone] = 1; return m; }, {})).sort()
   };
+}
+
+/* ──────────────────────────── Reports ─────────────────────────────── */
+
+/**
+ * Summary tables for the "FS Reports" tab, from buildAdminData output.
+ * Returns [{ title, header: [...], rows: [[...]] }].
+ */
+function buildReportTables(data) {
+  var avg = function (a) { return a.length ? Math.round(a.reduce(function (s, x) { return s + x; }, 0) / a.length) : ''; };
+  var pct = function (a, b) { return b ? Math.round(a / b * 100) + '%' : ''; };
+  var t1 = data.season.tiers[0].orders;
+  var referred = data.riders.filter(function (r) { return r.ownerKey; });
+
+  function group(list, keyFn) { var g = {}; list.forEach(function (x) { var k = keyFn(x) || 'غير محدد'; (g[k] = g[k] || []).push(x); }); return g; }
+
+  var bySv = group(data.riders, function (r) { return r.sv; });
+  var svRows = Object.keys(bySv).sort().map(function (k) {
+    var all = bySv[k], ref = all.filter(function (r) { return r.ownerKey; });
+    return [k, all.length, ref.length, pct(ref.length, all.length), avg(ref.map(function (r) { return r.orders; })),
+      pct(ref.filter(function (r) { return r.orders >= t1; }).length, ref.length), avg(ref.filter(function (r) { return r.batch; }).map(function (r) { return r.batch; })),
+      ref.reduce(function (s, r) { return s + r.bonus; }, 0)];
+  });
+
+  var apps = data.applicants.filter(function (a) { return a.submitted && a.submitted >= data.season.start; });
+  var byZone = group(apps, function (a) { return a.zone; });
+  var zoneRows = Object.keys(byZone).sort().map(function (k) {
+    var a = byZone[k], hired = a.filter(function (x) { return x.status === STATUS_HIRED; }).length;
+    return [k, a.length, hired, pct(hired, a.length), a.filter(function (x) { return x.status === STATUS_REJECTED; }).length];
+  });
+
+  var refRows = data.users.filter(function (u) { return u.applicants || u.hires; })
+    .sort(function (a, b) { return b.hires - a.hires || b.applicants - a.applicants; })
+    .map(function (u) { return [u.name, u.type === 'external' ? 'شريك' : 'طيار', u.type === 'external' ? u.phone : u.code, u.applicants, u.hires, u.bonus, u.paid, u.due, u.left ? 'ساب' : '']; });
+
+  var byMonth = {};
+  function m(d) { return d ? d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) : ''; }
+  apps.forEach(function (a) { var k = m(a.submitted); byMonth[k] = byMonth[k] || { apps: 0, hires: 0, bonus: 0, paid: 0 }; byMonth[k].apps++; });
+  referred.forEach(function (r) { var k = m(r.hireDate); byMonth[k] = byMonth[k] || { apps: 0, hires: 0, bonus: 0, paid: 0 }; byMonth[k].hires++; byMonth[k].bonus += r.bonus; byMonth[k].paid += r.paid; });
+  var monthRows = Object.keys(byMonth).filter(Boolean).sort().map(function (k) { var x = byMonth[k]; return [k, x.apps, x.hires, x.bonus, x.paid]; });
+
+  var cmp = function (label, list) {
+    var w30 = list.filter(function (r) { return r.orders30 !== null && r.orders30 !== undefined; });
+    var sp = list.filter(function (r) { return r.sp === true || r.sp === false; });
+    return [label, list.length, avg(w30.map(function (r) { return r.orders30; })), avg(list.filter(function (r) { return r.batch; }).map(function (r) { return r.batch; })),
+      pct(sp.filter(function (r) { return r.sp; }).length, sp.length)];
+  };
+
+  return [
+    { title: 'مقارنة: من ترشيح قصاد من غير ترشيح', header: ['المجموعة', 'تعيينات', 'متوسط أوردرات أول 30 يوم', 'متوسط Batch (1 أقوى)', 'With SP'],
+      rows: [cmp('من ترشيح', referred), cmp('من غير ترشيح', data.riders.filter(function (r) { return !r.ownerKey; })),
+        cmp('ترشيح طيار داخلي', referred.filter(function (r) { return r.ownerType === 'internal'; })), cmp('ترشيح شريك خارجي', referred.filter(function (r) { return r.ownerType === 'external'; }))] },
+    { title: 'حسب الشهر', header: ['الشهر', 'ترشيحات', 'تعيينات من ترشيحات', 'البونص (ج)', 'اتصرف (ج)'], rows: monthRows },
+    { title: 'حسب السوبرفايزر (SV الطيار الجديد)', header: ['SV', 'كل التعيينات', 'من ترشيحات', 'نسبة الترشيحات', 'متوسط أوردرات', 'وصلوا أول شريحة', 'متوسط Batch', 'البونص (ج)'], rows: svRows },
+    { title: 'حسب المنطقة', header: ['المنطقة', 'ترشيحات', 'اشتغلوا', 'تحويل', 'مرفوض'], rows: zoneRows },
+    { title: 'المرشِّحين', header: ['الاسم', 'النوع', 'الكود / الموبايل', 'ترشيحات', 'اتعيّنوا', 'البونص', 'اتصرف', 'مستحق', 'حالته'], rows: refRows }
+  ];
 }
 
 /* ───────────────────────── Applicant sync ─────────────────────────── */
@@ -1464,7 +1546,7 @@ if (typeof module !== 'undefined' && module.exports) {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
     cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
     buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, buildDashboard: buildDashboard,
-    findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
+    findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildReportTables: buildReportTables, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
   };
 }
 

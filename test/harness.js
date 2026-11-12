@@ -44,6 +44,7 @@ class Sheet {
   appendRow(vals) { const r = this.getLastRow() + 1; vals.forEach((v, i) => this.put(r, i + 1, v)); }
   deleteRow(r) { this.rows.splice(r - 1, 1); }
   setFrozenRows() {}
+  clear() { this.rows = []; }
   protect() { const p = { setDescription: () => p, setWarningOnly: () => p }; return p; }
   getConditionalFormatRules() { return this.cf; }
   setConditionalFormatRules(r) { this.cf = r; }
@@ -57,7 +58,7 @@ class Range {
   clearContent() { for (let i = 0; i < this.nr; i++) for (let j = 0; j < this.nc; j++) this.sheet.put(this.r + i, this.c + j, ''); return this; }
   setNumberFormat(f) { this.sheet.formats[this.c] = f; return this; }
   setDataValidation(v) { this.sheet.validations[this.c] = v; return this; }
-  setFontWeight() { return this; } setBackground() { return this; } setFontColor() { return this; }
+  setFontWeight() { return this; } setBackground() { return this; } setFontColor() { return this; } setFontSize() { return this; }
   getSheet() { return this.sheet; } getRow() { return this.r; } getColumn() { return this.c; }
   getNumRows() { return this.nr; } getNumColumns() { return this.nc; }
 }
