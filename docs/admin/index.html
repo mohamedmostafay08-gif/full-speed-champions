@@ -1566,9 +1566,9 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
   var REPORT_LABELS = [['REPORT_EMAILS', 'الإيميلات (افصل بينهم بفاصلة)', 'text'], ['REPORT_WHATSAPP', 'رقم الواتساب (بالكود الدولي: 2011…)', 'text'], ['CALLMEBOT_APIKEY', 'مفتاح CallMeBot', 'text']];
   function reportCard(d, edit) {
     return '<section class="card wide" style="display:grid;gap:10px"><h2>التقرير اليومي<small>كل يوم الساعة 9 الصبح</small></h2>' +
-      '<p class="sub" style="margin:0">أرقام إمبارح، والفلوس المستنية اعتماد وصرف، والمشاكل — بيوصل على الإيميل والواتساب. الواتساب بيوصل أرقام بس، من غير أسماء أو موبايلات.</p>' +
+      '<p class="sub" style="margin:0">أرقام إمبارح، والفلوس المستنية اعتماد وصرف، والمشاكل — بيوصل على الإيميل، وجواه زرار <b>"ابعت الملخص على واتساب"</b> يفتح واتساب بالملخص جاهز. الواتساب الأوتوماتيك (CallMeBot) اختياري.</p>' +
       '<div class="grid3">' + REPORT_LABELS.map(function (s) { return '<div class="field"><label>' + s[1] + '</label><input name="' + s[0] + '" class="ltr" value="' + esc(d.config[s[0]]) + '"' + (edit ? '' : ' disabled') + (s[0] === 'CALLMEBOT_APIKEY' ? ' autocomplete="off" placeholder="الرقم اللي هيوصلك"' : '') + '></div>'; }).join('') + '</div>' +
-      '<details class="steps"><summary>إزاي أفعّل الواتساب؟ (مرة واحدة بس)</summary><ol>' +
+      '<details class="steps"><summary>واتساب أوتوماتيك من غير ما تدوس (اختياري — CallMeBot)</summary><ol>' +
         '<li>افتح <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">صفحة CallMeBot الرسمية</a> وسجّل رقم الواتساب المكتوب فيها عندك باسم CallMeBot.</li>' +
         '<li>ابعتله على واتساب من رقمك الرسالة دي بالظبط: <b class="ltr">I allow callmebot to send me messages</b></li>' +
         '<li>هيرد عليك في دقيقتين برسالة فيها <b>apikey</b> — حط الرقم ده في خانة "مفتاح CallMeBot" فوق واحفظ.</li>' +

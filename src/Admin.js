@@ -593,12 +593,13 @@ function sendDailyReport_() {
 
   var to = String(cfg.REPORT_EMAILS || '').split(/[,\s،]+/).filter(function (e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); });
   if (to.length) {
-    try { MailApp.sendEmail({ to: to.join(','), subject: 'Full Speed Champions — تقرير ' + dateLabel, htmlBody: dailySummaryHtml_(sum, dateLabel, link) }); done.push('إيميل لـ ' + to.length); }
+    var waText = dailySummaryText(sum, dateLabel, link);
+    try { MailApp.sendEmail({ to: to.join(','), subject: 'Full Speed Champions — تقرير ' + dateLabel, htmlBody: dailySummaryHtml_(sum, dateLabel, link, waText, cfg) }); done.push('إيميل اتبعت لـ ' + to.length + ' ✓ (وفيه زرار واتساب)'); }
     catch (e) { done.push('الإيميل فشل: ' + e); }
   } else done.push('مفيش إيميلات في REPORT_EMAILS');
 
   var targets = whatsappTargets_(cfg);
-  if (!targets.length) done.push('واتساب: محتاج REPORT_WHATSAPP و CALLMEBOT_APIKEY');
+  if (!targets.length) done.push('واتساب أوتوماتيك مش متفعّل — استخدم زرار الواتساب اللي في الإيميل');
   var text = dailySummaryText(sum, dateLabel, link);
   targets.forEach(function (t) { done.push('واتساب ' + t.phone + ': ' + sendWhatsApp_(t.phone, t.key, text)); });
   return done;
@@ -624,7 +625,7 @@ function sendWhatsApp_(phone, key, text) {
   } catch (e) { return 'فشل: ' + e; }
 }
 
-function dailySummaryHtml_(s, dateLabel, link) {
+function dailySummaryHtml_(s, dateLabel, link, waText, cfg) {
   var n = s.numbers, m = s.money, p = s.problems, f = function (x) { return Number(x || 0).toLocaleString('en-US'); };
   var row = function (k, v, hi) { return '<tr><td style="padding:7px 14px;color:#46594B">' + k + '</td><td style="padding:7px 14px;font-weight:700;' + (hi ? 'color:#A86F00' : '') + '">' + v + '</td></tr>'; };
   var sec = function (title, rows) { return '<h3 style="margin:18px 0 6px;color:#0C150E;font-size:15px">' + title + '</h3><table style="border-collapse:collapse;background:#F2F8F3;border-radius:8px;min-width:320px">' + rows + '</table>'; };
@@ -636,7 +637,16 @@ function dailySummaryHtml_(s, dateLabel, link) {
     sec('💰 الفلوس', row('مستني اعتمادك', f(m.dueSum) + ' ج (' + m.dueCount + ' طيار)', true) + row('معتمد ومستني الصرف', f(m.approvedSum) + ' ج (' + m.approvedCount + ' عملية)', true) +
       row('هيستحق خلال أسبوع', f(m.soonSum) + ' ج (' + m.soonCount + ' طيار)')) +
     sec('⚠️ محتاج انتباهك', row('مرشحين واقفين على نفس الحالة', p.stuck) + row('طيارين كودهم وصل ولسه ما بدأوش (3 أيام+)', p.notStarted) + row('تنبيهات تلاعب أو تكرار', p.flagged)) +
-    (link ? '<p style="margin-top:18px"><a href="' + link + '" style="background:#187A31;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">افتح لوحة الإدارة</a></p>' : '') + '</div>';
+    '<p style="margin-top:18px">' +
+      (waText ? '<a href="' + waLink_(cfg && cfg.REPORT_WHATSAPP, waText) + '" style="background:#25D366;color:#052E16;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700;margin-left:8px;display:inline-block">ابعت الملخص على واتساب</a>' : '') +
+      (link ? '<a href="' + link + '" style="background:#187A31;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block">افتح لوحة الإدارة</a>' : '') + '</p></div>';
+}
+
+/** wa.me link with the summary filled in — to the first REPORT_WHATSAPP number, or "choose a chat" when none. */
+function waLink_(phones, text) {
+  var first = String(phones || '').split(/[,،\n]+/)[0].split(':')[0].replace(/\D/g, '');
+  if (/^01\d{9}$/.test(first)) first = '2' + first;
+  return 'https://wa.me/' + (/^20\d{10}$/.test(first) ? first : '') + '?text=' + encodeURIComponent(text);
 }
 
 /** One rider's daily orders, for the full rider page. */

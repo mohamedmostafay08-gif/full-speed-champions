@@ -196,6 +196,8 @@ test('daily report email goes to REPORT_EMAILS only when set', () => {
   env.ctx.dailyReport();
   assert.equal(env.ctx.__mails.length, 1);
   assert.match(env.ctx.__mails[0].htmlBody, /تقرير/);
+  // WhatsApp button with the summary, addressed to REPORT_WHATSAPP (default 201120339097)
+  assert.match(env.ctx.__mails[0].htmlBody, /https:\/\/wa\.me\/201120339097\?text=/);
 });
 
 test('Hiring tracker: official hire date, SV, SP; old riders are not referrals', () => {
