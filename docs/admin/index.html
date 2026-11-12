@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Cairo:wght@600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" onload="window.__fsChart&&window.__fsChart()"></script>
 <style>
 /* Layout: an operations console. Sidebar on the right (RTL), a filter bar on
    top of every analytic view, KPI strip first, charts, then the tables that
@@ -181,6 +181,22 @@ td .gold { color: var(--gold); font-weight: 700; }
 .login .brand { display: flex; align-items: center; gap: 10px; justify-content: center; }
 .login .brand .wm { font: 800 24px/1 var(--f-num); text-transform: uppercase; }
 .login .brand .wm b { color: var(--green); }
+.boot { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; background: var(--bg); }
+.boot-in { display: grid; justify-items: center; gap: 14px; animation: bootIn .4s ease both; }
+.boot .mk { width: 64px; height: 64px; }
+.boot .wm { font: 900 30px var(--f-display); letter-spacing: .02em; color: var(--ink); text-transform: uppercase; }
+.boot .wm b { color: var(--green); }
+.boot-bar { width: 180px; height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; position: relative; }
+.boot-bar i { position: absolute; inset: 0 auto 0 0; width: 40%; border-radius: 4px; background: var(--green); animation: bootBar 1.1s ease-in-out infinite; }
+.boot-t { color: var(--muted); font-size: 13px; }
+@keyframes bootBar { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+@keyframes bootIn { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .boot-bar i, .boot-in { animation: none; } }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 760px) { .grid3 { grid-template-columns: 1fr; } }
+details.steps { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+details.steps summary { cursor: pointer; font-weight: 700; }
+details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; gap: 6px; }
 .sk { border-radius: 14px; background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%); background-size: 200% 100%; animation: sk 1.2s linear infinite; }
 @keyframes sk { to { background-position: -200% 0; } }
 .heat td.hm { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; min-width: 44px; border: 2px solid var(--surface); }
@@ -228,7 +244,7 @@ td .gold { color: var(--gold); font-weight: 700; }
   <symbol id="i-wa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9.5c.5 2 2.5 4 4.5 4.5l1-1.2 2 .9c-.3 1.3-1.4 2-2.7 1.8A7 7 0 0 1 8 9.7C7.8 8.4 8.6 7.3 9.8 7l.9 2z"/></symbol>
 </svg>
 
-<div id="root"></div>
+<div id="root"><div class="boot" role="status" aria-live="polite"><div class="boot-in"><i class="mk"></i><span class="wm">Full<b>speed</b></span><span class="boot-bar"><i></i></span><span class="boot-t">بنجهّز لوحة الإدارة…</span></div></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div id="overlay"></div>
 
@@ -336,13 +352,21 @@ td .gold { color: var(--gold); font-weight: 700; }
       S.token = res.data.token; S.me = res.data.me; store('fs_admin_token', S.token); load();
     };
   }
-  function signOut() { S.token = null; S.data = null; store('fs_admin_token', null); renderLogin(); }
+  function signOut() { S.token = null; S.data = null; store('fs_admin_token', null); cacheSet(null); renderLogin(); }
 
+  var CACHE = 'fs_admin_cache';
+  function cacheGet() { try { return sessionStorage.getItem(CACHE); } catch (e) { return null; } }
+  function cacheSet(v) { try { if (v) sessionStorage.setItem(CACHE, v); else sessionStorage.removeItem(CACHE); } catch (e) { /* full or blocked: just skip */ } }
+  window.__fsChart = function () { if (S.data) render(); };
   async function load(quiet) {
-    if (!quiet) root.innerHTML = '<div class="layout"><aside class="side"></aside><main class="main"><div class="sk" style="height:60px"></div><div class="kpis">' +
+    if (!quiet && !root.querySelector('.boot')) root.innerHTML = '<div class="layout"><aside class="side"></aside><main class="main"><div class="sk" style="height:60px"></div><div class="kpis">' +
       '<div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div></div><div class="sk" style="height:300px"></div></main></div>';
     var res = await call('adminData');
-    if (!res.ok) return;
+    if (!res.ok) { if (root.querySelector('.boot') && S.token) renderLogin(); return; }
+    if (res.data.me && res.data.me.mustChange) { S.me = res.data.me; renderForceChange(); return; }
+    var json = live ? JSON.stringify(res.data) : '';
+    if (live && quiet && S.data && json === cacheGet()) return; // nothing changed since the cached copy
+    if (live) cacheSet(json);
     S.data = res.data; S.me = res.data.me;
     prepare(S.data);
     render();
@@ -1348,11 +1372,24 @@ td .gold { color: var(--gold); font-weight: 700; }
   var SETTING_LABELS = [
     ['PROGRAM_START_DATE', 'أول يوم تعيين بيتحسب في البرنامج', 'date'], ['BONUS_WINDOW_MONTHS', 'مدة البونص (شهور من التعيين)', 'number'],
     ['NUDGE_AFTER_DAYS', 'تنبيه متابعة المرشح بعد (أيام)', 'number'], ['COMPANY_REF_CODE', 'كود طلبات الموحّد للشركاء', 'text'],
-    ['SUPPORT_WHATSAPP', 'واتساب الدعم (بالكود الدولي: 2011…)', 'text'], ['REPORT_EMAILS', 'إيميلات التقرير اليومي (افصل بفاصلة)', 'text'],
+    ['SUPPORT_WHATSAPP', 'واتساب الدعم (بالكود الدولي: 2011…)', 'text'],
     ['SESSION_DAYS', 'الطيار يفضل مسجل دخول (أيام)', 'number'], ['MAX_LOGIN_FAILURES', 'محاولات غلط قبل القفل', 'number'],
     ['LOCK_MINUTES', 'مدة القفل (دقايق)', 'number'], ['MIN_PASSWORD_LENGTH', 'أقل طول لكلمة سر الطيار', 'number'],
     ['PUBLIC_APPLY_PER_HOUR', 'أقصى طلبات من لينك واحد في الساعة', 'number'], ['PUBLIC_APP_URL', 'لينك التطبيق', 'text']
   ];
+  var REPORT_LABELS = [['REPORT_EMAILS', 'الإيميلات (افصل بينهم بفاصلة)', 'text'], ['REPORT_WHATSAPP', 'رقم الواتساب (بالكود الدولي: 2011…)', 'text'], ['CALLMEBOT_APIKEY', 'مفتاح CallMeBot', 'text']];
+  function reportCard(d, edit) {
+    return '<section class="card wide" style="display:grid;gap:10px"><h2>التقرير اليومي<small>كل يوم الساعة 9 الصبح</small></h2>' +
+      '<p class="sub" style="margin:0">أرقام إمبارح، والفلوس المستنية اعتماد وصرف، والمشاكل — بيوصل على الإيميل والواتساب. الواتساب بيوصل أرقام بس، من غير أسماء أو موبايلات.</p>' +
+      '<div class="grid3">' + REPORT_LABELS.map(function (s) { return '<div class="field"><label>' + s[1] + '</label><input name="' + s[0] + '" class="ltr" value="' + esc(d.config[s[0]]) + '"' + (edit ? '' : ' disabled') + (s[0] === 'CALLMEBOT_APIKEY' ? ' autocomplete="off" placeholder="الرقم اللي هيوصلك"' : '') + '></div>'; }).join('') + '</div>' +
+      '<details class="steps"><summary>إزاي أفعّل الواتساب؟ (مرة واحدة بس)</summary><ol>' +
+        '<li>افتح <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">صفحة CallMeBot الرسمية</a> وسجّل رقم الواتساب المكتوب فيها عندك باسم CallMeBot.</li>' +
+        '<li>ابعتله على واتساب من رقمك الرسالة دي بالظبط: <b class="ltr">I allow callmebot to send me messages</b></li>' +
+        '<li>هيرد عليك في دقيقتين برسالة فيها <b>apikey</b> — حط الرقم ده في خانة "مفتاح CallMeBot" فوق واحفظ.</li>' +
+        '<li>دوس "ابعت التقرير دلوقتي" عشان تتأكد إنه وصل.</li></ol>' +
+        '<p class="muted" style="margin:6px 0 0;font-size:12px">لأكتر من رقم: كل واحد يفعّل من رقمه، واكتبهم في خانة الرقم كده: <span class="ltr">201120339097:111111, 201000000000:222222</span></p></details>' +
+      (edit ? '<div><button type="button" class="btn btn-wa" id="sendRep">' + icon('wa') + 'ابعت التقرير دلوقتي</button> <span class="muted" id="repRes" style="font-size:12px"></span></div>' : '') + '</section>';
+  }
   function viewSettings() {
     var d = S.data, edit = can('settings.edit');
     return head('الإعدادات', edit ? 'أي تغيير هنا بيوصل للتطبيق على طول' : 'عرض بس — التعديل للمدير') +
@@ -1360,7 +1397,7 @@ td .gold { color: var(--gold); font-weight: 700; }
       d.season.tiers.map(tierRow).join('') + '</div>' + (edit ? '<button type="button" class="btn btn-ghost btn-sm" id="addTier" style="margin-top:8px">+ شريحة</button>' : '') + '</section>' +
       '<section class="card" style="display:grid;gap:10px"><h2>البرنامج والأمان</h2>' + SETTING_LABELS.map(function (s) {
         return '<div class="field"><label>' + s[1] + '</label><input name="' + s[0] + '" type="' + s[2] + '" value="' + esc(d.config[s[0]]) + '"' + (edit ? '' : ' disabled') + (s[2] === 'text' && /WHATSAPP|URL|EMAILS|CODE/.test(s[0]) ? ' class="ltr"' : '') + '></div>';
-      }).join('') + '</section></div>' + (edit ? '<div style="margin-top:12px"><button class="btn btn-primary" type="submit" style="min-height:42px">حفظ الإعدادات</button></div>' : '') + '</form>';
+      }).join('') + '</section>' + reportCard(d, edit) + '</div>' + (edit ? '<div style="margin-top:12px"><button class="btn btn-primary" type="submit" style="min-height:42px">حفظ الإعدادات</button></div>' : '') + '</form>';
   }
   function tierRow(t) { return '<div style="display:flex;gap:8px;align-items:center"><input type="number" data-to value="' + t.orders + '" style="width:100px" aria-label="أوردرات"' + (can('settings.edit') ? '' : ' disabled') + '><span class="muted">أوردر ←</span><input type="number" data-tb value="' + t.bonus + '" style="width:110px" aria-label="بونص"' + (can('settings.edit') ? '' : ' disabled') + '><span class="muted">ج</span>' + (can('settings.edit') ? '<button type="button" class="btn btn-ghost btn-sm" data-rmt>✕</button>' : '') + '</div>'; }
   function bindSettings() {
@@ -1368,10 +1405,15 @@ td .gold { color: var(--gold); font-weight: 700; }
     var bindRm = function () { f.querySelectorAll('[data-rmt]').forEach(function (b) { b.onclick = function () { b.parentNode.remove(); }; }); };
     bindRm();
     document.getElementById('addTier').onclick = function () { document.getElementById('tiers').insertAdjacentHTML('beforeend', tierRow({ orders: '', bonus: '' })); bindRm(); };
+    document.getElementById('sendRep').onclick = async function (e) {
+      var b = e.currentTarget; busy(b, true); document.getElementById('repRes').textContent = 'بيتبعت… (احفظ الإعدادات الأول لو غيّرت حاجة)';
+      var res = await call('adminSendReport', {}); busy(b, false);
+      document.getElementById('repRes').textContent = res.ok ? res.data.result.join(' · ') : '';
+    };
     f.querySelectorAll('#tiers input').forEach(function (i) { i.style.cssText += ';min-height:34px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg-2);padding:4px 8px'; });
     f.onsubmit = async function (e) {
       e.preventDefault();
-      var cfg = {}; SETTING_LABELS.forEach(function (s) { cfg[s[0]] = f[s[0]].value; });
+      var cfg = {}; SETTING_LABELS.concat(REPORT_LABELS).forEach(function (s) { cfg[s[0]] = f[s[0]].value; });
       var tiers = Array.prototype.map.call(f.querySelectorAll('#tiers > div'), function (r) { return { orders: r.querySelector('[data-to]').value, bonus: r.querySelector('[data-tb]').value }; });
       var b = f.querySelector('[type=submit]'); busy(b, true); var res = await call('adminSaveSettings', { config: cfg, tiers: tiers }); busy(b, false);
       if (!res.ok) { showErrors(f, res.fields); return; }
@@ -1455,9 +1497,10 @@ td .gold { color: var(--gold); font-weight: 700; }
     var token = store('fs_admin_token');
     if (!token) { renderLogin(); return; }
     S.token = token;
-    var res = await Backend.call('adminSession', { token: token });
-    if (res && res.ok) { S.me = res.data.me; if (S.me.mustChange) renderForceChange(); else load(); }
-    else { store('fs_admin_token', null); renderLogin(); }
+    // Same browser session: show the last data instantly, then refresh quietly.
+    var cached = live && cacheGet();
+    if (cached) { try { S.data = JSON.parse(cached); S.me = S.data.me; prepare(S.data); render(); load(true); return; } catch (e) { cacheSet(null); } }
+    load();
   })();
 })();
 </script>

@@ -139,3 +139,29 @@ test('config tab overrides defaults and custom tiers', () => {
   assert.deepEqual(cfg.TIERS, [{ orders: 100, bonus: 200 }, { orders: 300, bonus: 1000 }]);
   assert.equal(ymd(cfg.PROGRAM_START_DATE), '2026-11-01');
 });
+
+test('daily summary: yesterday numbers, money and problems', () => {
+  const today = D(2026, 11, 12), y = D(2026, 11, 11);
+  const data = {
+    today,
+    applicants: [
+      { submitted: y, nudge: false, flags: [] }, { submitted: y, nudge: true, flags: ['self'] },
+      { submitted: D(2026, 11, 4), nudge: false, flags: [] }
+    ],
+    riders: [
+      { ownerKey: 'A', hireDate: y, payStatus: 'pending', bonus: 0, paid: 0, approved: 0, started: false, daysSinceHire: 1, flags: [] },
+      { ownerKey: 'A', hireDate: D(2026, 9, 1), payStatus: 'due', bonus: 800, paid: 0, approved: 0, started: true, daysSinceHire: 70, flags: [] },
+      { ownerKey: 'B', hireDate: D(2026, 9, 20), payStatus: 'pending', bonus: 600, paid: 0, approved: 0, payoutDate: D(2026, 11, 15), started: false, daysSinceHire: 50, flags: [] },
+      { ownerKey: '', hireDate: y, payStatus: 'none', bonus: 0, paid: 0, approved: 0, flags: [] }
+    ],
+    payouts: [{ status: 'approved', amount: 1000 }, { status: 'paid', amount: 500 }]
+  };
+  const s = L.buildDailySummary(data);
+  assert.equal(ymd(s.date), '2026-11-11');
+  assert.equal(s.numbers.apps, 2); assert.equal(s.numbers.appsLastWeek, 1); assert.equal(s.numbers.hires, 1);
+  assert.equal(s.money.dueSum, 800); assert.equal(s.money.approvedSum, 1000); assert.equal(s.money.soonSum, 600);
+  assert.equal(s.problems.stuck, 1); assert.equal(s.problems.notStarted, 1); assert.equal(s.problems.flagged, 1);
+  const text = L.dailySummaryText(s, '2026-11-11', 'https://x/admin/');
+  assert.match(text, /مستني اعتمادك: \*800 ج\*/);
+  assert.match(text, /https:\/\/x\/admin\//);
+});

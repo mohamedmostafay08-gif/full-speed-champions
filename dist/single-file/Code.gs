@@ -34,6 +34,8 @@ var CONFIG_DEFAULTS = {
   // Where the Google link reads its interface from. Empty = use the Index.html saved in Apps Script.
   ANNOUNCEMENT: '',                   // banner shown to every rider in the app (empty = none)
   REPORT_EMAILS: '',                  // comma-separated: who gets the daily report email
+  REPORT_WHATSAPP: '201120339097',    // who gets the daily report on WhatsApp (via CallMeBot)
+  CALLMEBOT_APIKEY: '',               // the key CallMeBot sends back after the one-time activation message
   UI_SOURCE_URL: 'https://raw.githubusercontent.com/mohamedmostafay08-gif/full-speed-champions/main/dist/single-file/Index.html'
 };
 
@@ -1173,6 +1175,69 @@ function buildAdminData(world, users) {
  * Summary tables for the "FS Reports" tab, from buildAdminData output.
  * Returns [{ title, header: [...], rows: [[...]] }].
  */
+/**
+ * The morning summary: yesterday's numbers, money, problems. Pure — the
+ * server turns it into an email and a WhatsApp message.
+ */
+function buildDailySummary(data) {
+  var t = data.today, y = addDays(t, -1), wk = addDays(y, -7);
+  var on = function (d, day) { return d && diffDays(d, day) === 0; };
+  var between = function (d, a, b) { return d && d >= a && d <= b; };
+  var refHires = data.riders.filter(function (r) { return r.ownerKey; });
+  var apps = function (day) { return data.applicants.filter(function (a) { return on(a.submitted, day); }).length; };
+  var hires = function (day) { return refHires.filter(function (r) { return on(r.hireDate, day); }).length; };
+  var last7a = data.applicants.filter(function (a) { return between(a.submitted, addDays(y, -6), y); }).length;
+  var prev7a = data.applicants.filter(function (a) { return between(a.submitted, addDays(y, -13), addDays(y, -7)); }).length;
+  var last7h = refHires.filter(function (r) { return between(r.hireDate, addDays(y, -6), y); }).length;
+  var prev7h = refHires.filter(function (r) { return between(r.hireDate, addDays(y, -13), addDays(y, -7)); }).length;
+  var due = data.riders.filter(function (r) { return r.payStatus === 'due'; });
+  var approved = data.payouts.filter(function (p) { return p.status === 'approved'; });
+  var in7 = addDays(t, 7);
+  var soon = refHires.filter(function (r) { return r.payStatus === 'pending' && r.bonus > 0 && r.payoutDate && r.payoutDate <= in7; });
+  var sum = function (a, f) { return a.reduce(function (s, x) { return s + f(x); }, 0); };
+  return {
+    date: y,
+    numbers: {
+      apps: apps(y), appsLastWeek: apps(wk), hires: hires(y), hiresLastWeek: hires(wk),
+      apps7: last7a, apps7Prev: prev7a, hires7: last7h, hires7Prev: prev7h,
+      conv7: last7a ? Math.round(refHires.filter(function (r) { return between(r.hireDate, addDays(y, -6), y); }).length / last7a * 100) : 0
+    },
+    money: {
+      dueCount: due.length, dueSum: sum(due, function (r) { return r.bonus - r.paid - (r.approved || 0); }),
+      approvedCount: approved.length, approvedSum: sum(approved, function (p) { return p.amount; }),
+      soonCount: soon.length, soonSum: sum(soon, function (r) { return r.bonus; })
+    },
+    problems: {
+      stuck: data.applicants.filter(function (a) { return a.nudge; }).length,
+      notStarted: refHires.filter(function (r) { return r.started === false && r.daysSinceHire >= 3; }).length,
+      flagged: data.applicants.filter(function (a) { return a.flags.length; }).length + data.riders.filter(function (r) { return r.flags.length; }).length
+    }
+  };
+}
+
+/** WhatsApp text for the morning summary (WhatsApp *bold*). */
+function dailySummaryText(s, dateLabel, link) {
+  var n = s.numbers, m = s.money, p = s.problems, f = function (x) { return Number(x || 0).toLocaleString('en-US'); };
+  var vs = function (a, b) { return b ? ' (' + (a >= b ? '▲' : '▼') + Math.abs(Math.round((a - b) / b * 100)) + '%)' : ''; };
+  var lines = ['🏁 *Full Speed Champions*', 'تقرير ' + dateLabel, '',
+    '*📊 أرقام إمبارح*',
+    '• ترشيحات جديدة: *' + n.apps + '* (نفس اليوم الأسبوع اللي فات ' + n.appsLastWeek + ')',
+    '• اتعيّنوا من ترشيحات: *' + n.hires + '* (الأسبوع اللي فات ' + n.hiresLastWeek + ')',
+    '• آخر 7 أيام: ' + n.apps7 + ' ترشيح' + vs(n.apps7, n.apps7Prev) + ' · ' + n.hires7 + ' تعيين' + vs(n.hires7, n.hires7Prev), '',
+    '*💰 الفلوس*',
+    '• مستني اعتمادك: *' + f(m.dueSum) + ' ج* (' + m.dueCount + ' طيار)',
+    '• معتمد ومستني الصرف: *' + f(m.approvedSum) + ' ج* (' + m.approvedCount + ' عملية)',
+    '• هيستحق خلال أسبوع: ' + f(m.soonSum) + ' ج (' + m.soonCount + ' طيار)', ''];
+  var probs = [];
+  if (p.stuck) probs.push('• ' + p.stuck + ' مرشح واقفين على نفس الحالة');
+  if (p.notStarted) probs.push('• ' + p.notStarted + ' طيار كودهم وصل من 3 أيام ولسه ما بدأوش');
+  if (p.flagged) probs.push('• ' + p.flagged + ' تنبيه تلاعب أو تكرار محتاج مراجعة');
+  lines.push('*⚠️ محتاج انتباهك*');
+  lines = lines.concat(probs.length ? probs : ['• مفيش مشاكل ✓']);
+  if (link) lines.push('', link);
+  return lines.join('\n');
+}
+
 function buildReportTables(data) {
   var avg = function (a) { return a.length ? Math.round(a.reduce(function (s, x) { return s + x; }, 0) / a.length) : ''; };
   var pct = function (a, b) { return b ? Math.round(a / b * 100) + '%' : ''; };
@@ -1324,7 +1389,7 @@ if (typeof module !== 'undefined' && module.exports) {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
     cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
     buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, buildDashboard: buildDashboard,
-    findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildReportTables: buildReportTables, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
+    findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildReportTables: buildReportTables, buildDailySummary: buildDailySummary, dailySummaryText: dailySummaryText, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
   };
 }
 
@@ -1550,7 +1615,10 @@ function setupFullSpeed() {
         PUBLIC_APPLY_PER_HOUR: 'أقصى عدد طلبات من لينك واحد في الساعة',
         MIN_PASSWORD_LENGTH: 'أقل طول لكلمة المرور',
         SUPPORT_WHATSAPP: 'رقم واتساب الدعم (بصيغة دولية)',
-        PUBLIC_APP_URL: 'لينك التطبيق على GitHub Pages — ده اللي بيتبعت للمرشحين'
+        PUBLIC_APP_URL: 'لينك التطبيق على GitHub Pages — ده اللي بيتبعت للمرشحين',
+        REPORT_EMAILS: 'إيميلات التقرير اليومي — افصل بينهم بفاصلة',
+        REPORT_WHATSAPP: 'رقم واتساب التقرير اليومي (بصيغة دولية 20…). أكتر من رقم: رقم:مفتاح، رقم:مفتاح',
+        CALLMEBOT_APIKEY: 'مفتاح CallMeBot اللي بيوصلك على واتساب بعد رسالة التفعيل'
       };
       var rows = Object.keys(CONFIG_DEFAULTS).map(function (k) { return [k, CONFIG_DEFAULTS[k], notes[k] || '']; });
       sh.getRange(2, 1, rows.length, 3).setValues(rows);
@@ -2311,6 +2379,7 @@ var ADMIN_ACTIONS_ = {
   adminApprovePayouts: adminApprovePayouts_,
   adminRecordPayout: adminRecordPayout_,
   adminRefreshReports: adminRefreshReports_,
+  adminSendReport: adminSendReport_,
   adminDeletePayout: adminDeletePayout_,
   adminUserAction: adminUserAction_,
   adminSaveSettings: adminSaveSettings_,
@@ -2480,6 +2549,8 @@ function adminData_(p) {
       var v = cfg[k];
       data.config[k] = v instanceof Date ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd') : v;
     });
+    // The WhatsApp key is a secret: say whether it's set, never send it to the browser.
+    data.config.CALLMEBOT_APIKEY = cfg.CALLMEBOT_APIKEY ? '••••••' : '';
     data.audit = values_(TABS.AUDIT).slice(1).slice(-400).reverse().map(function (r) {
       return { at: r[0] instanceof Date ? r[0].toISOString() : String(r[0]), by: r[1], action: r[2], target: r[3], before: r[4], after: r[5] };
     });
@@ -2694,7 +2765,7 @@ function setConfig_(key, value) {
 }
 
 var EDITABLE_SETTINGS_ = ['PROGRAM_START_DATE', 'BONUS_WINDOW_MONTHS', 'NUDGE_AFTER_DAYS', 'COMPANY_REF_CODE', 'SESSION_DAYS',
-  'MAX_LOGIN_FAILURES', 'LOCK_MINUTES', 'PUBLIC_APPLY_PER_HOUR', 'MIN_PASSWORD_LENGTH', 'SUPPORT_WHATSAPP', 'REPORT_EMAILS', 'PUBLIC_APP_URL'];
+  'MAX_LOGIN_FAILURES', 'LOCK_MINUTES', 'PUBLIC_APPLY_PER_HOUR', 'MIN_PASSWORD_LENGTH', 'SUPPORT_WHATSAPP', 'REPORT_EMAILS', 'REPORT_WHATSAPP', 'CALLMEBOT_APIKEY', 'PUBLIC_APP_URL'];
 
 function adminSaveSettings_(p) {
   return asAdmin_(p, 'settings.edit', function (a) {
@@ -2709,8 +2780,9 @@ function adminSaveSettings_(p) {
     return withLock_(function () {
       Object.keys(cfg).forEach(function (k) {
         if (EDITABLE_SETTINGS_.indexOf(k) === -1) return;
+        if (k === 'CALLMEBOT_APIKEY' && /^•+$/.test(String(cfg[k]))) return; // unchanged masked key
         var before = setConfig_(k, String(cfg[k]).trim());
-        if (String(before) !== String(cfg[k]).trim()) audit_(a, 'غيّر إعداد', k, before, cfg[k]);
+        if (String(before) !== String(cfg[k]).trim()) audit_(a, 'غيّر إعداد', k, k === 'CALLMEBOT_APIKEY' ? '••' : before, k === 'CALLMEBOT_APIKEY' ? '••' : cfg[k]);
       });
       if (tiers) {
         tiers.sort(function (x, y) { return x.orders - y.orders; });
@@ -2859,28 +2931,74 @@ function adminRefreshReports_(p) {
 
 /* ────────────────────────── Daily report ──────────────────────────── */
 
-/** Morning email with yesterday's numbers to the addresses in REPORT_EMAILS. */
+/** Morning report (trigger, 9 AM): FS Reports tab, email to REPORT_EMAILS, WhatsApp to REPORT_WHATSAPP. */
 function dailyReport() {
-  var cfg = loadConfig_();
   try { writeReportsTab_(); } catch (e) { log_('error', 'FS Reports: ' + e); }
-  var to = String(cfg.REPORT_EMAILS || '').split(/[,\s]+/).filter(function (e) { return /@/.test(e); });
-  if (!to.length) return;
+  var out = sendDailyReport_();
+  log_('info', 'التقرير اليومي: ' + out.join(' · '));
+}
+
+/** Builds the summary once and sends it everywhere it's configured. Returns what happened, line by line. */
+function sendDailyReport_() {
+  var cfg = loadConfig_(), done = [];
   var data = buildAdminData(loadWorld_(), readUsers_());
-  var yesterday = addDays(data.today, -1);
-  var same = function (d) { return d && diffDays(d, yesterday) === 0; };
-  var newApps = data.applicants.filter(function (x) { return same(x.submitted); }).length;
-  var hires = data.riders.filter(function (r) { return same(r.hireDate) && r.ownerKey; }).length;
-  var due = data.riders.filter(function (r) { return r.payStatus === 'due' || r.payStatus === 'approved'; });
-  var dueSum = due.reduce(function (s, r) { return s + r.bonus - r.paid; }, 0);
-  var stuck = data.applicants.filter(function (x) { return x.nudge; }).length;
-  var flagged = data.applicants.filter(function (x) { return x.flags.length; }).length + data.riders.filter(function (r) { return r.flags.length; }).length;
-  var row = function (k, v) { return '<tr><td style="padding:6px 12px;color:#46594B">' + k + '</td><td style="padding:6px 12px;font-weight:700">' + v + '</td></tr>'; };
-  var html = '<div dir="rtl" style="font-family:Tahoma,Arial;font-size:14px">' +
-    '<h2 style="color:#187A31;margin:0 0 8px">Full Speed Champions — تقرير ' + Utilities.formatDate(yesterday, Session.getScriptTimeZone(), 'yyyy-MM-dd') + '</h2>' +
-    '<table style="border-collapse:collapse;background:#F2F8F3;border-radius:8px">' +
-    row('ترشيحات جديدة امبارح', newApps) + row('اتعيّنوا امبارح من ترشيحات', hires) +
-    row('بونص مستحق ومستني الصرف', dueSum.toLocaleString('en-US') + ' ج (' + due.length + ' طيار)') +
-    row('مرشحين محتاجين متابعة', stuck) + row('تنبيهات محتاجة مراجعة', flagged) +
-    '</table>' + (cfg.PUBLIC_APP_URL ? '<p><a href="' + cfg.PUBLIC_APP_URL + 'admin/">افتح لوحة الإدارة</a></p>' : '') + '</div>';
-  MailApp.sendEmail({ to: to.join(','), subject: 'Full Speed Champions — تقرير يومي', htmlBody: html });
+  var sum = buildDailySummary(data);
+  var dateLabel = Utilities.formatDate(sum.date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var link = cfg.PUBLIC_APP_URL ? String(cfg.PUBLIC_APP_URL).replace(/\/?$/, '/') + 'admin/' : '';
+
+  var to = String(cfg.REPORT_EMAILS || '').split(/[,\s،]+/).filter(function (e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); });
+  if (to.length) {
+    try { MailApp.sendEmail({ to: to.join(','), subject: 'Full Speed Champions — تقرير ' + dateLabel, htmlBody: dailySummaryHtml_(sum, dateLabel, link) }); done.push('إيميل لـ ' + to.length); }
+    catch (e) { done.push('الإيميل فشل: ' + e); }
+  } else done.push('مفيش إيميلات في REPORT_EMAILS');
+
+  var targets = whatsappTargets_(cfg);
+  if (!targets.length) done.push('واتساب: محتاج REPORT_WHATSAPP و CALLMEBOT_APIKEY');
+  var text = dailySummaryText(sum, dateLabel, link);
+  targets.forEach(function (t) { done.push('واتساب ' + t.phone + ': ' + sendWhatsApp_(t.phone, t.key, text)); });
+  return done;
+}
+
+/** "201…" + CALLMEBOT_APIKEY, or "201…:key, 2010…:key2" for several people. */
+function whatsappTargets_(cfg) {
+  return String(cfg.REPORT_WHATSAPP || '').split(/[,،\n]+/).map(function (x) {
+    var parts = x.split(':'), phone = String(parts[0] || '').replace(/\D/g, '');
+    if (/^01\d{9}$/.test(phone)) phone = '2' + phone;
+    return { phone: phone, key: String(parts[1] || cfg.CALLMEBOT_APIKEY || '').trim() };
+  }).filter(function (t) { return /^20\d{10}$/.test(t.phone) && t.key; });
+}
+
+/** CallMeBot: free WhatsApp messages to a number that activated it once. Only totals go out — no names, phones or IDs. */
+function sendWhatsApp_(phone, key, text) {
+  try {
+    var url = 'https://api.callmebot.com/whatsapp.php?phone=' + phone + '&text=' + encodeURIComponent(text) + '&apikey=' + encodeURIComponent(key);
+    var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    var code = res.getResponseCode(), body = res.getContentText().slice(0, 200);
+    if (code === 200 && !/error|invalid|not\s+valid|apikey/i.test(body.replace(/<[^>]+>/g, ' ').replace(/Message queued/i, ''))) return 'اتبعت ✓';
+    return 'فشل (' + code + ') ' + body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+  } catch (e) { return 'فشل: ' + e; }
+}
+
+function dailySummaryHtml_(s, dateLabel, link) {
+  var n = s.numbers, m = s.money, p = s.problems, f = function (x) { return Number(x || 0).toLocaleString('en-US'); };
+  var row = function (k, v, hi) { return '<tr><td style="padding:7px 14px;color:#46594B">' + k + '</td><td style="padding:7px 14px;font-weight:700;' + (hi ? 'color:#A86F00' : '') + '">' + v + '</td></tr>'; };
+  var sec = function (title, rows) { return '<h3 style="margin:18px 0 6px;color:#0C150E;font-size:15px">' + title + '</h3><table style="border-collapse:collapse;background:#F2F8F3;border-radius:8px;min-width:320px">' + rows + '</table>'; };
+  return '<div dir="rtl" style="font-family:Tahoma,Arial;font-size:14px;color:#0C150E">' +
+    '<h2 style="color:#187A31;margin:0">Full Speed Champions</h2><div style="color:#46594B">تقرير ' + dateLabel + '</div>' +
+    sec('📊 أرقام إمبارح', row('ترشيحات جديدة', n.apps + ' <span style="color:#7A9180;font-weight:400">(نفس اليوم الأسبوع اللي فات ' + n.appsLastWeek + ')</span>') +
+      row('اتعيّنوا من ترشيحات', n.hires + ' <span style="color:#7A9180;font-weight:400">(الأسبوع اللي فات ' + n.hiresLastWeek + ')</span>') +
+      row('آخر 7 أيام', n.apps7 + ' ترشيح · ' + n.hires7 + ' تعيين <span style="color:#7A9180;font-weight:400">(قبلها ' + n.apps7Prev + ' · ' + n.hires7Prev + ')</span>')) +
+    sec('💰 الفلوس', row('مستني اعتمادك', f(m.dueSum) + ' ج (' + m.dueCount + ' طيار)', true) + row('معتمد ومستني الصرف', f(m.approvedSum) + ' ج (' + m.approvedCount + ' عملية)', true) +
+      row('هيستحق خلال أسبوع', f(m.soonSum) + ' ج (' + m.soonCount + ' طيار)')) +
+    sec('⚠️ محتاج انتباهك', row('مرشحين واقفين على نفس الحالة', p.stuck) + row('طيارين كودهم وصل ولسه ما بدأوش (3 أيام+)', p.notStarted) + row('تنبيهات تلاعب أو تكرار', p.flagged)) +
+    (link ? '<p style="margin-top:18px"><a href="' + link + '" style="background:#187A31;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">افتح لوحة الإدارة</a></p>' : '') + '</div>';
+}
+
+/** Owner button in Settings: send the report now, to check email and WhatsApp work. */
+function adminSendReport_(p) {
+  return asAdmin_(p, 'settings.edit', function (a) {
+    var out = sendDailyReport_();
+    audit_(a, 'بعت التقرير اليومي تجربة', '', '', out.join(' · '));
+    return ok_({ result: out });
+  });
 }

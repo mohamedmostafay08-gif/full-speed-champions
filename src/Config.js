@@ -32,6 +32,8 @@ var CONFIG_DEFAULTS = {
   // Where the Google link reads its interface from. Empty = use the Index.html saved in Apps Script.
   ANNOUNCEMENT: '',                   // banner shown to every rider in the app (empty = none)
   REPORT_EMAILS: '',                  // comma-separated: who gets the daily report email
+  REPORT_WHATSAPP: '201120339097',    // who gets the daily report on WhatsApp (via CallMeBot)
+  CALLMEBOT_APIKEY: '',               // the key CallMeBot sends back after the one-time activation message
   UI_SOURCE_URL: 'https://raw.githubusercontent.com/mohamedmostafay08-gif/full-speed-champions/main/dist/single-file/Index.html'
 };
 

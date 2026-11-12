@@ -426,6 +426,8 @@ var CONFIG_DEFAULTS = {
   // Where the Google link reads its interface from. Empty = use the Index.html saved in Apps Script.
   ANNOUNCEMENT: '',                   // banner shown to every rider in the app (empty = none)
   REPORT_EMAILS: '',                  // comma-separated: who gets the daily report email
+  REPORT_WHATSAPP: '201120339097',    // who gets the daily report on WhatsApp (via CallMeBot)
+  CALLMEBOT_APIKEY: '',               // the key CallMeBot sends back after the one-time activation message
   UI_SOURCE_URL: 'https://raw.githubusercontent.com/mohamedmostafay08-gif/full-speed-champions/main/dist/single-file/Index.html'
 };
 
@@ -1559,6 +1561,69 @@ function buildAdminData(world, users) {
  * Summary tables for the "FS Reports" tab, from buildAdminData output.
  * Returns [{ title, header: [...], rows: [[...]] }].
  */
+/**
+ * The morning summary: yesterday's numbers, money, problems. Pure — the
+ * server turns it into an email and a WhatsApp message.
+ */
+function buildDailySummary(data) {
+  var t = data.today, y = addDays(t, -1), wk = addDays(y, -7);
+  var on = function (d, day) { return d && diffDays(d, day) === 0; };
+  var between = function (d, a, b) { return d && d >= a && d <= b; };
+  var refHires = data.riders.filter(function (r) { return r.ownerKey; });
+  var apps = function (day) { return data.applicants.filter(function (a) { return on(a.submitted, day); }).length; };
+  var hires = function (day) { return refHires.filter(function (r) { return on(r.hireDate, day); }).length; };
+  var last7a = data.applicants.filter(function (a) { return between(a.submitted, addDays(y, -6), y); }).length;
+  var prev7a = data.applicants.filter(function (a) { return between(a.submitted, addDays(y, -13), addDays(y, -7)); }).length;
+  var last7h = refHires.filter(function (r) { return between(r.hireDate, addDays(y, -6), y); }).length;
+  var prev7h = refHires.filter(function (r) { return between(r.hireDate, addDays(y, -13), addDays(y, -7)); }).length;
+  var due = data.riders.filter(function (r) { return r.payStatus === 'due'; });
+  var approved = data.payouts.filter(function (p) { return p.status === 'approved'; });
+  var in7 = addDays(t, 7);
+  var soon = refHires.filter(function (r) { return r.payStatus === 'pending' && r.bonus > 0 && r.payoutDate && r.payoutDate <= in7; });
+  var sum = function (a, f) { return a.reduce(function (s, x) { return s + f(x); }, 0); };
+  return {
+    date: y,
+    numbers: {
+      apps: apps(y), appsLastWeek: apps(wk), hires: hires(y), hiresLastWeek: hires(wk),
+      apps7: last7a, apps7Prev: prev7a, hires7: last7h, hires7Prev: prev7h,
+      conv7: last7a ? Math.round(refHires.filter(function (r) { return between(r.hireDate, addDays(y, -6), y); }).length / last7a * 100) : 0
+    },
+    money: {
+      dueCount: due.length, dueSum: sum(due, function (r) { return r.bonus - r.paid - (r.approved || 0); }),
+      approvedCount: approved.length, approvedSum: sum(approved, function (p) { return p.amount; }),
+      soonCount: soon.length, soonSum: sum(soon, function (r) { return r.bonus; })
+    },
+    problems: {
+      stuck: data.applicants.filter(function (a) { return a.nudge; }).length,
+      notStarted: refHires.filter(function (r) { return r.started === false && r.daysSinceHire >= 3; }).length,
+      flagged: data.applicants.filter(function (a) { return a.flags.length; }).length + data.riders.filter(function (r) { return r.flags.length; }).length
+    }
+  };
+}
+
+/** WhatsApp text for the morning summary (WhatsApp *bold*). */
+function dailySummaryText(s, dateLabel, link) {
+  var n = s.numbers, m = s.money, p = s.problems, f = function (x) { return Number(x || 0).toLocaleString('en-US'); };
+  var vs = function (a, b) { return b ? ' (' + (a >= b ? '▲' : '▼') + Math.abs(Math.round((a - b) / b * 100)) + '%)' : ''; };
+  var lines = ['🏁 *Full Speed Champions*', 'تقرير ' + dateLabel, '',
+    '*📊 أرقام إمبارح*',
+    '• ترشيحات جديدة: *' + n.apps + '* (نفس اليوم الأسبوع اللي فات ' + n.appsLastWeek + ')',
+    '• اتعيّنوا من ترشيحات: *' + n.hires + '* (الأسبوع اللي فات ' + n.hiresLastWeek + ')',
+    '• آخر 7 أيام: ' + n.apps7 + ' ترشيح' + vs(n.apps7, n.apps7Prev) + ' · ' + n.hires7 + ' تعيين' + vs(n.hires7, n.hires7Prev), '',
+    '*💰 الفلوس*',
+    '• مستني اعتمادك: *' + f(m.dueSum) + ' ج* (' + m.dueCount + ' طيار)',
+    '• معتمد ومستني الصرف: *' + f(m.approvedSum) + ' ج* (' + m.approvedCount + ' عملية)',
+    '• هيستحق خلال أسبوع: ' + f(m.soonSum) + ' ج (' + m.soonCount + ' طيار)', ''];
+  var probs = [];
+  if (p.stuck) probs.push('• ' + p.stuck + ' مرشح واقفين على نفس الحالة');
+  if (p.notStarted) probs.push('• ' + p.notStarted + ' طيار كودهم وصل من 3 أيام ولسه ما بدأوش');
+  if (p.flagged) probs.push('• ' + p.flagged + ' تنبيه تلاعب أو تكرار محتاج مراجعة');
+  lines.push('*⚠️ محتاج انتباهك*');
+  lines = lines.concat(probs.length ? probs : ['• مفيش مشاكل ✓']);
+  if (link) lines.push('', link);
+  return lines.join('\n');
+}
+
 function buildReportTables(data) {
   var avg = function (a) { return a.length ? Math.round(a.reduce(function (s, x) { return s + x; }, 0) / a.length) : ''; };
   var pct = function (a, b) { return b ? Math.round(a / b * 100) + '%' : ''; };
@@ -1710,7 +1775,7 @@ if (typeof module !== 'undefined' && module.exports) {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
     cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
     buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, buildDashboard: buildDashboard,
-    findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildReportTables: buildReportTables, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
+    findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildReportTables: buildReportTables, buildDailySummary: buildDailySummary, dailySummaryText: dailySummaryText, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
   };
 }
 
