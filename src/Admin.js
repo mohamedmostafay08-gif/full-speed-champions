@@ -23,6 +23,7 @@ var ADMIN_ACTIONS_ = {
   adminRecordPayout: adminRecordPayout_,
   adminRefreshReports: adminRefreshReports_,
   adminSendReport: adminSendReport_,
+  adminRider: adminRider_,
   adminDeletePayout: adminDeletePayout_,
   adminUserAction: adminUserAction_,
   adminSaveSettings: adminSaveSettings_,
@@ -635,6 +636,16 @@ function dailySummaryHtml_(s, dateLabel, link) {
       row('هيستحق خلال أسبوع', f(m.soonSum) + ' ج (' + m.soonCount + ' طيار)')) +
     sec('⚠️ محتاج انتباهك', row('مرشحين واقفين على نفس الحالة', p.stuck) + row('طيارين كودهم وصل ولسه ما بدأوش (3 أيام+)', p.notStarted) + row('تنبيهات تلاعب أو تكرار', p.flagged)) +
     (link ? '<p style="margin-top:18px"><a href="' + link + '" style="background:#187A31;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">افتح لوحة الإدارة</a></p>' : '') + '</div>';
+}
+
+/** One rider's daily orders, for the full rider page. */
+function adminRider_(p) {
+  return asAdmin_(p, null, function () {
+    var code = cleanCode(p.code), world = loadWorld_();
+    if (!world.ridersByCode[code]) return fail_('الطيار ده مش موجود.');
+    var days = (world.dailyOrders[code] || []).slice().sort(function (a, b) { return a.date - b.date; });
+    return ok_({ code: code, daily: days.map(function (d) { return { date: d.date, orders: d.orders }; }) });
+  });
 }
 
 /** Owner button in Settings: send the report now, to check email and WhatsApp work. */

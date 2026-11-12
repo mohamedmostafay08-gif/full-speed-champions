@@ -189,6 +189,30 @@ td .gold { color: var(--gold); font-weight: 700; }
 @keyframes bootBar { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
 @keyframes bootIn { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .boot-bar i, .boot-in { animation: none; } }
+.ladder { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; margin-top: 10px; }
+.rung { display: grid; gap: 2px; text-align: center; padding: 8px 2px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); font-size: 11px; color: var(--dim); }
+.rung b { font: 800 14px var(--f-display); color: var(--muted); }
+.rung.on { background: var(--gold-soft); border-color: color-mix(in srgb, var(--gold) 45%, transparent); color: var(--gold); }
+.rung.on b { color: var(--gold); }
+.ladder-bar { height: 6px; border-radius: 6px; background: var(--line); margin-top: 8px; overflow: hidden; }
+.ladder-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--green), var(--gold)); border-radius: 6px; }
+.timeline { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 0; }
+.timeline li { display: grid; gap: 2px; padding: 0 18px 14px 0; position: relative; border-inline-start: 2px solid var(--line); margin-inline-start: 6px; padding-inline-start: 16px; }
+.timeline li::before { content: ''; position: absolute; inset-inline-start: -7px; top: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--green); border: 2px solid var(--surface); }
+.timeline li:last-child { border-color: transparent; }
+.timeline li span { font-size: 12px; }
+@media (max-width: 700px) { .ladder { grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.chart-box.donut { height: 200px; }
+.chart-box.gauge { height: 170px; }
+.donut-c { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
+.donut-c b { font: 800 28px var(--f-display); line-height: 1; }
+.donut-c span { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.gauge .donut-c { padding-top: 54px; }
+.dl { display: grid; gap: 6px; margin-top: 10px; font-size: 12px; }
+.dl div { display: grid; grid-template-columns: 10px 1fr auto 38px; gap: 8px; align-items: center; }
+.dl i { width: 10px; height: 10px; border-radius: 3px; }
+.dl b { font-variant-numeric: tabular-nums; }
+.dl small { color: var(--muted); text-align: end; }
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 760px) { .grid3 { grid-template-columns: 1fr; } }
 details.steps { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
@@ -215,6 +239,32 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
   .charts > .card, .charts > .card.third { grid-column: span 12; }
   .grid2 { grid-template-columns: 1fr; }
   .filters input[type=search] { min-width: 0; width: 100%; }
+}
+/* Phones: every table turns into a stack of cards, label on the right, value on the left. */
+@media (max-width: 700px) {
+  .tbl-wrap:has(table.rc) { border: 0; overflow: visible; }
+  table.rc thead { display: none; }
+  table.rc, table.rc tbody, table.rc tr, table.rc td { display: block; width: 100%; }
+  table.rc tr { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 6px 14px; margin-bottom: 10px; position: relative; }
+  table.rc td { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; padding: 7px 0; border-top: 1px solid var(--line); text-align: end; }
+  table.rc td:first-child { border-top: 0; }
+  table.rc td::before { content: attr(data-label); color: var(--muted); font-size: 12px; flex: none; text-align: start; padding-top: 1px; }
+  table.rc td[data-label=""] { justify-content: flex-start; }
+  table.rc td[data-label=""]::before { display: none; }
+  table.rc td:has(> input[data-pick]) { border: 0; padding: 4px 0 0; }
+  table.rc td > .v { text-align: end; min-width: 0; }
+  table.rc td[data-label=""] > .v { text-align: start; }
+  .pager { flex-wrap: wrap; gap: 8px; }
+  .kpis, .kpis.k3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi .num { font-size: 26px; }
+  .page-head { flex-wrap: wrap; }
+  .main { min-width: 0; }
+  table.rc td, table.rc td.n { white-space: normal; overflow-wrap: anywhere; }
+  .seg { display: flex; flex-wrap: wrap; width: 100%; }
+  .seg button { flex: 1 1 auto; }
+  .filters label { flex-wrap: wrap; width: 100%; }
+  .filters label select, .filters label input { flex: 1; min-width: 0; }
+  .chart-box.tall { height: 280px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
   table.cmp td .win { color: var(--green); font-weight: 800; }
@@ -558,6 +608,9 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
       '<div class="charts">' +
         '<section class="card wide"><h2>الترشيحات والتعيينات أسبوع بأسبوع<small>الأسبوع بيبدأ السبت</small></h2>' +
           legend([['ترشيحات', css('--s1')], ['تعيينات من ترشيحات', css('--s2')]]) + '<div class="chart-box"><canvas id="cTrend" aria-label="ترشيحات وتعيينات أسبوعية" role="img"></canvas></div></section>' +
+        '<section class="card third"><h2>جم منين؟<small>كل التعيينات في الفترة</small></h2><div class="chart-box donut"><canvas id="cSrc" role="img" aria-label="مصادر التعيينات"></canvas><div class="donut-c"><b>' + sc.allHires.length + '</b><span>تعيين</span></div></div><div id="lgSrc"></div></section>' +
+        '<section class="card third"><h2>نسبة التحويل<small>من الترشيح لحد ما اشتغل</small></h2><div class="chart-box donut gauge"><canvas id="cConv" role="img" aria-label="نسبة التحويل"></canvas><div class="donut-c"><b>' + conv + '%</b><span>' + (prev.apps ? 'الفترة اللي قبلها ' + prevConv() + '%' : '') + '</span></div></div><p class="sub" style="text-align:center;margin:0">' + (conv >= 30 ? 'تحويل ممتاز 👌' : conv >= 15 ? 'تحويل كويس — فيه مساحة نحسّن' : 'تحويل ضعيف — راجع المرشحين الواقفين') + '</p></section>' +
+        '<section class="card third"><h2>فلوس البونص<small>كل الطيارين من ترشيحات</small></h2><div class="chart-box donut"><canvas id="cMoney" role="img" aria-label="حالة فلوس البونص"></canvas><div class="donut-c"><b>' + money(moneyParts().reduce(function (s, x) { return s + x[1]; }, 0)) + '</b><span>جنيه</span></div></div><div id="lgMoney"></div></section>' +
         '<section class="card"><h2>رحلة المرشح<small>' + sc.apps.length + ' ترشيح في الفترة</small></h2><p class="sub">كام واحد وصل لكل خطوة — والفرق بين الخطوات هو اللي بيقع</p><div class="funnel">' +
           funnel.map(function (f, i) {
             return '<div class="funnel-row"><span>' + f.s + '</span><span class="bar" style="width:' + (funnel[0].n ? f.n / funnel[0].n * 100 : 0) + '%"></span><span class="n"><b>' + f.n + '</b><small>' + (i ? pct(f.n, funnel[0].n) + '%' : '') + '</small></span></div>';
@@ -570,6 +623,26 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
           top.map(function (t) { var u = d.usersByKey[t.k] || {}; return [esc(cleanName(u.name) || t.k), u.type === 'external' ? 'شريك' : 'طيار', t.apps, t.hires, pct(t.hires, t.apps || t.hires) + '%', '<span class="gold">' + money(t.bonus) + '</span>']; }), { empty: 'مفيش ترشيحات في الفترة دي.' }) + '</section>' +
         '<section class="card"><h2>محتاج انتباهك</h2>' + attention() + '</section>' +
       '</div>';
+  }
+  function prevConv() {
+    var start = rangeStart(), len = diff(start, rangeEnd()) + 1, pS = addDays(start, -len), pE = addDays(start, -1);
+    var a = S.data.applicants.filter(function (x) { return x.submitted && x.submitted >= pS && x.submitted <= pE && srcOk(x.refType) && zoneOk(x.zone) && svOk(x.refSv); });
+    return a.length ? pct(a.filter(function (x) { return x.status === 'اشتغل'; }).length, a.length) : 0;
+  }
+  function moneyParts() {
+    var d = S.data, rs = d.riders.filter(function (r) { return r.ownerKey && srcOk(r.ownerType) && zoneOk(r.zone) && svOk(r.sv); });
+    var sum = function (f) { return rs.reduce(function (s, r) { return s + f(r); }, 0); };
+    return [['اتصرف', sum(function (r) { return r.paid; }), css('--green')],
+      ['معتمد ومستني صرف', sum(function (r) { return r.approved; }), css('--s1')],
+      ['مستني اعتماد', sum(function (r) { return r.payStatus === 'due' ? r.bonus - r.paid - r.approved : 0; }), css('--gold')],
+      ['بيتحسب (لسه هيزيد)', sum(function (r) { return r.payStatus === 'pending' ? r.bonus : 0; }), css('--line-2')]];
+  }
+  function donut(id, lgId, parts, fmtV) {
+    var total = parts.reduce(function (s, x) { return s + x[1]; }, 0);
+    chart(id, { type: 'doughnut', data: { labels: parts.map(function (x) { return x[0]; }), datasets: [{ data: parts.map(function (x) { return x[1]; }), backgroundColor: parts.map(function (x) { return x[2]; }), borderColor: css('--surface'), borderWidth: 3, hoverOffset: 6 }] },
+      options: { cutout: '72%', scales: {}, interaction: { mode: 'nearest', intersect: true }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return c.label + ': ' + (fmtV ? fmtV(c.raw) : c.raw) + ' (' + pct(c.raw, total) + '%)'; } } } } } });
+    var lg = document.getElementById(lgId);
+    if (lg) lg.innerHTML = '<div class="dl">' + parts.map(function (x) { return '<div><i style="background:' + x[2] + '"></i><span>' + x[0] + '</span><b>' + (fmtV ? fmtV(x[1]) : x[1]) + '</b><small>' + pct(x[1], total) + '%</small></div>'; }).join('') + '</div>';
   }
   function kpi(lbl, val, cls, extra) { return '<div class="kpi"><span class="lbl">' + lbl + '</span><span class="num ' + (cls || '') + '">' + (typeof val === 'number' ? money(val) : val) + '</span>' + (extra || '') + '</div>'; }
   function attention() {
@@ -624,6 +697,12 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
       { label: 'ترشيحات', data: weeks.map(function (w) { return a[iso(w)] || 0; }), borderColor: css('--s1'), backgroundColor: css('--s1'), borderWidth: 2, pointRadius: 4, tension: .25 },
       { label: 'تعيينات من ترشيحات', data: weeks.map(function (w) { return h[iso(w)] || 0; }), borderColor: css('--s2'), backgroundColor: css('--s2'), borderWidth: 2, pointRadius: 4, tension: .25 }
     ] } });
+    var srcN = function (k) { return sc.allHires.filter(function (r) { return r.source === k; }).length; };
+    donut('cSrc', 'lgSrc', [['كود طلبات (طيار داخلي)', srcN('talabat'), css('--s2')], ['استمارة البرنامج', srcN('app'), css('--s1')], ['من غير ترشيح', srcN('none'), css('--line-2')]]);
+    donut('cMoney', 'lgMoney', moneyParts(), function (v) { return money(v) + ' ج'; });
+    var cv = sc.apps.length ? pct(sc.apps.filter(function (a) { return a.status === 'اشتغل'; }).length, sc.apps.length) : 0;
+    chart('cConv', { type: 'doughnut', data: { labels: ['اشتغلوا', 'لسه / وقعوا'], datasets: [{ data: [cv, 100 - cv], backgroundColor: [cv >= 30 ? css('--green') : cv >= 15 ? css('--gold') : css('--danger'), css('--line')], borderWidth: 0 }] },
+      options: { rotation: -90, circumference: 180, cutout: '78%', scales: {}, plugins: { legend: { display: false }, tooltip: { enabled: false } } } });
     var z = {};
     sc.apps.forEach(function (x) { if (x.zone) z[x.zone] = (z[x.zone] || 0) + 1; });
     var zs = Object.keys(z).sort(function (p, q) { return z[q] - z[p]; }).slice(0, 8);
@@ -847,7 +926,7 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
     };
     var I = side('internal'), E = side('external'), M = monthStats(), cur = M[M.length - 1], prv = M[M.length - 2];
     var dl = function (a, b) { if (!b) return a ? '<span class="delta">جديد</span>' : ''; var p = Math.round((a - b) / b * 100); return '<span class="delta"><b class="' + (p >= 0 ? 'up' : 'down') + '">' + (p >= 0 ? '▲ ' : '▼ ') + Math.abs(p) + '%</b> عن ' + prv.label + '</span>'; };
-    var verdict = A.o30 !== null && B.o30 !== null ? (A.o30 >= B.o30 ? 'طيارين الترشيحات بيعملوا في المتوسط <b>' + A.o30 + '</b> أوردر في آخر 30 يوم مقابل <b>' + B.o30 + '</b> للباقيين — الترشيح بيجيب طيارين أقوى.' : 'طيارين الترشيحات بيعملوا <b>' + A.o30 + '</b> أوردر في آخر 30 يوم مقابل <b>' + B.o30 + '</b> للباقيين — محتاجين نركّز على جودة المرشحين.') : 'لسه مفيش أوردرات كفاية في Daily Orders للمقارنة.';
+    var verdict = A.o30 !== null && B.o30 !== null ? (A.o30 >= B.o30 ? 'طيارين الترشيحات بيعملوا في المتوسط <b>' + A.o30 + '</b> أوردر في أول 30 يوم من تعيينهم مقابل <b>' + B.o30 + '</b> للباقيين — الترشيح بيجيب طيارين أقوى.' : 'طيارين الترشيحات بيعملوا <b>' + A.o30 + '</b> أوردر في أول 30 يوم من تعيينهم مقابل <b>' + B.o30 + '</b> للباقيين — محتاجين نركّز على جودة المرشحين.') : 'لسه مفيش أوردرات كفاية في Daily Orders للمقارنة.';
     return head('المقارنات', 'الترشيح قصاد التعيين العادي، الداخلي قصاد الشركاء، وشهر قصاد شهر') + filterBar() +
       '<div class="kpis">' +
         kpi('ترشيحات ' + cur.label, cur.apps, '', dl(cur.apps, prv.apps)) +
@@ -857,16 +936,16 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
       '</div>' + insight(verdict) +
       '<div class="charts">' +
         cmpCard('الترشيح قصاد التعيين العادي', 'كل اللي اتعيّنوا في الفترة — الأخضر هو الأحسن', 'من ترشيح', 'من غير ترشيح', [
-          cmpRow('عدد التعيينات', A.n, B.n), cmpRow('متوسط أوردرات آخر 30 يوم', A.o30, B.o30), cmpRow('متوسط الباتش (الأقل أقوى)', A.batch, B.batch, '', true),
+          cmpRow('عدد التعيينات', A.n, B.n), cmpRow('متوسط أوردرات أول 30 يوم', A.o30, B.o30), cmpRow('متوسط الباتش (الأقل أقوى)', A.batch, B.batch, '', true),
           cmpRow('باتش 1–2 (قوي)', A.strong, B.strong, '%'), cmpRow('With SP', A.sp, B.sp, '%'), cmpRow('بدأوا شغل فعلاً', A.started, B.started, '%')]) +
         cmpCard('الطيارين الداخليين قصاد الشركاء', 'مين بيجيب مرشحين أكتر وأحسن', 'طيارين داخليين', 'شركاء', [
           cmpRow('مرشِّحين جابوا تعيين', I.refs, E.refs), cmpRow('ترشيحات', I.apps, E.apps), cmpRow('اتعيّنوا', I.hires, E.hires), cmpRow('نسبة التحويل', I.conv, E.conv, '%'),
-          cmpRow('تكلفة البونص لكل تعيين', I.cost, E.cost, ' ج', true), cmpRow('متوسط أوردرات آخر 30 يوم', I.o30, E.o30), cmpRow('متوسط الباتش', I.batch, E.batch, '', true)]) +
+          cmpRow('تكلفة البونص لكل تعيين', I.cost, E.cost, ' ج', true), cmpRow('متوسط أوردرات أول 30 يوم', I.o30, E.o30), cmpRow('متوسط الباتش', I.batch, E.batch, '', true)]) +
         '<section class="card wide"><h2>توزيع الباتش<small>نسبة الطيارين في كل باتش — 1 أقوى</small></h2>' + legend([['من ترشيح', css('--s2')], ['من غير ترشيح', css('--s1')]]) +
           '<div class="chart-box"><canvas id="cBatch" role="img" aria-label="توزيع الباتش للترشيحات قصاد غير الترشيحات"></canvas></div></section>' +
         '<section class="card wide"><h2>شهر قصاد شهر<small>من بداية البرنامج (لحد 6 شهور) — بالفلاتر اللي فوق ما عدا الفترة</small></h2>' + legend([['ترشيحات', css('--s1')], ['تعيينات من ترشيحات', css('--s2')], ['تعيينات من غير ترشيح', css('--s3')]]) +
           '<div class="chart-box"><canvas id="cMonths" role="img" aria-label="مقارنة شهرية"></canvas></div>' +
-          table([['الشهر'], ['ترشيحات', 'n'], ['كل التعيينات', 'n'], ['من ترشيحات', 'n'], ['نسبة الترشيحات', 'n'], ['تحويل', 'n'], ['أوردرات 30 يوم', 'n'], ['بونص التعيينات دي (ج)', 'n'], ['اتصرف (ج)', 'n']],
+          table([['الشهر'], ['ترشيحات', 'n'], ['كل التعيينات', 'n'], ['من ترشيحات', 'n'], ['نسبة الترشيحات', 'n'], ['تحويل', 'n'], ['أوردرات أول 30 يوم', 'n'], ['بونص التعيينات دي (ج)', 'n'], ['اتصرف (ج)', 'n']],
             M.slice().reverse().map(function (x) { return [x.label, x.apps, x.all, x.ref, x.share + '%', x.conv + '%', x.o30 === null ? '—' : x.o30, '<span class="gold">' + money(x.bonus) + '</span>', money(x.paid)]; }), { name: 'شهر-قصاد-شهر' }) + '</section>' +
       '</div>';
   }
@@ -963,8 +1042,8 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
     var page = opt.page || 0, shown = page ? rows.slice(0, page) : rows;
     var xid = 't' + (++EXPORT_N);
     EXPORTS[xid] = { name: opt.name || 'تقرير', head: cols.map(function (c) { return c[0]; }), rows: rows.map(function (r) { return r.map(plain); }) };
-    return '<div class="tbl-wrap"><table><thead><tr>' + cols.map(function (c) { return '<th>' + c[0] + '</th>'; }).join('') + '</tr></thead><tbody>' +
-      shown.map(function (r) { return '<tr>' + r.map(function (v, i) { return '<td class="' + (cols[i][1] || '') + '">' + v + '</td>'; }).join('') + '</tr>'; }).join('') +
+    return '<div class="tbl-wrap"><table class="rc"><thead><tr>' + cols.map(function (c) { return '<th>' + c[0] + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      shown.map(function (r) { return '<tr>' + r.map(function (v, i) { return '<td class="' + (cols[i][1] || '') + '" data-label="' + esc(plain(cols[i][0])) + '"><div class="v">' + v + '</div></td>'; }).join('') + '</tr>'; }).join('') +
       '</tbody></table></div><div class="pager"><span>' + (page && rows.length > page ? 'بيعرض ' + page + ' من ' + rows.length : rows.length + ' صف') + '</span>' + exportBtn(xid) + '</div>';
   }
 
@@ -984,12 +1063,12 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
     var pick = opt.pick || S.picked;
     var xc = cols.filter(function (c) { return c.t; });
     EXPORTS[id] = { name: opt.name || id, head: xc.map(function (c) { return c.t; }), rows: sorted.map(function (x) { return xc.map(function (c) { return c.x ? c.x(x) : plain(c.v(x)); }); }) };
-    return '<div class="tbl-wrap"><table data-list="' + id + '"><thead><tr>' +
+    return '<div class="tbl-wrap"><table class="rc" data-list="' + id + '"><thead><tr>' +
       (opt.select ? '<th style="width:32px"><input type="checkbox" data-all aria-label="تحديد الكل"></th>' : '') +
       cols.map(function (c) { return '<th data-sort="' + (c.k || '') + '" aria-sort="' + (st.k === c.k ? (st.dir > 0 ? 'ascending' : 'descending') : 'none') + '">' + c.t + '</th>'; }).join('') + '</tr></thead><tbody>' +
       slice.map(function (x) {
         return '<tr class="' + (opt.open ? 'clickable' : '') + '" data-id="' + esc(opt.id(x)) + '">' + (opt.select ? '<td><input type="checkbox" data-pick value="' + esc(opt.id(x)) + '"' + (pick[opt.id(x)] ? ' checked' : '') + ' aria-label="تحديد"></td>' : '') +
-          cols.map(function (c) { return '<td class="' + (c.c || '') + '">' + c.v(x) + '</td>'; }).join('') + '</tr>';
+          cols.map(function (c) { return '<td class="' + (c.c || '') + '" data-label="' + esc(c.t || '') + '"><div class="v">' + c.v(x) + '</div></td>'; }).join('') + '</tr>';
       }).join('') + '</tbody></table></div>' +
       '<div class="pager"><span>' + sorted.length + ' نتيجة</span><span>' + exportBtn(id) + '</span>' + (pages > 1 ? '<span><button class="btn btn-ghost btn-sm" data-page="-1"' + (st.page ? '' : ' disabled') + '>السابق</button> ' + (st.page + 1) + ' / ' + pages + ' <button class="btn btn-ghost btn-sm" data-page="1"' + (st.page < pages - 1 ? '' : ' disabled') + '>التالي</button></span>' : '') + '</div>';
   }
@@ -1177,20 +1256,78 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
     var d = S.data, r = d.riders.filter(function (x) { return x.code === code; })[0]; if (!r) return;
     var u = d.usersByKey[r.ownerKey] || {};
     var o = overlay(dhead(esc(cleanName(r.name)), '#' + esc(r.code) + ' · ' + esc(r.zone)) +
+      '<button class="btn btn-ghost" id="fullProfile" style="justify-self:start">' + icon('user') + 'افتح الملف كله</button>' +
       '<div><div class="kv"><span>اتعين</span><span>' + fmt(r.hireDate, true) + '</span></div><div class="kv"><span>آخر يوم بيتحسب</span><span>' + fmt(r.lastDay, true) + '</span></div>' +
       '<div class="kv"><span>أوردرات مكتملة</span><span>' + money(r.orders) + (r.ordersSource === 'manual' ? ' (من العمود اليدوي)' : '') + '</span></div>' +
       '<div class="kv"><span>البونص</span><span class="gold">' + money(r.bonus) + ' ج' + (r.extra ? ' (منها ' + r.extra + ' حملة: ' + esc(r.campaigns.join('، ')) + ')' : '') + '</span></div>' +
       '<div class="kv"><span>اتصرف</span><span>' + money(r.paid) + ' ج</span></div>' +
       '<div class="kv"><span>المرشِّح</span><span>' + esc(cleanName(r.ownerName) || r.ownerKey || '—') + (u.phone ? ' · <span class="ltr">' + esc(u.phone) + '</span>' : '') + '</span></div></div>' +
       (r.batch ? '<div class="kv"><span>الباتش التشغيلي</span><span>' + r.batch + '</span></div>' : '') +
-      (r.orders30 !== null && r.orders30 !== undefined ? '<div class="kv"><span>أوردرات آخر 30 يوم</span><span>' + money(r.orders30) + '</span></div>' : '') +
+      (r.orders30 !== null && r.orders30 !== undefined ? '<div class="kv"><span>أوردرات أول 30 يوم</span><span>' + money(r.orders30) + '</span></div>' : '') +
       (r.payouts && r.payouts.length ? '<div class="card"><h2>عمليات الصرف</h2>' + r.payouts.map(function (p) { return '<div class="kv"><span>' + (p.approved ? 'اعتمده ' + esc(p.approvedBy) + ' ' + fmt(p.approvedAt, true) + ' — مستني الصرف' : fmt(p.paidAt, true) + ' — ' + esc(p.method) + (p.reference ? ' (' + esc(p.reference) + ')' : '')) + '</span><span>' + money(p.amount) + ' ج</span></div>'; }).join('') + '</div>' : '') +
       (r.payStatus === 'due' && can('payouts.approve') ? '<button class="btn btn-gold" id="aprNow">اعتمد صرف ' + money(r.bonus - r.paid - r.approved) + ' ج</button>' : '') +
       (r.payStatus === 'approved' && can('payouts.edit') ? '<button class="btn btn-gold" id="payNow">سجّل الصرف ' + money(r.approved) + ' ج</button>' : '') +
       (u.phone && r.payStatus === 'paid' ? '<a class="btn btn-wa" target="_blank" rel="noopener" href="' + wa(u.phone, 'أهلاً ' + cleanName(u.name).split(' ')[0] + ' 👋 اتصرفلك بونص ' + money(r.paid) + ' ج عن ' + cleanName(r.name) + '. شكراً إنك جزء من Full Speed 💚') + '">' + icon('wa') + 'بلّغ المرشِّح إن الفلوس اتصرفت</a>' : ''));
     var pn = o.querySelector('#payNow'); if (pn) pn.onclick = function () { openPay(code); };
+    var fp = o.querySelector('#fullProfile'); if (fp) fp.onclick = function () { closeOverlay(); openProfile(code); };
     var an = o.querySelector('#aprNow'); if (an) an.onclick = function () { approveCodes([code]); };
   }
+  /* ─────────────── Full rider profile ─────────────── */
+  S.daily = {};
+  function openProfile(code) { S.back = S.view; S.riderCode = code; S.view = 'rider'; render(); scrollTo(0, 0); }
+  function viewRider() {
+    var d = S.data, r = d.riders.filter(function (x) { return x.code === S.riderCode; })[0];
+    if (!r) return head('الطيار') + '<div class="empty">الطيار ده مش موجود.</div>';
+    var u = d.usersByKey[r.ownerKey] || {};
+    var app = d.applicants.filter(function (a) { return a.hiredCode === r.code; })[0] || d.applicants.filter(function (a) { return a.phone && r.phone && String(a.phone).slice(-10) === String(r.phone).replace(/\D/g, '').slice(-10); })[0];
+    var tiers = d.season.tiers, top = tiers[tiers.length - 1].orders;
+    var p = PAY[r.payStatus] || PAY.none;
+    var steps = [
+      app && app.submitted ? [app.submitted, 'اترشّح', (app.refName ? 'من ' + esc(cleanName(app.refName)) : '') ] : null,
+      r.hireDate ? [r.hireDate, 'اتعيّن', esc(r.sv || '')] : null,
+      r.firstOrderDate ? [day(r.firstOrderDate), 'أول أوردر', r.daysToStart === 0 ? 'نفس يوم التعيين' : r.daysToStart ? 'بعد ' + r.daysToStart + ' يوم من التعيين' : ''] : (r.started === false ? [null, 'لسه ما بدأش شغل', 'كوده وصل من ' + r.daysSinceHire + ' يوم'] : null),
+      r.lastDay ? [r.lastDay, 'آخر يوم بيتحسب', r.state === 'active' ? 'باقي ' + r.daysLeft + ' يوم' : 'المدة خلصت'] : null
+    ].concat((r.payouts || []).map(function (x) { return x.approved ? [day(x.approvedAt), 'اتعتمد ' + money(x.amount) + ' ج', esc(x.approvedBy || '')] : [day(x.paidAt), 'اتصرف ' + money(x.amount) + ' ج', esc(x.method || '')]; })).filter(Boolean);
+    return '<div class="page-head"><div><button class="btn btn-ghost btn-sm" id="back" style="margin-bottom:8px">→ رجوع</button><h1>' + esc(cleanName(r.name)) + '</h1><p><span class="ltr">#' + esc(r.code) + '</span> · ' + esc(r.zone || '') + ' · ' + esc(r.sv || 'SV غير محدد') + ' · ' + esc(r.vehicle || '') + '</p></div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="pill ' + p[1] + '" style="font-size:13px;padding:6px 12px">' + p[0] + '</span>' + (r.sp === false ? '<span class="pill red" style="font-size:13px;padding:6px 12px">No SP</span>' : r.sp ? '<span class="pill green" style="font-size:13px;padding:6px 12px">With SP</span>' : '') + '</div></div>' +
+      '<div class="kpis">' + kpi('أوردرات في مدة البونص', money(r.orders), '', '<span class="delta">' + (r.ordersSource === 'manual' ? 'من العمود اليدوي' : 'من Daily Orders') + '</span>') +
+        kpi('البونص', money(r.bonus), 'gold', '<span class="delta">' + (r.nextBonus ? 'باقي ' + money(r.ordersToNext) + ' أوردر على ' + money(r.nextBonus) + ' ج' : 'وصل لأعلى شريحة') + '</span>') +
+        kpi('أوردرات أول 30 يوم', r.orders30 === null || r.orders30 === undefined ? '—' : money(r.orders30), '', '<span class="delta">' + (r.batch ? 'باتش ' + r.batch : 'الباتش مش متسجل') + '</span>') +
+        kpi(r.state === 'active' ? 'باقي على آخر يوم' : 'مدة البونص', r.state === 'active' ? r.daysLeft + ' يوم' : 'خلصت', 'txt', '<span class="delta">لحد ' + fmt(r.lastDay, true) + '</span>') + '</div>' +
+      '<section class="card" style="margin-top:12px"><h2>طريقه لأعلى شريحة<small>' + money(r.orders) + ' من ' + money(top) + ' أوردر</small></h2><div class="ladder">' +
+        tiers.map(function (t) { var on = r.orders >= t.orders; return '<div class="rung' + (on ? ' on' : '') + '" title="' + t.orders + ' أوردر"><b>' + money(t.bonus) + '</b><span>' + money(t.orders) + '</span></div>'; }).join('') +
+        '</div><div class="ladder-bar"><i style="width:' + Math.min(100, r.orders / top * 100) + '%"></i></div></section>' +
+      '<div class="charts" style="margin-top:12px">' +
+        '<section class="card wide"><h2>الأوردرات يوم بيوم<small>العمود = أوردرات اليوم · الخط = المجموع</small></h2>' + legend([['أوردرات اليوم', css('--s1')], ['المجموع', css('--gold')]]) +
+          '<div class="chart-box tall" id="dailyBox"><div class="sk" style="height:100%"></div><canvas id="cDaily" role="img" aria-label="أوردرات الطيار يوم بيوم" hidden></canvas></div></section>' +
+        '<section class="card"><h2>الرحلة</h2><ol class="timeline">' + steps.map(function (st) { return '<li><b>' + st[1] + '</b><span class="muted">' + (st[0] ? fmt(st[0], true) : '') + (st[2] ? ' · ' + st[2] : '') + '</span></li>'; }).join('') + '</ol></section>' +
+        '<section class="card"><h2>المرشِّح</h2>' + (r.ownerKey ? '<div class="kv"><span>الاسم</span><span>' + esc(cleanName(r.ownerName) || r.ownerKey) + (u.left ? ' <span class="pill red">ساب</span>' : '') + '</span></div>' +
+          '<div class="kv"><span>النوع</span><span>' + (r.ownerType === 'external' ? 'شريك خارجي' : 'طيار داخلي') + '</span></div>' +
+          '<div class="kv"><span>اتنسب عن طريق</span><span>' + (r.source === 'talabat' ? 'كود طلبات' : 'استمارة البرنامج') + '</span></div>' +
+          (u.phone ? '<div class="kv"><span>الموبايل</span><span class="ltr">' + esc(u.phone) + '</span></div><a class="btn btn-wa" style="margin-top:10px" target="_blank" rel="noopener" href="' + wa(u.phone, 'أهلاً ' + cleanName(u.name).split(' ')[0] + ' 👋 ' + cleanName(r.name) + ' اللي رشحته عمل ' + money(r.orders) + ' أوردر لحد دلوقتي وبونصك ' + money(r.bonus) + ' ج 💚') + '">' + icon('wa') + 'كلّم المرشِّح</a>' : '')
+          : '<p class="muted" style="margin:0">اتعيّن من غير ترشيح.</p>') + '</section>' +
+      '</div>';
+  }
+  function bindRider() {
+    document.getElementById('back').onclick = function () { S.view = S.back && S.back !== 'rider' ? S.back : 'riders'; render(); };
+    var code = S.riderCode, draw = function (days) {
+      var box = document.getElementById('dailyBox'); if (!box || S.riderCode !== code) return;
+      var r = S.data.riders.filter(function (x) { return x.code === code; })[0];
+      var list = days.map(function (x) { return { d: day(x.date), n: Number(x.orders) || 0 }; }).filter(function (x) { return x.d && (!r.hireDate || x.d >= r.hireDate); });
+      if (!list.length) { box.innerHTML = '<div class="empty">مفيش أوردرات للطيار ده في Daily Orders لسه.</div>'; return; }
+      box.querySelector('.sk').remove(); box.querySelector('canvas').hidden = false;
+      var cum = 0, inWin = function (x) { return !r.lastDay || x.d <= r.lastDay; };
+      chart('cDaily', { data: { labels: list.map(function (x) { return fmt(x.d); }), datasets: [
+        { type: 'bar', label: 'أوردرات اليوم', data: list.map(function (x) { return x.n; }), backgroundColor: list.map(function (x) { return inWin(x) ? css('--s1') : css('--line-2'); }), borderRadius: 3, maxBarThickness: 14, yAxisID: 'y' },
+        { type: 'line', label: 'المجموع في مدة البونص', data: list.map(function (x) { if (inWin(x)) cum += x.n; return cum; }), borderColor: css('--gold'), backgroundColor: css('--gold'), borderWidth: 2, pointRadius: 0, tension: .2, yAxisID: 'y2' }] },
+        options: { scales: { x: { grid: { display: false }, ticks: { color: css('--muted'), maxTicksLimit: 12 }, reverse: true },
+          y: { beginAtZero: true, grid: { color: css('--line') }, ticks: { color: css('--muted'), precision: 0 }, position: 'right', title: { display: true, text: 'في اليوم', color: css('--muted') } },
+          y2: { beginAtZero: true, grid: { display: false }, ticks: { color: css('--gold') }, position: 'left', title: { display: true, text: 'المجموع', color: css('--gold') } } } } });
+    };
+    if (S.daily[code]) draw(S.daily[code]);
+    else call('adminRider', { code: code }).then(function (res) { if (res.ok) { S.daily[code] = res.data.daily; draw(res.data.daily); } });
+  }
+
   function approveCodes(codes) {
     var d = S.data, rs = d.riders.filter(function (r) { return codes.indexOf(r.code) !== -1 && r.payStatus === 'due'; });
     if (!rs.length) return;
@@ -1486,8 +1623,8 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
     };
   }
 
-  var VIEWS = { overview: viewOverview, analytics: viewAnalytics, compare: viewCompare, sv: viewSV, applicants: viewApplicants, riders: viewRiders, payouts: viewPayouts, users: viewUsers, alerts: viewAlerts, campaigns: viewCampaigns, settings: viewSettings, team: viewTeam, audit: viewAudit };
-  var BINDERS = { overview: bindOverview, analytics: bindAnalytics, compare: bindCompare, sv: bindSV, applicants: bindApplicants, riders: bindRiders, payouts: bindPayouts, users: bindUsers, alerts: bindAlerts, campaigns: bindCampaigns, settings: bindSettings, team: bindTeam, audit: bindAudit };
+  var VIEWS = { overview: viewOverview, analytics: viewAnalytics, compare: viewCompare, rider: viewRider, sv: viewSV, applicants: viewApplicants, riders: viewRiders, payouts: viewPayouts, users: viewUsers, alerts: viewAlerts, campaigns: viewCampaigns, settings: viewSettings, team: viewTeam, audit: viewAudit };
+  var BINDERS = { overview: bindOverview, analytics: bindAnalytics, compare: bindCompare, rider: bindRider, sv: bindSV, applicants: bindApplicants, riders: bindRiders, payouts: bindPayouts, users: bindUsers, alerts: bindAlerts, campaigns: bindCampaigns, settings: bindSettings, team: bindTeam, audit: bindAudit };
 
   /* ─────────────── Start ─────────────── */
   (async function () {

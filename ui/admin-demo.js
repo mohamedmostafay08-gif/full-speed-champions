@@ -159,6 +159,7 @@
       log('اعتمد صرف بونص', rs.length + ' طيار', '', total + ' ج'); return ok({ approved: rs.length, total: total, skipped: (p.codes || []).length - rs.length });
     },
     adminRefreshReports: function () { log('حدّث تاب التقارير', ''); return ok(); },
+    adminRider: function (p) { return ok({ code: p.code, daily: wire(daily.filter(function (d) { return d.code === p.code; }).map(function (d) { return { date: d.date, orders: d.orders }; })) }); },
     adminSendReport: function () { return ok({ result: ['نسخة تجريبية — مفيش حاجة اتبعتت فعلاً'] }); },
     adminRecordPayout: function (p) {
       var po = payouts.filter(function (x) { return x.id === p.id && /معتمد/.test(x.status); })[0];
