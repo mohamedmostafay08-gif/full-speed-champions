@@ -89,6 +89,7 @@ test('applicant status + note, rejection needs a reason, audit trail', () => {
   const apps = env.sheets['New Applicants'], h = apps.rows[0];
   assert.equal(apps.rows[2][h.indexOf('الحالة')], 'مرفوض');
   assert.equal(apps.rows[2][h.indexOf('ملاحظات الإدارة')], 'مش عنده رخصة');
+  assert.equal(apps.rows[2][h.indexOf('سبب الرفض')], 'مش عنده رخصة');     // new column, filled on rejection
   assert.ok(env.sheets['FS Audit'].rows.some((r) => r[2] === 'غيّر الحالة' && r[4] === 'تم التواصل' && r[5] === 'مرفوض'));
   // wrong phone guard: the row moved → skipped
   const moved = env.api('adminUpdateApplicants', { token, items: [{ row: 3, phone: '01111111111' }], status: 'جديد' });
@@ -98,6 +99,10 @@ test('applicant status + note, rejection needs a reason, audit trail', () => {
   const p = ziad.data.dashboard.pipeline.find((x) => x.name === 'مرشح بيستنى');
   assert.equal(p.status, 'مرفوض');
   assert.equal(p.note, 'مش عنده رخصة');
+  assert.equal(p.reason, 'مش عنده رخصة');
+  // back in the pipeline → the reason is cleared
+  env.api('adminUpdateApplicants', { token, items: [{ row: 3, phone: '01000000009' }], status: 'تم التواصل' });
+  assert.equal(apps.rows[2][h.indexOf('سبب الرفض')], '');
 });
 
 test('payouts in two steps: owner approves, finance pays; rider app follows', () => {

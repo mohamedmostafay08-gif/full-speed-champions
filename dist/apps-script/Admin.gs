@@ -238,6 +238,8 @@ function adminUpdateApplicants_(p) {
           audit_(a, 'غيّر الحالة', name, current[t.map.status], p.status);
           t.sh.getRange(row, t.map.status + 1).setValue(p.status);
           if (t.map.statusUpdated !== -1) t.sh.getRange(row, t.map.statusUpdated + 1).setValue(new Date());
+          // "سبب الرفض": your reason when rejecting; cleared when the candidate is back in the pipeline.
+          if (t.map.reason !== -1) t.sh.getRange(row, t.map.reason + 1).setValue(p.status === STATUS_REJECTED ? safeCell(cleanText(p.note)) : '');
         }
         if (p.note !== undefined && t.map.note !== -1 && cleanText(current[t.map.note]) !== cleanText(p.note)) {
           audit_(a, 'ملاحظة للمرشِّح', name, current[t.map.note], p.note);

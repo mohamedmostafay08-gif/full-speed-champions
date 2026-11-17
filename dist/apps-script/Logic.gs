@@ -202,6 +202,7 @@ function buildWorld(raw, cfg, today) {
       rawStatus: cleanText(a.status),
       status: normalizeStatus(a.status) || guessStatus(a.status),
       note: cleanText(a.note),
+      reason: cleanText(a.reason),
       statusUpdated: parseSheetDate(a.statusUpdated, opts),
       hiredCode: cleanCode(a.hiredCode)
     };
@@ -258,6 +259,29 @@ function buildWorld(raw, cfg, today) {
     a.matchedCode = a.hiredCode || (h && h.code) || (r && r.code) || '';
     a.matchedBy = a.hiredCode ? 'typed' : h ? 'headcount' : r ? 'tracker' : '';
     if (a.matchedCode && !appsByCode[a.matchedCode]) appsByCode[a.matchedCode] = a;
+  });
+
+  // Reasons the program can tell by itself (shown to the referrer, written to "سبب الرفض").
+  var firstByPhone = {}, firstByNid = {};
+  applicants.slice().sort(function (a, b) { return (a.timestamp || 0) - (b.timestamp || 0); }).forEach(function (a) {
+    var prev = (a.phone && firstByPhone[a.phone]) || (a.nationalId && firstByNid[a.nationalId]) || null;
+    var sameRef = prev && appOwnerKey(prev.refCode) === appOwnerKey(a.refCode);
+    if (prev && prev !== a && !(sameRef && prev.status === STATUS_REJECTED)) {  // same referrer may re-refer after a rejection
+      a.autoReason = !sameRef
+        ? { key: 'dupOther', text: 'مترشح قبل كده من مرشِّح تاني', reject: true }
+        : { key: 'dupSame', text: 'استمارة مكررة — اتحسبت أول مرة بس', reject: false };
+    } else {
+      var rr = a.matchedCode && byCode[a.matchedCode], applied = a.timestamp && dateOnly(a.timestamp);
+      if (rr && rr.hireDate && applied && applied > dateOnly(rr.hireDate)) {
+        a.autoReason = diffDays(rr.hireDate, applied) > 30
+          ? { key: 'oldRider', text: 'مندوب شغال عندنا أصلاً قبل الترشيح — مالوش بونص', reject: false }
+          : { key: 'afterHire', text: 'الاستمارة اترفعت بعد التعيين — مالوش بونص', reject: false };
+      } else if (rr && rr.hireDate && cfg.PROGRAM_START_DATE && rr.hireDate < cfg.PROGRAM_START_DATE) {
+        a.autoReason = { key: 'beforeStart', text: 'اتعيّن قبل بداية البرنامج — مالوش بونص', reject: false };
+      }
+    }
+    if (a.phone && !firstByPhone[a.phone]) firstByPhone[a.phone] = a;
+    if (a.nationalId && !firstByNid[a.nationalId]) firstByNid[a.nationalId] = a;
   });
 
   var campaigns = (raw.campaigns || []).map(function (c) {
@@ -373,6 +397,19 @@ function appOwnerKey(refCode) {
  * external partners use. Riders under that code (or with no code) belong to
  * whoever submitted their application in the program.
  */
+/** Why a candidate was rejected or earns no bonus: the "سبب الرفض" column, else what the program found, else the rejection note. */
+function reasonOf(a, status) {
+  if (a.reason) return a.reason;
+  if (a.autoReason) return a.autoReason.text;
+  return status === STATUS_REJECTED ? a.note : '';
+}
+
+/** Rows the hourly sync should update: auto reasons not yet in the sheet, and duplicates to mark rejected. */
+function findAutoReasons(world) {
+  return world.applicants.filter(function (a) { return a.autoReason && a.row && (!a.reason || (a.autoReason.reject && a.status !== STATUS_REJECTED && a.status !== STATUS_HIRED)); })
+    .map(function (a) { return { row: a.row, phone: a.phone, text: a.autoReason.text, reject: a.autoReason.reject && a.status !== STATUS_REJECTED && a.status !== STATUS_HIRED, writeReason: !a.reason }; });
+}
+
 /** The application a hired rider came from (New Applicants), if any — made on or before the hire day. */
 function riderApp(rider, world) {
   var app = (world.appsByCode && world.appsByCode[rider.code]) || null;
@@ -479,7 +516,7 @@ function buildDashboard(world, user) {
       var since = a.statusUpdated || a.timestamp;
       var waiting = diffDays(since, today);
       return {
-        name: a.name, phone: a.phone, zone: a.zone, note: a.note,
+        name: a.name, phone: a.phone, zone: a.zone, note: a.note, reason: reasonOf(a, status),
         submitted: a.timestamp, status: status, rawStatus: a.rawStatus,
         stage: stageIndex(status), rejected: status === STATUS_REJECTED,
         hiredCode: hired ? hired.code : '', hiredDate: hired ? hired.hireDate : null, codeArrived: !!(hired && !hired.started), codeArrived: !!(hired && !hired.started),
@@ -657,6 +694,7 @@ function buildAdminData(world, users) {
       row: a.row, submitted: a.timestamp, refKey: key, refName: p ? p.name : '', refType: p ? p.type : '', refSv: svOf(key, world),
       name: a.name, phone: a.phone, nationalId: a.nationalId, zone: a.zone,
       status: status, sheetStatus: a.rawStatus, note: a.note, statusUpdated: a.statusUpdated,
+      reason: reasonOf(a, status), autoReason: a.autoReason ? a.autoReason.key : '',
       daysWaiting: waiting, stage: stageIndex(status),
       hiredCode: hired ? hired.code : '', hiredDate: hired ? hired.hireDate : null, codeArrived: !!(hired && !hired.started),
       nudge: status !== STATUS_HIRED && status !== STATUS_REJECTED && waiting >= cfg.NUDGE_AFTER_DAYS,
@@ -954,7 +992,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
     cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
-    buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, hiredFrom: hiredFrom, appliedBeforeHire: appliedBeforeHire, buildDashboard: buildDashboard, buildLeaderboard: buildLeaderboard,
+    buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, hiredFrom: hiredFrom, appliedBeforeHire: appliedBeforeHire, findAutoReasons: findAutoReasons, reasonOf: reasonOf, buildDashboard: buildDashboard, buildLeaderboard: buildLeaderboard,
     findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildReportTables: buildReportTables, buildDataCheck: buildDataCheck, buildDailySummary: buildDailySummary, dailySummaryText: dailySummaryText, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
   };
 }

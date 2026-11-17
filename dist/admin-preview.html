@@ -420,7 +420,8 @@ var COLUMNS = {
     refType: ['نوع المرشِّح'],
     statusUpdated: ['آخر تحديث للحالة'],
     hiredCode: ['كود بعد التعيين'],
-    hiredDate: ['تاريخ التعيين الفعلي']
+    hiredDate: ['تاريخ التعيين الفعلي'],
+    reason: ['سبب الرفض']
   },
   DAILY_ORDERS: {
     date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم', 'Work Date'],
@@ -1045,6 +1046,7 @@ function buildWorld(raw, cfg, today) {
       rawStatus: cleanText(a.status),
       status: normalizeStatus(a.status) || guessStatus(a.status),
       note: cleanText(a.note),
+      reason: cleanText(a.reason),
       statusUpdated: parseSheetDate(a.statusUpdated, opts),
       hiredCode: cleanCode(a.hiredCode)
     };
@@ -1101,6 +1103,29 @@ function buildWorld(raw, cfg, today) {
     a.matchedCode = a.hiredCode || (h && h.code) || (r && r.code) || '';
     a.matchedBy = a.hiredCode ? 'typed' : h ? 'headcount' : r ? 'tracker' : '';
     if (a.matchedCode && !appsByCode[a.matchedCode]) appsByCode[a.matchedCode] = a;
+  });
+
+  // Reasons the program can tell by itself (shown to the referrer, written to "سبب الرفض").
+  var firstByPhone = {}, firstByNid = {};
+  applicants.slice().sort(function (a, b) { return (a.timestamp || 0) - (b.timestamp || 0); }).forEach(function (a) {
+    var prev = (a.phone && firstByPhone[a.phone]) || (a.nationalId && firstByNid[a.nationalId]) || null;
+    var sameRef = prev && appOwnerKey(prev.refCode) === appOwnerKey(a.refCode);
+    if (prev && prev !== a && !(sameRef && prev.status === STATUS_REJECTED)) {  // same referrer may re-refer after a rejection
+      a.autoReason = !sameRef
+        ? { key: 'dupOther', text: 'مترشح قبل كده من مرشِّح تاني', reject: true }
+        : { key: 'dupSame', text: 'استمارة مكررة — اتحسبت أول مرة بس', reject: false };
+    } else {
+      var rr = a.matchedCode && byCode[a.matchedCode], applied = a.timestamp && dateOnly(a.timestamp);
+      if (rr && rr.hireDate && applied && applied > dateOnly(rr.hireDate)) {
+        a.autoReason = diffDays(rr.hireDate, applied) > 30
+          ? { key: 'oldRider', text: 'مندوب شغال عندنا أصلاً قبل الترشيح — مالوش بونص', reject: false }
+          : { key: 'afterHire', text: 'الاستمارة اترفعت بعد التعيين — مالوش بونص', reject: false };
+      } else if (rr && rr.hireDate && cfg.PROGRAM_START_DATE && rr.hireDate < cfg.PROGRAM_START_DATE) {
+        a.autoReason = { key: 'beforeStart', text: 'اتعيّن قبل بداية البرنامج — مالوش بونص', reject: false };
+      }
+    }
+    if (a.phone && !firstByPhone[a.phone]) firstByPhone[a.phone] = a;
+    if (a.nationalId && !firstByNid[a.nationalId]) firstByNid[a.nationalId] = a;
   });
 
   var campaigns = (raw.campaigns || []).map(function (c) {
@@ -1216,6 +1241,19 @@ function appOwnerKey(refCode) {
  * external partners use. Riders under that code (or with no code) belong to
  * whoever submitted their application in the program.
  */
+/** Why a candidate was rejected or earns no bonus: the "سبب الرفض" column, else what the program found, else the rejection note. */
+function reasonOf(a, status) {
+  if (a.reason) return a.reason;
+  if (a.autoReason) return a.autoReason.text;
+  return status === STATUS_REJECTED ? a.note : '';
+}
+
+/** Rows the hourly sync should update: auto reasons not yet in the sheet, and duplicates to mark rejected. */
+function findAutoReasons(world) {
+  return world.applicants.filter(function (a) { return a.autoReason && a.row && (!a.reason || (a.autoReason.reject && a.status !== STATUS_REJECTED && a.status !== STATUS_HIRED)); })
+    .map(function (a) { return { row: a.row, phone: a.phone, text: a.autoReason.text, reject: a.autoReason.reject && a.status !== STATUS_REJECTED && a.status !== STATUS_HIRED, writeReason: !a.reason }; });
+}
+
 /** The application a hired rider came from (New Applicants), if any — made on or before the hire day. */
 function riderApp(rider, world) {
   var app = (world.appsByCode && world.appsByCode[rider.code]) || null;
@@ -1322,7 +1360,7 @@ function buildDashboard(world, user) {
       var since = a.statusUpdated || a.timestamp;
       var waiting = diffDays(since, today);
       return {
-        name: a.name, phone: a.phone, zone: a.zone, note: a.note,
+        name: a.name, phone: a.phone, zone: a.zone, note: a.note, reason: reasonOf(a, status),
         submitted: a.timestamp, status: status, rawStatus: a.rawStatus,
         stage: stageIndex(status), rejected: status === STATUS_REJECTED,
         hiredCode: hired ? hired.code : '', hiredDate: hired ? hired.hireDate : null, codeArrived: !!(hired && !hired.started), codeArrived: !!(hired && !hired.started),
@@ -1500,6 +1538,7 @@ function buildAdminData(world, users) {
       row: a.row, submitted: a.timestamp, refKey: key, refName: p ? p.name : '', refType: p ? p.type : '', refSv: svOf(key, world),
       name: a.name, phone: a.phone, nationalId: a.nationalId, zone: a.zone,
       status: status, sheetStatus: a.rawStatus, note: a.note, statusUpdated: a.statusUpdated,
+      reason: reasonOf(a, status), autoReason: a.autoReason ? a.autoReason.key : '',
       daysWaiting: waiting, stage: stageIndex(status),
       hiredCode: hired ? hired.code : '', hiredDate: hired ? hired.hireDate : null, codeArrived: !!(hired && !hired.started),
       nudge: status !== STATUS_HIRED && status !== STATUS_REJECTED && waiting >= cfg.NUDGE_AFTER_DAYS,
@@ -1797,7 +1836,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     normalizeArabic: normalizeArabic, headerKey: headerKey, mapHeaders: mapHeaders, rowsToRecords: rowsToRecords,
     cleanCode: cleanCode, safeCell: safeCell, normalizeStatus: normalizeStatus, guessStatus: guessStatus, resolveConfig: resolveConfig,
-    buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, hiredFrom: hiredFrom, appliedBeforeHire: appliedBeforeHire, buildDashboard: buildDashboard, buildLeaderboard: buildLeaderboard,
+    buildWorld: buildWorld, ownerKey: ownerKey, riderOwner: riderOwner, hiredFrom: hiredFrom, appliedBeforeHire: appliedBeforeHire, findAutoReasons: findAutoReasons, reasonOf: reasonOf, buildDashboard: buildDashboard, buildLeaderboard: buildLeaderboard,
     findNewlyHired: findNewlyHired, VEHICLES: VEHICLES, buildReportTables: buildReportTables, buildDataCheck: buildDataCheck, buildDailySummary: buildDailySummary, dailySummaryText: dailySummaryText, buildAdminData: buildAdminData, evaluateRider: evaluateRider, campaignExtra: campaignExtra, validateCandidate: validateCandidate
   };
 }
@@ -2452,7 +2491,7 @@ if (typeof module !== 'undefined' && module.exports) {
     var bestZone = zk.filter(function (k) { return z[k].apps >= 10; }).sort(function (p, q) { return pct(z[q].hired, z[q].apps) - pct(z[p].hired, z[p].apps); })[0];
     // Rejections
     var reasons = {};
-    sc.apps.filter(function (a) { return a.status === 'مرفوض'; }).forEach(function (a) { var r = (a.note || 'من غير سبب').split(/[—\-|،,]/)[0].trim() || 'من غير سبب'; reasons[r] = (reasons[r] || 0) + 1; });
+    sc.apps.filter(function (a) { return a.status === 'مرفوض'; }).forEach(function (a) { var r = (a.reason || a.note || 'من غير سبب').split(/[—\-|،,]/)[0].trim() || 'من غير سبب'; reasons[r] = (reasons[r] || 0) + 1; });
     var rk = Object.keys(reasons).sort(function (p, q) { return reasons[q] - reasons[p]; });
     var rejTotal = rk.reduce(function (s, k) { return s + reasons[k]; }, 0);
     // Leaders
@@ -2832,8 +2871,8 @@ if (typeof module !== 'undefined' && module.exports) {
         { t: 'المنطقة', k: 'zone', v: function (a) { return esc(a.zone); } },
         { t: 'المرشِّح', k: 'refName', v: function (a) { return esc(cleanName(a.refName) || a.refKey) + '<div class="muted" style="font-size:11px">' + (a.refType === 'external' ? 'شريك' : 'طيار') + '</div>'; } },
         { t: 'اتقدم', k: 'submitted', c: 'n', v: function (a) { return fmt(a.submitted); } },
-        { t: 'الحالة', k: 'stage', v: function (a) { return (a.codeArrived ? '<span class="pill gold">كوده وصل ⏳</span>' : '<span class="pill ' + (STATUS_PILL[a.status] || 'dim') + '">' + esc(a.status) + '</span>') + (a.nudge ? '<div class="flag" style="color:var(--gold)">⏳ ' + a.daysWaiting + ' يوم</div>' : ''); } },
-        { t: 'ملاحظة', k: 'note', v: function (a) { return '<span class="muted">' + esc(a.note).slice(0, 60) + '</span>'; } }
+        { t: 'الحالة', k: 'stage', v: function (a) { return (a.codeArrived ? '<span class="pill gold">كوده وصل ⏳</span>' : '<span class="pill ' + (STATUS_PILL[a.status] || 'dim') + '">' + esc(a.status) + '</span>') + (a.nudge ? '<div class="flag" style="color:var(--gold)">⏳ ' + a.daysWaiting + ' يوم</div>' : '') + (a.reason ? '<div class="flag"' + (a.status === 'مرفوض' ? '' : ' style="color:var(--gold)"') + '>' + esc(a.reason) + (a.autoReason ? ' <span class="muted">(تلقائي)</span>' : '') + '</div>' : ''); } },
+        { t: 'ملاحظة', k: 'note', v: function (a) { return '<span class="muted">' + esc(a.note === a.reason ? '' : a.note).slice(0, 60) + '</span>'; } }
       ], items, { name: 'المرشحين', id: function (a) { return a.row; }, sort: 'submitted', select: can('applicants.edit'), open: openApplicant, empty: 'مفيش مرشحين بالفلتر ده.' });
   }
   function bindApplicants() {
@@ -2845,8 +2884,8 @@ if (typeof module !== 'undefined' && module.exports) {
     document.getElementById('afl').onchange = function (e) { f.flag = e.target.checked; render(); };
     document.getElementById('ar').onchange = function (e) { f.range = e.target.checked ? 'all' : 'season'; render(); };
     document.getElementById('expApps').onclick = function () {
-      csv('المرشحين', [['التاريخ', 'الاسم', 'الموبايل', 'الرقم القومي', 'المنطقة', 'المرشِّح', 'كود/رقم المرشِّح', 'الحالة', 'ملاحظة', 'تنبيهات']].concat(applicantsFiltered().map(function (a) {
-        return [a.submitted ? iso(a.submitted) : '', a.name, a.phone, a.nationalId, a.zone, cleanName(a.refName), a.refKey, a.status, a.note, a.flags.map(function (x) { return S.data.flagLabels[x]; }).join(' / ')];
+      csv('المرشحين', [['التاريخ', 'الاسم', 'الموبايل', 'الرقم القومي', 'المنطقة', 'المرشِّح', 'كود/رقم المرشِّح', 'الحالة', 'سبب الرفض', 'ملاحظة', 'تنبيهات']].concat(applicantsFiltered().map(function (a) {
+        return [a.submitted ? iso(a.submitted) : '', a.name, a.phone, a.nationalId, a.zone, cleanName(a.refName), a.refKey, a.status, a.reason || '', a.note, a.flags.map(function (x) { return S.data.flagLabels[x]; }).join(' / ')];
       })));
     };
     bindList('apps', { open: openApplicant, select: can('applicants.edit') });
@@ -2881,7 +2920,8 @@ if (typeof module !== 'undefined' && module.exports) {
       (a.flags.length ? '<div class="flag">⚠ ' + a.flags.map(function (x) { return d.flagLabels[x]; }).join('، ') + '</div>' : '') +
       '<div><div class="kv"><span>المرشِّح</span><span>' + esc(cleanName(a.refName) || a.refKey) + ' (' + (a.refType === 'external' ? 'شريك' : 'طيار') + ')</span></div>' +
       '<div class="kv"><span>الرقم القومي</span><span class="ltr">' + esc(a.nationalId) + '</span></div>' +
-      (a.hiredCode ? '<div class="kv"><span>اتعين</span><span>كود #' + esc(a.hiredCode) + ' من ' + fmt(a.hiredDate) + '</span></div>' : '') + '</div>' +
+      (a.hiredCode ? '<div class="kv"><span>اتعين</span><span>كود #' + esc(a.hiredCode) + ' من ' + fmt(a.hiredDate) + '</span></div>' : '') +
+      (a.reason ? '<div class="kv"><span>' + (a.status === 'مرفوض' ? 'سبب الرفض' : 'ملحوظة') + '</span><span style="color:' + (a.status === 'مرفوض' ? 'var(--danger)' : 'var(--gold)') + '">' + esc(a.reason) + (a.autoReason ? ' (البرنامج عرفه لوحده)' : '') + '</span></div>' : '') + '</div>' +
       (a.phone ? '<div style="display:flex;gap:8px"><a class="btn btn-wa" target="_blank" rel="noopener" href="' + wa(a.phone, 'أهلاً ' + a.name.split(' ')[0] + '، معاك فريق Full Speed 👋') + '">' + icon('wa') + 'واتساب</a><span class="btn btn-ghost ltr">' + esc(a.phone) + '</span></div>' : '') +
       (edit ? '<form id="stF" class="card" style="display:grid;gap:10px"><h2>الحالة وملاحظة للمرشِّح</h2>' +
         '<div class="field"><label>الحالة</label><select name="status">' + d.statuses.map(function (s) { return '<option' + (s === a.status ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></div>' +

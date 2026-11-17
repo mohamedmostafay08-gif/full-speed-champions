@@ -207,3 +207,29 @@ test('application later on the hire day still counts (compared by day, not hour)
   assert.equal(L.appliedBeforeHire({ timestamp: new Date(2026, 10, 7, 21, 58) }, { hireDate: D(2026, 11, 7) }), true);
   assert.equal(L.appliedBeforeHire({ timestamp: new Date(2026, 10, 8, 0, 5) }, { hireDate: D(2026, 11, 7) }), false);
 });
+
+test('automatic reasons: duplicate from another referrer, same-referrer copy, after hire, before the program', () => {
+  const cfg = L.resolveConfig([], []);
+  const apps = [
+    ['Timestamp', 'Referral Code', 'الاسم الرباعي', 'الموبايل', 'الرقم القومي', 'الحالة'],
+    ['11/2/2026 10:00:00', 1948971, 'الأول', 1000000020, 29901010100031, 'جديد'],
+    ['11/3/2026 10:00:00', 4906555, 'نفس الموبايل مرشِّح تاني', 1000000020, 29901010100032, 'جديد'],
+    ['11/4/2026 10:00:00', 1948971, 'نفس الشخص تاني', 1000000020, 29901010100031, 'جديد'],
+    ['11/20/2026 10:00:00', 1948971, 'اترفعت بعد التعيين', 1151307016, 29901010100033, 'جديد'],
+    ['10/1/2026 10:00:00', 1948971, 'اتعين قبل البرنامج', 1128505791, 29901010100034, 'جديد']
+  ];
+  const w = L.buildWorld({
+    riders: L.rowsToRecords(RIDERS, K.COLUMNS.RIDERS),
+    headcount: L.rowsToRecords(HEADCOUNT, K.COLUMNS.HEADCOUNT),
+    applicants: L.rowsToRecords(apps, K.COLUMNS.APPLICANTS)
+  }, cfg, D(2026, 11, 25));
+  const by = Object.fromEntries(w.applicants.map((a) => [a.name, a.autoReason && a.autoReason.key]));
+  assert.equal(by['الأول'], undefined);
+  assert.equal(by['نفس الموبايل مرشِّح تاني'], 'dupOther');
+  assert.equal(by['نفس الشخص تاني'], 'dupSame');
+  assert.equal(by['اترفعت بعد التعيين'], 'afterHire');     // hired 8 Nov, applied 20 Nov
+  assert.equal(by['اتعين قبل البرنامج'], 'beforeStart');   // hired 29 Oct
+  const todo = L.findAutoReasons(w);
+  assert.equal(todo.filter((t) => t.reject).length, 1);   // only the other referrer's duplicate becomes "مرفوض"
+  assert.equal(L.reasonOf({ reason: '', autoReason: null, note: 'البطاقة منتهية' }, 'مرفوض'), 'البطاقة منتهية');
+});

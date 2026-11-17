@@ -291,6 +291,8 @@ h2.section .count { font: 600 12px var(--f-body); color: var(--muted); }
 .note b { color: var(--info); }
 .note.warn { background: var(--gold-soft); border-color: color-mix(in srgb, var(--gold) 35%, transparent); display: grid; gap: 8px; }
 .note.warn b { color: var(--gold); }
+.note.bad { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+.note.bad b { color: var(--danger); }
 .note.ok { background: var(--green-soft); border-color: color-mix(in srgb, var(--green) 30%, transparent); }
 .note.ok b { color: var(--green-hi); }
 
@@ -950,13 +952,14 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
     var msg = 'أهلاً ' + first(a.name) + '، أنا ' + me + ' من Full Speed 👋 طلبك عندنا "' + a.status + '". لو محتاج مساعدة تكمل الورق كلمني، عايزين ننزّلك الشغل بسرعة 🚀';
     var nudge = a.nudge ? '<div class="note warn"><span><b>محتاج متابعة:</b> بقاله ' + plural(a.daysWaiting, 'يوم', 'يوم') + ' على "' + esc(a.status) + '".</span>' +
       (a.phone ? '<a class="btn btn-wa btn-sm" href="' + wa(a.phone, msg) + '" target="_blank" rel="noopener">' + icon('wa') + 'ابعتله رسالة جاهزة</a>' : '') + '</div>' : '';
-    var note = a.note ? '<div class="note"><b>ملاحظة الإدارة:</b> ' + esc(a.note) + '</div>' : '';
+    var reason = a.reason ? '<div class="note ' + (a.rejected ? 'bad' : 'warn') + '"><span><b>' + (a.rejected ? 'سبب الرفض:' : 'ملحوظة:') + '</b> ' + esc(a.reason) + '</span></div>' : '';
+    var note = a.note && a.note !== a.reason ? '<div class="note"><b>ملاحظة الإدارة:</b> ' + esc(a.note) + '</div>' : '';
     var hired = a.status === 'اشتغل' && a.hiredCode ? '<div class="note ok"><b>اتعين ✓</b> كوده <span class="ltr">#' + esc(a.hiredCode) + '</span>' + (a.hiredDate ? ' من ' + fmtDay(a.hiredDate) : '') + ' — تابع أوردراته في الرئيسية.</div>' : '';
     return '<article class="slip">' +
       '<div class="slip-head"><div><h3 class="slip-name">' + esc(a.name) + '</h3>' +
       '<div class="slip-meta"><span>اتقدم ' + fmtDay(a.submitted) + '</span><span>' + esc(a.zone) + '</span></div></div>' +
       '<span class="pill ' + pill + '">' + esc(a.status) + '</span></div>' +
-      stepper + hired + nudge + note +
+      stepper + hired + reason + nudge + note +
       (!a.nudge && a.phone && a.status !== 'اشتغل' && !a.rejected ? '<div class="slip-actions"><a class="btn btn-ghost btn-sm" href="' + wa(a.phone, msg) + '" target="_blank" rel="noopener">' + icon('wa') + 'كلّمه</a><a class="round" href="tel:+' + intl(a.phone) + '" aria-label="اتصال">' + icon('phone') + '</a></div>' : '') +
     '</article>';
   }

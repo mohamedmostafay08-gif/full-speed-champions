@@ -158,8 +158,8 @@ function syncApplicants() {
   if (!lock.tryLock(20000)) return;
   try {
     var world = loadWorld_();
-    var hires = findNewlyHired(world);
-    if (!hires.length) return;
+    var hires = findNewlyHired(world), reasons = findAutoReasons(world);
+    if (!hires.length && !reasons.length) return;
     var sh = tab_(TABS.APPLICANTS);
     var map = mapHeaders(sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0], COLUMNS.APPLICANTS);
     hires.forEach(function (h) {
@@ -168,7 +168,19 @@ function syncApplicants() {
       if (map.hiredDate !== -1 && h.hireDate) sh.getRange(h.row, map.hiredDate + 1).setValue(h.hireDate);
       if (map.statusUpdated !== -1) sh.getRange(h.row, map.statusUpdated + 1).setValue(new Date());
     });
-    log_('sync', hires.length + ' مرشح اتسجلوا "اشتغل" تلقائياً');
+    // Reasons the program found by itself; a duplicate from another referrer becomes "مرفوض".
+    var rejected = 0, written = 0;
+    reasons.forEach(function (r) {
+      if (map.phone !== -1 && canonicalPhone(sh.getRange(r.row, map.phone + 1).getValue()) !== r.phone) return; // row moved
+      if (r.writeReason && map.reason !== -1) { sh.getRange(r.row, map.reason + 1).setValue(r.text); written++; }
+      if (r.reject && map.status !== -1) {
+        sh.getRange(r.row, map.status + 1).setValue(STATUS_REJECTED); rejected++;
+        if (map.statusUpdated !== -1) sh.getRange(r.row, map.statusUpdated + 1).setValue(new Date());
+      }
+    });
+    if (hires.length) log_('sync', hires.length + ' مرشح اتسجلوا "اشتغل" تلقائياً');
+    if (written || rejected) log_('sync', 'سبب الرفض اتكتب لـ ' + written + ' مرشح' + (rejected ? '، و' + rejected + ' اترفضوا لأنهم مترشحين قبل كده' : ''));
+    invalidate_();
   } finally {
     lock.releaseLock();
   }

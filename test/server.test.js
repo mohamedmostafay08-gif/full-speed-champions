@@ -166,6 +166,8 @@ test('hourly sync writes "اشتغل" and the rider code into New Applicants', (
   const h = apps.rows[0];
   assert.equal(apps.rows[1][h.indexOf('الحالة')], 'اشتغل');
   assert.equal(apps.rows[1][h.indexOf('كود بعد التعيين')], '5031339');
+  // "مرشح قديم" applied 4 Nov with the phone of nobody hired → no reason; the column exists after setup
+  assert.ok(h.indexOf('سبب الرفض') !== -1);
 });
 
 test('installable app: doPost speaks the same API as JSON', () => {

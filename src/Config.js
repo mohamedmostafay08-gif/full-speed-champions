@@ -119,7 +119,8 @@ var COLUMNS = {
     refType: ['نوع المرشِّح'],
     statusUpdated: ['آخر تحديث للحالة'],
     hiredCode: ['كود بعد التعيين'],
-    hiredDate: ['تاريخ التعيين الفعلي']
+    hiredDate: ['تاريخ التعيين الفعلي'],
+    reason: ['سبب الرفض']
   },
   DAILY_ORDERS: {
     date: ['التاريخ', 'Date', 'Dates', 'Day', 'اليوم', 'Work Date'],
