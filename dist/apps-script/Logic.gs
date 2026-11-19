@@ -275,8 +275,8 @@ function buildWorld(raw, cfg, today) {
     } else {
       var rr = a.matchedCode && byCode[a.matchedCode], applied = a.timestamp && dateOnly(a.timestamp);
       if (a.matchedCode && !rr && headcountByCode[a.matchedCode]) {
-        // In Headcount but in neither hire tab: an existing rider, not a new hire.
-        a.autoReason = { key: 'inHeadcount', text: 'مندوب موجود عندنا في Headcount ومش تعيين جديد — مالوش بونص', reject: false };
+        // In Headcount but in neither hire tab yet: not counted until Hiring tracker / Normal Riders Handle shows the hire.
+        a.autoReason = { key: 'inHeadcount', text: 'موجود في Headcount — مستني يظهر في Hiring tracker', reject: false };
       } else if (rr && rr.hireDate && applied && applied > dateOnly(rr.hireDate)) {
         a.autoReason = diffDays(rr.hireDate, applied) > 30
           ? { key: 'oldRider', text: 'مندوب شغال عندنا أصلاً قبل الترشيح — مالوش بونص', reject: false }
@@ -405,7 +405,8 @@ function appOwnerKey(refCode) {
 /** Why a candidate was rejected or earns no bonus: the "سبب الرفض" column, else what the program found, else the rejection note. */
 var AUTO_REASON_TEXTS = [
   'رقم الموبايل ده بتاع المرشِّح نفسه', 'مترشح قبل كده من مرشِّح تاني', 'استمارة مكررة — اتحسبت أول مرة بس',
-  'مندوب موجود عندنا في Headcount ومش تعيين جديد — مالوش بونص', 'مندوب شغال عندنا أصلاً قبل الترشيح — مالوش بونص',
+  'موجود في Headcount — مستني يظهر في Hiring tracker', 'مندوب شغال عندنا أصلاً قبل الترشيح — مالوش بونص',
+  'مندوب موجود عندنا في Headcount ومش تعيين جديد — مالوش بونص',   // older wording, replaced automatically
   'الاستمارة اترفعت بعد التعيين — مالوش بونص', 'اتعيّن قبل بداية البرنامج — مالوش بونص'
 ];
 function isAutoReason(text) { return AUTO_REASON_TEXTS.indexOf(text) !== -1; }
