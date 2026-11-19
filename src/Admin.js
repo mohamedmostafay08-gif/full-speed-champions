@@ -196,6 +196,7 @@ function adminData_(p) {
     });
     // The WhatsApp key is a secret: say whether it's set, never send it to the browser.
     data.config.CALLMEBOT_APIKEY = cfg.CALLMEBOT_APIKEY ? '••••••' : '';
+    data.config.MASTER_PASSWORD = cfg.MASTER_PASSWORD ? '••••••' : '';
     data.audit = values_(TABS.AUDIT).slice(1).slice(-400).reverse().map(function (r) {
       return { at: r[0] instanceof Date ? r[0].toISOString() : String(r[0]), by: r[1], action: r[2], target: r[3], before: r[4], after: r[5] };
     });
@@ -423,9 +424,18 @@ function adminSaveSettings_(p) {
     });
     var tiers = p.tiers ? p.tiers.map(function (t) { return { orders: parseInt(t.orders, 10), bonus: parseInt(t.bonus, 10) }; }) : null;
     if (tiers && (!tiers.length || tiers.some(function (t) { return !(t.orders > 0 && t.bonus > 0); }))) errors.tiers = 'كل شريحة محتاجة عدد أوردرات ومبلغ.';
+    var mp = cfg.MASTER_PASSWORD;
+    if (mp !== undefined && !/^•+$/.test(String(mp)) && String(mp).trim() !== '' && String(mp).length < 8) errors.MASTER_PASSWORD = '8 حروف على الأقل.';
     if (Object.keys(errors).length) return fail_(errors[Object.keys(errors)[0]], errors);
     return withLock_(function () {
+      if (mp !== undefined && !/^•+$/.test(String(mp))) {
+        // Only the owner, never stored as text; empty = turned off.
+        if (a.role !== 'owner') return;
+        setConfig_('MASTER_PASSWORD', String(mp).trim() ? hashPassword_(String(mp)) : '');
+        audit_(a, String(mp).trim() ? 'غيّر الـ master password' : 'لغى الـ master password', '', '', '');
+      }
       Object.keys(cfg).forEach(function (k) {
+        if (k === 'MASTER_PASSWORD') return;
         if (EDITABLE_SETTINGS_.indexOf(k) === -1) return;
         if (k === 'CALLMEBOT_APIKEY' && /^•+$/.test(String(cfg[k]))) return; // unchanged masked key
         var before = setConfig_(k, String(cfg[k]).trim());

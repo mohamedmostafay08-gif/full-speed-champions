@@ -302,3 +302,20 @@ test('data check: recognised columns and how applications became counted hires',
   assert.ok(!hired['5032000']);                       // never applied → not a referral
   assert.equal(c.counted, 2);
 });
+
+test('owner sets the master password from Settings: stored hashed, shown masked, audited', () => {
+  const { env, temp } = ready();
+  const token = ownerToken(env, temp);
+  assert.equal(env.api('adminSaveSettings', { token, config: { MASTER_PASSWORD: 'short' } }).ok, false);
+  assert.equal(env.api('adminSaveSettings', { token, config: { MASTER_PASSWORD: 'LongEnough#1' } }).ok, true);
+  const row = env.sheets['FS Config'].rows.find((r) => r[0] === 'MASTER_PASSWORD');
+  assert.match(String(row[1]), /^pbkdf2\$/);
+  env.ctx.CFG_ = null;
+  assert.equal(plain(env.api('adminData', { token }).data).config.MASTER_PASSWORD, '••••••');
+  assert.ok(env.sheets['FS Audit'].rows.some((r) => r[2] === 'غيّر الـ master password'));
+  // the masked value coming back unchanged keeps the password
+  env.api('adminSaveSettings', { token, config: { MASTER_PASSWORD: '••••••' } });
+  assert.match(String(env.sheets['FS Config'].rows.find((r) => r[0] === 'MASTER_PASSWORD')[1]), /^pbkdf2\$/);
+  env.ctx.CFG_ = null; env.ctx.WORLD_ = null;
+  assert.equal(env.api('login', { type: 'internal', code: '4722422', password: 'LongEnough#1' }).ok, true);
+});

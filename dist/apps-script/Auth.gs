@@ -48,6 +48,27 @@ function safeEqual_(a, b) {
 }
 
 /** { ok, upgrade } — upgrade is a new hash to store when the old format matched. */
+/**
+ * The master password (FS Config MASTER_PASSWORD). If someone typed it there as
+ * plain text, it is replaced with its hash the first time it is checked.
+ */
+function checkMaster_(password) {
+  var stored = String(loadConfig_().MASTER_PASSWORD || '').trim();
+  if (!stored || !password) return false;
+  // Guessing across many accounts: after 50 wrong tries in an hour the master password rests for an hour.
+  var cache = CacheService.getScriptCache(), fails = parseInt(cache.get('master:fails') || '0', 10);
+  if (fails >= 50) return false;
+  if (/^pbkdf2\$/.test(stored)) {
+    var good = verifyPassword_(String(password), stored).ok;
+    if (!good) { cache.put('master:fails', String(fails + 1), 3600); if (fails + 1 === 50) log_('master', 'محاولات كتير غلط — الـ master password اتوقف ساعة'); }
+    return good;
+  }
+  if (stored.length < 8) return false;                      // too short to be safe: ignored
+  var ok = safeEqual_(String(password), stored);
+  try { setConfig_('MASTER_PASSWORD', hashPassword_(stored)); CFG_ = null; } catch (e) { /* hash on the next try */ }
+  return ok;
+}
+
 function verifyPassword_(password, stored) {
   var parts = String(stored || '').split('$');
   if (parts[0] === 'pbkdf2' && parts.length === 4) {
@@ -101,11 +122,12 @@ function underRate_(key, perHour) {
 
 /* ──────────────────────────── Sessions ────────────────────────────── */
 
-function createSession_(user, cfg) {
+function createSession_(user, cfg, viaMaster) {
   var token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
   var now = new Date();
-  var expires = new Date(now.getTime() + cfg.SESSION_DAYS * 86400000);
-  tab_(TABS.SESSIONS).appendRow([sha256Hex_(token), "'" + (user.type === 'external' ? user.phone : user.code), user.type, now, expires]);
+  // A master-password session lasts one day and is marked in the Type column ("internal:master").
+  var expires = new Date(now.getTime() + (viaMaster ? 1 : cfg.SESSION_DAYS) * 86400000);
+  tab_(TABS.SESSIONS).appendRow([sha256Hex_(token), "'" + (user.type === 'external' ? user.phone : user.code), user.type + (viaMaster ? ':master' : ''), now, expires]);
   return token;
 }
 
@@ -124,7 +146,8 @@ function readSession_(token) {
     if (rows[i].tokenHash !== hash) continue;
     var exp = rows[i].expires instanceof Date ? rows[i].expires.getTime() : 0;
     if (exp <= Date.now()) return null;
-    var sess = { type: cleanText(rows[i].type), code: cleanCode(rows[i].code), expires: exp };
+    var t = cleanText(rows[i].type);
+    var sess = { type: t.replace(/:master$/, ''), master: /:master$/.test(t), code: cleanCode(rows[i].code), expires: exp };
     cache.put('sess:' + hash, JSON.stringify(sess), 600);
     return sess;
   }

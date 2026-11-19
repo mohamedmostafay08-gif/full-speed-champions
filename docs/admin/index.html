@@ -1565,6 +1565,13 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
     ['PUBLIC_APPLY_PER_HOUR', 'أقصى طلبات من لينك واحد في الساعة', 'number'], ['PUBLIC_APP_URL', 'لينك التطبيق', 'text']
   ];
   var REPORT_LABELS = [['REPORT_EMAILS', 'الإيميلات (افصل بينهم بفاصلة)', 'text'], ['REPORT_WHATSAPP', 'رقم الواتساب (بالكود الدولي: 2011…)', 'text'], ['CALLMEBOT_APIKEY', 'مفتاح CallMeBot', 'text']];
+  function masterCard(d, edit) {
+    if (!edit || S.me.role !== 'owner') return '';
+    return '<section class="card" style="display:grid;gap:10px"><h2>Master password<small>للمدير بس</small></h2>' +
+      '<p class="sub" style="margin:0">باسورد واحد يفتح برنامج أي طيار أو شريك من شاشة الدخول العادية: تكتب الكود (أو موبايل الشريك) والباسورد ده. كل دخول بيتسجل في FS Log، والجلسة بتخلص بعد يوم.</p>' +
+      '<div class="field"><label>' + (d.config.MASTER_PASSWORD ? 'متسجل ✓ — اكتب واحد جديد عشان تغيّره، أو امسح الخانة عشان تلغيه' : 'مش متسجل — اكتب واحد (8 حروف على الأقل)') + '</label>' +
+      '<input name="MASTER_PASSWORD" type="password" autocomplete="new-password" class="ltr" value="' + esc(d.config.MASTER_PASSWORD) + '"></div></section>';
+  }
   function reportCard(d, edit) {
     return '<section class="card wide" style="display:grid;gap:10px"><h2>التقرير اليومي<small>كل يوم الساعة 9 الصبح</small></h2>' +
       '<p class="sub" style="margin:0">أرقام إمبارح، والفلوس المستنية اعتماد وصرف، والمشاكل — بيوصل على الإيميل، وجواه زرار <b>"ابعت الملخص على واتساب"</b> يفتح واتساب بالملخص جاهز. الواتساب الأوتوماتيك (CallMeBot) اختياري.</p>' +
@@ -1584,7 +1591,7 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
       d.season.tiers.map(tierRow).join('') + '</div>' + (edit ? '<button type="button" class="btn btn-ghost btn-sm" id="addTier" style="margin-top:8px">+ شريحة</button>' : '') + '</section>' +
       '<section class="card" style="display:grid;gap:10px"><h2>البرنامج والأمان</h2>' + SETTING_LABELS.map(function (s) {
         return '<div class="field"><label>' + s[1] + '</label><input name="' + s[0] + '" type="' + s[2] + '" value="' + esc(d.config[s[0]]) + '"' + (edit ? '' : ' disabled') + (s[2] === 'text' && /WHATSAPP|URL|EMAILS|CODE/.test(s[0]) ? ' class="ltr"' : '') + '></div>';
-      }).join('') + '</section>' + reportCard(d, edit) + '</div>' + (edit ? '<div style="margin-top:12px"><button class="btn btn-primary" type="submit" style="min-height:42px">حفظ الإعدادات</button></div>' : '') + '</form>';
+      }).join('') + '</section>' + masterCard(d, edit) + reportCard(d, edit) + '</div>' + (edit ? '<div style="margin-top:12px"><button class="btn btn-primary" type="submit" style="min-height:42px">حفظ الإعدادات</button></div>' : '') + '</form>';
   }
   function tierRow(t) { return '<div style="display:flex;gap:8px;align-items:center"><input type="number" data-to value="' + t.orders + '" style="width:100px" aria-label="أوردرات"' + (can('settings.edit') ? '' : ' disabled') + '><span class="muted">أوردر ←</span><input type="number" data-tb value="' + t.bonus + '" style="width:110px" aria-label="بونص"' + (can('settings.edit') ? '' : ' disabled') + '><span class="muted">ج</span>' + (can('settings.edit') ? '<button type="button" class="btn btn-ghost btn-sm" data-rmt>✕</button>' : '') + '</div>'; }
   function bindSettings() {
@@ -1601,6 +1608,7 @@ details.steps ol { margin: 8px 0 0; padding-inline-start: 20px; display: grid; g
     f.onsubmit = async function (e) {
       e.preventDefault();
       var cfg = {}; SETTING_LABELS.concat(REPORT_LABELS).forEach(function (s) { cfg[s[0]] = f[s[0]].value; });
+      if (f.MASTER_PASSWORD) cfg.MASTER_PASSWORD = f.MASTER_PASSWORD.value;
       var tiers = Array.prototype.map.call(f.querySelectorAll('#tiers > div'), function (r) { return { orders: r.querySelector('[data-to]').value, bonus: r.querySelector('[data-tb]').value }; });
       var b = f.querySelector('[type=submit]'); busy(b, true); var res = await call('adminSaveSettings', { config: cfg, tiers: tiers }); busy(b, false);
       if (!res.ok) { showErrors(f, res.fields); return; }

@@ -703,7 +703,9 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
     badge.hidden = !n; badge.textContent = n;
 
     var body = { home: viewHome, pipeline: viewPipeline, bonus: viewBonus, profile: viewProfile }[S.view]();
-    app.innerHTML = topbar() + (live ? '' : '<div class="demo-flag">نسخة تجريبية — الأسماء والأرقام وهمية</div>') + '<div class="view">' + body + '</div>';
+    app.innerHTML = topbar() + (live ? '' : '<div class="demo-flag">نسخة تجريبية — الأسماء والأرقام وهمية</div>') +
+      (S.dash && S.dash.asMaster ? '<div class="demo-flag" style="border-color:var(--danger);color:var(--danger)">🔑 إنت داخل بالـ master password على حساب ' + esc(S.dash.user.name || '') + ' — اعمل خروج لما تخلّص</div>' : '') +
+      '<div class="view">' + body + '</div>';
     document.getElementById('themeBtn').onclick = toggleTheme;
     document.getElementById('refreshBtn').onclick = function () { refresh(); };
     bindView();

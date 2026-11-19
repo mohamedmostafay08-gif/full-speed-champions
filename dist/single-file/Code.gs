@@ -35,7 +35,8 @@ var CONFIG_DEFAULTS = {
   ANNOUNCEMENT: '',                   // banner shown to every rider in the app (empty = none)
   REPORT_EMAILS: '',                  // comma-separated: who gets the daily report email
   REPORT_WHATSAPP: '201120339097',    // who gets the daily report on WhatsApp (via CallMeBot)
-  CALLMEBOT_APIKEY: '',               // the key CallMeBot sends back after the one-time activation message
+  CALLMEBOT_APIKEY: '',
+  MASTER_PASSWORD: '',                // opens any rider/partner account; stored hashed, every use is logged               // the key CallMeBot sends back after the one-time activation message
   UI_SOURCE_URL: 'https://raw.githubusercontent.com/mohamedmostafay08-gif/full-speed-champions/main/dist/single-file/Index.html'
 };
 
@@ -1808,7 +1809,8 @@ function setupFullSpeed() {
         PUBLIC_APP_URL: 'لينك التطبيق على GitHub Pages — ده اللي بيتبعت للمرشحين',
         REPORT_EMAILS: 'إيميلات التقرير اليومي — افصل بينهم بفاصلة',
         REPORT_WHATSAPP: 'رقم واتساب التقرير اليومي (بصيغة دولية 20…). أكتر من رقم: رقم:مفتاح، رقم:مفتاح',
-        CALLMEBOT_APIKEY: 'مفتاح CallMeBot اللي بيوصلك على واتساب بعد رسالة التفعيل'
+        CALLMEBOT_APIKEY: 'مفتاح CallMeBot اللي بيوصلك على واتساب بعد رسالة التفعيل',
+        MASTER_PASSWORD: 'باسورد بيفتح أي حساب. اكتبه هنا (8 حروف على الأقل) وهيتشفّر لوحده أول ما يتستخدم — أو غيّره من لوحة الإدارة'
       };
       var rows = Object.keys(CONFIG_DEFAULTS).map(function (k) { return [k, CONFIG_DEFAULTS[k], notes[k] || '']; });
       sh.getRange(2, 1, rows.length, 3).setValues(rows);
@@ -2103,6 +2105,27 @@ function safeEqual_(a, b) {
 }
 
 /** { ok, upgrade } — upgrade is a new hash to store when the old format matched. */
+/**
+ * The master password (FS Config MASTER_PASSWORD). If someone typed it there as
+ * plain text, it is replaced with its hash the first time it is checked.
+ */
+function checkMaster_(password) {
+  var stored = String(loadConfig_().MASTER_PASSWORD || '').trim();
+  if (!stored || !password) return false;
+  // Guessing across many accounts: after 50 wrong tries in an hour the master password rests for an hour.
+  var cache = CacheService.getScriptCache(), fails = parseInt(cache.get('master:fails') || '0', 10);
+  if (fails >= 50) return false;
+  if (/^pbkdf2\$/.test(stored)) {
+    var good = verifyPassword_(String(password), stored).ok;
+    if (!good) { cache.put('master:fails', String(fails + 1), 3600); if (fails + 1 === 50) log_('master', 'محاولات كتير غلط — الـ master password اتوقف ساعة'); }
+    return good;
+  }
+  if (stored.length < 8) return false;                      // too short to be safe: ignored
+  var ok = safeEqual_(String(password), stored);
+  try { setConfig_('MASTER_PASSWORD', hashPassword_(stored)); CFG_ = null; } catch (e) { /* hash on the next try */ }
+  return ok;
+}
+
 function verifyPassword_(password, stored) {
   var parts = String(stored || '').split('$');
   if (parts[0] === 'pbkdf2' && parts.length === 4) {
@@ -2156,11 +2179,12 @@ function underRate_(key, perHour) {
 
 /* ──────────────────────────── Sessions ────────────────────────────── */
 
-function createSession_(user, cfg) {
+function createSession_(user, cfg, viaMaster) {
   var token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
   var now = new Date();
-  var expires = new Date(now.getTime() + cfg.SESSION_DAYS * 86400000);
-  tab_(TABS.SESSIONS).appendRow([sha256Hex_(token), "'" + (user.type === 'external' ? user.phone : user.code), user.type, now, expires]);
+  // A master-password session lasts one day and is marked in the Type column ("internal:master").
+  var expires = new Date(now.getTime() + (viaMaster ? 1 : cfg.SESSION_DAYS) * 86400000);
+  tab_(TABS.SESSIONS).appendRow([sha256Hex_(token), "'" + (user.type === 'external' ? user.phone : user.code), user.type + (viaMaster ? ':master' : ''), now, expires]);
   return token;
 }
 
@@ -2179,7 +2203,8 @@ function readSession_(token) {
     if (rows[i].tokenHash !== hash) continue;
     var exp = rows[i].expires instanceof Date ? rows[i].expires.getTime() : 0;
     if (exp <= Date.now()) return null;
-    var sess = { type: cleanText(rows[i].type), code: cleanCode(rows[i].code), expires: exp };
+    var t = cleanText(rows[i].type);
+    var sess = { type: t.replace(/:master$/, ''), master: /:master$/.test(t), code: cleanCode(rows[i].code), expires: exp };
     cache.put('sess:' + hash, JSON.stringify(sess), 600);
     return sess;
   }
@@ -2389,17 +2414,21 @@ function login_(p) {
   if (!code || !p.password) return fail_('اكتب ' + (type === 'external' ? 'رقم الموبايل' : 'الكود') + ' وكلمة المرور.');
 
   var wait = lockedFor_(type, code);
-  if (wait) return fail_('محاولات كتير غلط. الحساب مقفول ' + wait + ' دقيقة.');
+  if (wait && !checkMaster_(p.password)) return fail_('محاولات كتير غلط. الحساب مقفول ' + wait + ' دقيقة.');
 
   var user = findUser_(type, code);
+  if (!user && checkMaster_(p.password)) {
+    var v = virtualUser_(type, code);
+    return v ? masterLogin_(v, cfg) : fail_('الكود ده مش موجود عندنا.');
+  }
   if (!user) {
     return fail_(type === 'external'
       ? 'الرقم ده مش متسجل كشريك. اعمل حساب جديد الأول.'
       : 'الكود ده لسه ما اتفعّلش. اضغط "أول مرة؟ فعّل حسابك".');
   }
-  if (user.status === 'blocked') return fail_('الحساب ده موقوف من الإدارة.');
-
   var check = verifyPassword_(String(p.password), user.hash);
+  if (!check.ok && checkMaster_(p.password)) { clearFailures_(type, code); return masterLogin_(user, cfg); }
+  if (user.status === 'blocked') return fail_('الحساب ده موقوف من الإدارة.');
   if (!check.ok) {
     var left = recordFailure_(type, code, cfg);
     return fail_(left ? 'كلمة المرور غلط. باقي ' + left + ' محاولات.' : 'محاولات كتير غلط. الحساب اتقفل ' + cfg.LOCK_MINUTES + ' دقيقة.');
@@ -2472,12 +2501,40 @@ function currentUser_(token) {
   var s = readSession_(token);
   if (!s) return null;
   var u = findUser_(s.type, s.code);
+  if (s.master) {
+    u = u ? Object.assign({}, u) : virtualUser_(s.type, s.code);
+    if (u) u.viaMaster = true;
+    return u;
+  }
   return u && u.status !== 'blocked' ? u : null;
+}
+
+/** An account that was never activated, opened with the master password: a rider code we know, or a partner who referred someone. */
+function virtualUser_(type, code) {
+  var world = loadWorld_();
+  if (type === 'internal') {
+    var h = world.headcountByCode[code] || world.ridersByCode[code];
+    return h ? { type: 'internal', code: code, name: h.name, phone: h.phone || '', refId: '', status: 'active', virtual: true } : null;
+  }
+  var known = world.applicants.some(function (a) { return appOwnerKey(a.refCode) === code; });
+  return known ? { type: 'external', code: code, phone: code, name: 'شريك', refId: '', status: 'active', virtual: true } : null;
+}
+
+/** Opens any account with the master password. Logged in FS Log every time. */
+function masterLogin_(user, cfg) {
+  var key = user.type === 'external' ? user.phone : user.code;
+  log_('master', 'دخول بالـ master password على ' + (user.type === 'external' ? 'الشريك ' : 'الطيار ') + key + (user.virtual ? ' (حساب مش متفعّل)' : ''));
+  return withLock_(function () {
+    var token = createSession_(user, cfg, true);
+    var u = Object.assign({}, user, { viaMaster: true });
+    return ok_({ token: token, dashboard: dashboardFor_(u) });
+  });
 }
 
 function dashboardFor_(user) {
   invalidate_();
   var world = loadWorld_(), dash = buildDashboard(world, user);
+  if (user.viaMaster) dash.asMaster = true;
   try { dash.leaderboard = buildLeaderboard(world, readUsers_(), ownerKey(user)); } catch (e) { log_('error', 'leaderboard: ' + e); }
   return dash;
 }
@@ -2496,6 +2553,7 @@ function changePassword_(p) {
   var cfg = loadConfig_();
   var user = currentUser_(p.token);
   if (!user) return fail_('SESSION_EXPIRED');
+  if (user.viaMaster) return fail_('إنت داخل بالـ master password — كلمة سر الطيار بيغيّرها الطيار بنفسه أو من لوحة الإدارة.');
   if (!verifyPassword_(String(p.current || ''), user.hash).ok) return fail_('كلمة المرور الحالية غلط.', { current: 'غلط.' });
   var next = String(p.next || '');
   if (next.length < cfg.MIN_PASSWORD_LENGTH) return fail_('كلمة المرور الجديدة قصيرة.', { next: 'على الأقل ' + cfg.MIN_PASSWORD_LENGTH + '.' });
@@ -2745,6 +2803,7 @@ function adminData_(p) {
     });
     // The WhatsApp key is a secret: say whether it's set, never send it to the browser.
     data.config.CALLMEBOT_APIKEY = cfg.CALLMEBOT_APIKEY ? '••••••' : '';
+    data.config.MASTER_PASSWORD = cfg.MASTER_PASSWORD ? '••••••' : '';
     data.audit = values_(TABS.AUDIT).slice(1).slice(-400).reverse().map(function (r) {
       return { at: r[0] instanceof Date ? r[0].toISOString() : String(r[0]), by: r[1], action: r[2], target: r[3], before: r[4], after: r[5] };
     });
@@ -2972,9 +3031,18 @@ function adminSaveSettings_(p) {
     });
     var tiers = p.tiers ? p.tiers.map(function (t) { return { orders: parseInt(t.orders, 10), bonus: parseInt(t.bonus, 10) }; }) : null;
     if (tiers && (!tiers.length || tiers.some(function (t) { return !(t.orders > 0 && t.bonus > 0); }))) errors.tiers = 'كل شريحة محتاجة عدد أوردرات ومبلغ.';
+    var mp = cfg.MASTER_PASSWORD;
+    if (mp !== undefined && !/^•+$/.test(String(mp)) && String(mp).trim() !== '' && String(mp).length < 8) errors.MASTER_PASSWORD = '8 حروف على الأقل.';
     if (Object.keys(errors).length) return fail_(errors[Object.keys(errors)[0]], errors);
     return withLock_(function () {
+      if (mp !== undefined && !/^•+$/.test(String(mp))) {
+        // Only the owner, never stored as text; empty = turned off.
+        if (a.role !== 'owner') return;
+        setConfig_('MASTER_PASSWORD', String(mp).trim() ? hashPassword_(String(mp)) : '');
+        audit_(a, String(mp).trim() ? 'غيّر الـ master password' : 'لغى الـ master password', '', '', '');
+      }
       Object.keys(cfg).forEach(function (k) {
+        if (k === 'MASTER_PASSWORD') return;
         if (EDITABLE_SETTINGS_.indexOf(k) === -1) return;
         if (k === 'CALLMEBOT_APIKEY' && /^•+$/.test(String(cfg[k]))) return; // unchanged masked key
         var before = setConfig_(k, String(cfg[k]).trim());

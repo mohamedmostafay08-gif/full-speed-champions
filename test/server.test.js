@@ -203,3 +203,35 @@ test('errors never leak internals', () => {
   assert.equal(res.ok, false);
   assert.doesNotMatch(res.error, /secret/);
 });
+
+test('master password: opens any account (even never activated), hashed on first use, logged, cannot change the rider password', () => {
+  const { env } = ready();
+  // Not set yet → nothing opens
+  assert.equal(env.api('login', { type: 'internal', code: '4722422', password: 'Master2026!' }).ok, false);
+  // Typed in FS Config as plain text
+  const cfg = env.sheets['FS Config'];
+  const row = cfg.rows.findIndex((r) => r[0] === 'MASTER_PASSWORD');
+  assert.ok(row > 0, 'MASTER_PASSWORD row added by setup');
+  cfg.rows[row][1] = 'Master2026!';
+  env.ctx.SS_ = null; env.ctx.CFG_ = null; env.ctx.WORLD_ = null;
+
+  // 4722422 never activated in this sheet: master still opens it
+  const r1 = env.api('login', { type: 'internal', code: '4722422', password: 'Master2026!' });
+  assert.equal(r1.ok, true, r1.error);
+  assert.equal(r1.data.dashboard.asMaster, true);
+  assert.match(String(cfg.rows[row][1]), /^pbkdf2\$/);              // plain text replaced by its hash
+  assert.ok(env.sheets['FS Log'].rows.some((r) => r[1] === 'master' && /4722422/.test(r[2])));
+  // The session survives a reload, still marked
+  assert.equal(env.api('session', { token: r1.data.token }).data.dashboard.asMaster, true);
+  // …but can't change the rider's password
+  assert.equal(env.api('changePassword', { token: r1.data.token, current: 'x', next: 'whatever123' }).ok, false);
+
+  // A partner with an account: the master password works, their own still works too
+  env.ctx.CFG_ = null;
+  assert.equal(env.api('login', { type: 'external', code: '01144077041', password: 'Master2026!' }).ok, true);
+  assert.equal(env.api('login', { type: 'external', code: '01144077041', password: 'partner99' }).data.dashboard.asMaster, undefined);
+  // Unknown code → refused
+  assert.equal(env.api('login', { type: 'internal', code: '9999999', password: 'Master2026!' }).ok, false);
+  // Wrong master → normal wrong-password answer
+  assert.match(env.api('login', { type: 'external', code: '01144077041', password: 'nope-nope' }).error, /غلط/);
+});

@@ -158,17 +158,21 @@ function login_(p) {
   if (!code || !p.password) return fail_('اكتب ' + (type === 'external' ? 'رقم الموبايل' : 'الكود') + ' وكلمة المرور.');
 
   var wait = lockedFor_(type, code);
-  if (wait) return fail_('محاولات كتير غلط. الحساب مقفول ' + wait + ' دقيقة.');
+  if (wait && !checkMaster_(p.password)) return fail_('محاولات كتير غلط. الحساب مقفول ' + wait + ' دقيقة.');
 
   var user = findUser_(type, code);
+  if (!user && checkMaster_(p.password)) {
+    var v = virtualUser_(type, code);
+    return v ? masterLogin_(v, cfg) : fail_('الكود ده مش موجود عندنا.');
+  }
   if (!user) {
     return fail_(type === 'external'
       ? 'الرقم ده مش متسجل كشريك. اعمل حساب جديد الأول.'
       : 'الكود ده لسه ما اتفعّلش. اضغط "أول مرة؟ فعّل حسابك".');
   }
-  if (user.status === 'blocked') return fail_('الحساب ده موقوف من الإدارة.');
-
   var check = verifyPassword_(String(p.password), user.hash);
+  if (!check.ok && checkMaster_(p.password)) { clearFailures_(type, code); return masterLogin_(user, cfg); }
+  if (user.status === 'blocked') return fail_('الحساب ده موقوف من الإدارة.');
   if (!check.ok) {
     var left = recordFailure_(type, code, cfg);
     return fail_(left ? 'كلمة المرور غلط. باقي ' + left + ' محاولات.' : 'محاولات كتير غلط. الحساب اتقفل ' + cfg.LOCK_MINUTES + ' دقيقة.');
@@ -241,12 +245,40 @@ function currentUser_(token) {
   var s = readSession_(token);
   if (!s) return null;
   var u = findUser_(s.type, s.code);
+  if (s.master) {
+    u = u ? Object.assign({}, u) : virtualUser_(s.type, s.code);
+    if (u) u.viaMaster = true;
+    return u;
+  }
   return u && u.status !== 'blocked' ? u : null;
+}
+
+/** An account that was never activated, opened with the master password: a rider code we know, or a partner who referred someone. */
+function virtualUser_(type, code) {
+  var world = loadWorld_();
+  if (type === 'internal') {
+    var h = world.headcountByCode[code] || world.ridersByCode[code];
+    return h ? { type: 'internal', code: code, name: h.name, phone: h.phone || '', refId: '', status: 'active', virtual: true } : null;
+  }
+  var known = world.applicants.some(function (a) { return appOwnerKey(a.refCode) === code; });
+  return known ? { type: 'external', code: code, phone: code, name: 'شريك', refId: '', status: 'active', virtual: true } : null;
+}
+
+/** Opens any account with the master password. Logged in FS Log every time. */
+function masterLogin_(user, cfg) {
+  var key = user.type === 'external' ? user.phone : user.code;
+  log_('master', 'دخول بالـ master password على ' + (user.type === 'external' ? 'الشريك ' : 'الطيار ') + key + (user.virtual ? ' (حساب مش متفعّل)' : ''));
+  return withLock_(function () {
+    var token = createSession_(user, cfg, true);
+    var u = Object.assign({}, user, { viaMaster: true });
+    return ok_({ token: token, dashboard: dashboardFor_(u) });
+  });
 }
 
 function dashboardFor_(user) {
   invalidate_();
   var world = loadWorld_(), dash = buildDashboard(world, user);
+  if (user.viaMaster) dash.asMaster = true;
   try { dash.leaderboard = buildLeaderboard(world, readUsers_(), ownerKey(user)); } catch (e) { log_('error', 'leaderboard: ' + e); }
   return dash;
 }
@@ -265,6 +297,7 @@ function changePassword_(p) {
   var cfg = loadConfig_();
   var user = currentUser_(p.token);
   if (!user) return fail_('SESSION_EXPIRED');
+  if (user.viaMaster) return fail_('إنت داخل بالـ master password — كلمة سر الطيار بيغيّرها الطيار بنفسه أو من لوحة الإدارة.');
   if (!verifyPassword_(String(p.current || ''), user.hash).ok) return fail_('كلمة المرور الحالية غلط.', { current: 'غلط.' });
   var next = String(p.next || '');
   if (next.length < cfg.MIN_PASSWORD_LENGTH) return fail_('كلمة المرور الجديدة قصيرة.', { next: 'على الأقل ' + cfg.MIN_PASSWORD_LENGTH + '.' });

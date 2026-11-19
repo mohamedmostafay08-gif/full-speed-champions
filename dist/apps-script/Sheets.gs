@@ -236,7 +236,8 @@ function setupFullSpeed() {
         PUBLIC_APP_URL: 'لينك التطبيق على GitHub Pages — ده اللي بيتبعت للمرشحين',
         REPORT_EMAILS: 'إيميلات التقرير اليومي — افصل بينهم بفاصلة',
         REPORT_WHATSAPP: 'رقم واتساب التقرير اليومي (بصيغة دولية 20…). أكتر من رقم: رقم:مفتاح، رقم:مفتاح',
-        CALLMEBOT_APIKEY: 'مفتاح CallMeBot اللي بيوصلك على واتساب بعد رسالة التفعيل'
+        CALLMEBOT_APIKEY: 'مفتاح CallMeBot اللي بيوصلك على واتساب بعد رسالة التفعيل',
+        MASTER_PASSWORD: 'باسورد بيفتح أي حساب. اكتبه هنا (8 حروف على الأقل) وهيتشفّر لوحده أول ما يتستخدم — أو غيّره من لوحة الإدارة'
       };
       var rows = Object.keys(CONFIG_DEFAULTS).map(function (k) { return [k, CONFIG_DEFAULTS[k], notes[k] || '']; });
       sh.getRange(2, 1, rows.length, 3).setValues(rows);
