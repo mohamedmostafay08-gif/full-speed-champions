@@ -1110,13 +1110,18 @@ function buildWorld(raw, cfg, today) {
   applicants.slice().sort(function (a, b) { return (a.timestamp || 0) - (b.timestamp || 0); }).forEach(function (a) {
     var prev = (a.phone && firstByPhone[a.phone]) || (a.nationalId && firstByNid[a.nationalId]) || null;
     var sameRef = prev && appOwnerKey(prev.refCode) === appOwnerKey(a.refCode);
-    if (prev && prev !== a && !(sameRef && prev.status === STATUS_REJECTED)) {  // same referrer may re-refer after a rejection
+    if (a.matchedCode && a.matchedCode === appOwnerKey(a.refCode)) {
+      a.autoReason = { key: 'self', text: 'رقم الموبايل ده بتاع المرشِّح نفسه', reject: true };
+    } else if (prev && prev !== a && !(sameRef && prev.status === STATUS_REJECTED)) {  // same referrer may re-refer after a rejection
       a.autoReason = !sameRef
         ? { key: 'dupOther', text: 'مترشح قبل كده من مرشِّح تاني', reject: true }
         : { key: 'dupSame', text: 'استمارة مكررة — اتحسبت أول مرة بس', reject: false };
     } else {
       var rr = a.matchedCode && byCode[a.matchedCode], applied = a.timestamp && dateOnly(a.timestamp);
-      if (rr && rr.hireDate && applied && applied > dateOnly(rr.hireDate)) {
+      if (a.matchedCode && !rr && headcountByCode[a.matchedCode]) {
+        // In Headcount but in neither hire tab: an existing rider, not a new hire.
+        a.autoReason = { key: 'inHeadcount', text: 'مندوب موجود عندنا في Headcount ومش تعيين جديد — مالوش بونص', reject: false };
+      } else if (rr && rr.hireDate && applied && applied > dateOnly(rr.hireDate)) {
         a.autoReason = diffDays(rr.hireDate, applied) > 30
           ? { key: 'oldRider', text: 'مندوب شغال عندنا أصلاً قبل الترشيح — مالوش بونص', reject: false }
           : { key: 'afterHire', text: 'الاستمارة اترفعت بعد التعيين — مالوش بونص', reject: false };
@@ -1242,16 +1247,31 @@ function appOwnerKey(refCode) {
  * whoever submitted their application in the program.
  */
 /** Why a candidate was rejected or earns no bonus: the "سبب الرفض" column, else what the program found, else the rejection note. */
+var AUTO_REASON_TEXTS = [
+  'رقم الموبايل ده بتاع المرشِّح نفسه', 'مترشح قبل كده من مرشِّح تاني', 'استمارة مكررة — اتحسبت أول مرة بس',
+  'مندوب موجود عندنا في Headcount ومش تعيين جديد — مالوش بونص', 'مندوب شغال عندنا أصلاً قبل الترشيح — مالوش بونص',
+  'الاستمارة اترفعت بعد التعيين — مالوش بونص', 'اتعيّن قبل بداية البرنامج — مالوش بونص'
+];
+function isAutoReason(text) { return AUTO_REASON_TEXTS.indexOf(text) !== -1; }
+
 function reasonOf(a, status) {
-  if (a.reason) return a.reason;
+  if (a.reason && !isAutoReason(a.reason)) return a.reason;     // typed by hand always wins
   if (a.autoReason) return a.autoReason.text;
   return status === STATUS_REJECTED ? a.note : '';
 }
 
 /** Rows the hourly sync should update: auto reasons not yet in the sheet, and duplicates to mark rejected. */
 function findAutoReasons(world) {
-  return world.applicants.filter(function (a) { return a.autoReason && a.row && (!a.reason || (a.autoReason.reject && a.status !== STATUS_REJECTED && a.status !== STATUS_HIRED)); })
-    .map(function (a) { return { row: a.row, phone: a.phone, text: a.autoReason.text, reject: a.autoReason.reject && a.status !== STATUS_REJECTED && a.status !== STATUS_HIRED, writeReason: !a.reason }; });
+  var out = [];
+  world.applicants.forEach(function (a) {
+    if (!a.row) return;
+    var want = a.autoReason ? a.autoReason.text : '';
+    // The program owns cells that are empty or hold one of its own texts; it refreshes or clears them.
+    var writeReason = (!a.reason || isAutoReason(a.reason)) && a.reason !== want;
+    var reject = !!(a.autoReason && a.autoReason.reject && a.status !== STATUS_REJECTED && a.status !== STATUS_HIRED);
+    if (writeReason || reject) out.push({ row: a.row, phone: a.phone, text: want, reject: reject, writeReason: writeReason });
+  });
+  return out;
 }
 
 /** The application a hired rider came from (New Applicants), if any — made on or before the hire day. */
@@ -1286,13 +1306,9 @@ function appliedBeforeHire(app, rider) {
 /** The hired rider an application became (by typed code or phone in Headcount / hire tabs), or null. */
 function hiredFrom(app, world) {
   var code = app.matchedCode; if (!code) return null;
-  var r = world.ridersByCode[code];
-  if (!r) {
-    var h = world.headcountByCode[code]; if (!h) return null;
-    // In Headcount but not in Hiring tracker yet: hired, hire date still unknown.
-    r = { code: code, name: h.name, zone: h.zone, phone: h.phone, hireDate: null, started: /^active/i.test(h.active), noTracker: true };
-  }
-  return appliedBeforeHire(app, r) ? r : null;
+  if (code === appOwnerKey(app.refCode)) return null;           // the referrer's own phone/code
+  var r = world.ridersByCode[code];                              // a new hire = in Hiring tracker / Normal Riders Handle
+  return r && appliedBeforeHire(app, r) ? r : null;
 }
 
 /* ──────────────────────────── Dashboard ───────────────────────────── */
@@ -1666,7 +1682,8 @@ function buildDataCheck(world, tabs) {
       var found = a.matchedCode && (world.ridersByCode[a.matchedCode] || world.headcountByCode[a.matchedCode]);
       item.applied = a.timestamp;
       item.hireDate = found && found.hireDate ? found.hireDate : null;
-      item.reason = !found ? 'notFound' : 'afterHire';
+      item.reason = a.autoReason ? a.autoReason.key : !found ? 'notFound' : 'afterHire';
+      item.reasonText = a.autoReason ? a.autoReason.text : '';
       if (item.reason === 'notFound' ? a.status === STATUS_HIRED : true) lost.push(item);
     }
   });
@@ -1748,6 +1765,7 @@ function findNewlyHired(world) {
   world.applicants.forEach(function (a) {
     var r = hiredFrom(a, world);
     if (!r || !r.started) return;
+    if (a.status === STATUS_REJECTED) return;                    // never undo a rejection
     if (a.status === STATUS_HIRED && a.hiredCode === r.code) return;
     out.push({ row: a.row, code: r.code, hireDate: r.hireDate });
   });
@@ -3119,7 +3137,7 @@ if (typeof module !== 'undefined' && module.exports) {
         table([['الصف', 'n'], ['المرشح'], ['الموبايل'], ['Referral Code'], ['الكود'], ['الاستمارة', 'n'], ['التعيين', 'n'], ['السبب']], c.lost.map(function (x) {
           return [x.row, esc(x.name), '<span class="ltr">' + esc(x.phone || '—') + '</span>', '<span class="ltr">' + esc(x.refCode || '—') + '</span>', '<span class="ltr">' + esc(x.code || '—') + '</span>',
             x.applied ? fmt(day(x.applied), true) : '—', x.hireDate ? fmt(day(x.hireDate), true) : '—',
-            x.reason === 'afterHire' ? '<span class="pill dim">الاستمارة اترفعت بعد التعيين</span>' : '<span class="flag">الموبايل مش في Headcount ولا Hiring tracker — اكتب الكود في "كود بعد التعيين"</span>'];
+            x.reasonText ? '<span class="pill dim">' + esc(x.reasonText) + '</span>' : x.reason === 'afterHire' ? '<span class="pill dim">الاستمارة اترفعت بعد التعيين</span>' : '<span class="flag">الموبايل مش في Headcount ولا Hiring tracker — اكتب الكود في "كود بعد التعيين"</span>'];
         }), { name: 'ما-اتحسبوش' }) + '</section>' : '');
   }
   function bindCheck() {

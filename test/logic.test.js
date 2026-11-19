@@ -233,3 +233,34 @@ test('automatic reasons: duplicate from another referrer, same-referrer copy, af
   assert.equal(todo.filter((t) => t.reject).length, 1);   // only the other referrer's duplicate becomes "مرفوض"
   assert.equal(L.reasonOf({ reason: '', autoReason: null, note: 'البطاقة منتهية' }, 'مرفوض'), 'البطاقة منتهية');
 });
+
+test('real-sheet cases: referrer own phone, existing rider in Headcount, rejection never undone, auto text refreshed', () => {
+  const cfg = L.resolveConfig([], []);
+  const hc = [
+    ['Code', 'Rider COD Rider Name', 'Zone', 'SPV', 'Manger', 'Phone', 'Vehicle', 'SP Status', 'Batch NO', 'Active ?'],
+    [4504833, 'Eid Hassan', 'Heliopolis', 'X', 'FS', 201124704538, 'Bike', '', 5, 'Active'],    // the referrer
+    [4943608, 'Old Rider', 'Damietta', 'X', 'FS', 201027822732, 'Bike', '', 5, 'Active']         // an existing rider
+  ];
+  const apps = [
+    ['Timestamp', 'Referral Code', 'الاسم الرباعي', 'الموبايل', 'الرقم القومي', 'الحالة', 'كود بعد التعيين', 'سبب الرفض'],
+    ['11/2/2026 10:00:00', 4504833, 'رشّح نفسه', 1124704538, 29901010100041, 'مرفوض', '', ''],
+    ['11/2/2026 11:00:00', 4804753, 'مندوب قديم', 1027822732, 29901010100042, 'جديد', '', ''],
+    ['11/2/2026 12:00:00', 4804753, 'سبب قديم اتغير', 1000000050, 29901010100043, 'جديد', '', 'الاستمارة اترفعت بعد التعيين — مالوش بونص'],
+    ['11/2/2026 13:00:00', 4804753, 'سبب مكتوب باليد', 1000000051, 29901010100044, 'مرفوض', '', 'مش عنده بطاقة']
+  ];
+  const w = L.buildWorld({
+    riders: L.rowsToRecords(RIDERS, K.COLUMNS.RIDERS),
+    headcount: L.rowsToRecords(hc, K.COLUMNS.HEADCOUNT),
+    applicants: L.rowsToRecords(apps, K.COLUMNS.APPLICANTS)
+  }, cfg, D(2026, 11, 19));
+  const a = Object.fromEntries(w.applicants.map((x) => [x.name, x]));
+  assert.equal(a['رشّح نفسه'].autoReason.key, 'self');
+  assert.equal(L.hiredFrom(a['رشّح نفسه'], w), null);           // never "اشتغل" with the referrer's own code
+  assert.equal(a['مندوب قديم'].autoReason.key, 'inHeadcount');
+  assert.equal(L.hiredFrom(a['مندوب قديم'], w), null);          // Headcount alone is not a new hire
+  assert.deepEqual(L.findNewlyHired(w), []);                    // and nothing gets overwritten to "اشتغل"
+  const todo = Object.fromEntries(L.findAutoReasons(w).map((t) => [t.row, t]));
+  assert.equal(todo[4].text, '');                               // stale auto text cleared
+  assert.ok(!todo[5]);                                          // hand-written reason untouched
+  assert.equal(L.reasonOf(a['سبب مكتوب باليد'], 'مرفوض'), 'مش عنده بطاقة');
+});

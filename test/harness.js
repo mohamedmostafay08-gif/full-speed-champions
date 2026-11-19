@@ -55,6 +55,7 @@ class Range {
   getValues() { return Array.from({ length: this.nr }, (_, i) => Array.from({ length: this.nc }, (_, j) => this.sheet.cell(this.r + i, this.c + j))); }
   setValues(v) { v.forEach((row, i) => row.forEach((x, j) => this.sheet.put(this.r + i, this.c + j, x))); return this; }
   setValue(v) { this.sheet.put(this.r, this.c, v); return this; }
+  getValue() { return this.sheet.cell(this.r, this.c); }
   clearContent() { for (let i = 0; i < this.nr; i++) for (let j = 0; j < this.nc; j++) this.sheet.put(this.r + i, this.c + j, ''); return this; }
   setNumberFormat(f) { this.sheet.formats[this.c] = f; return this; }
   setDataValidation(v) { this.sheet.validations[this.c] = v; return this; }
