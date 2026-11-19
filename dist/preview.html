@@ -1211,7 +1211,7 @@ function buildWorld(raw, cfg, today) {
     } else if (prev && prev !== a && !(sameRef && prev.status === STATUS_REJECTED)) {  // same referrer may re-refer after a rejection
       a.autoReason = !sameRef
         ? { key: 'dupOther', text: 'مترشح قبل كده من مرشِّح تاني', reject: true }
-        : { key: 'dupSame', text: 'استمارة مكررة — اتحسبت أول مرة بس', reject: false };
+        : { key: 'dupSame', text: 'استمارة مكررة — اتحسبت أول مرة بس', reject: true };
     } else {
       var rr = a.matchedCode && byCode[a.matchedCode], applied = a.timestamp && dateOnly(a.timestamp);
       if (a.matchedCode && !rr && headcountByCode[a.matchedCode]) {
@@ -1219,10 +1219,10 @@ function buildWorld(raw, cfg, today) {
         a.autoReason = { key: 'inHeadcount', text: 'موجود في Headcount — مستني يظهر في Hiring tracker', reject: false };
       } else if (rr && rr.hireDate && applied && applied > dateOnly(rr.hireDate)) {
         a.autoReason = diffDays(rr.hireDate, applied) > 30
-          ? { key: 'oldRider', text: 'مندوب شغال عندنا أصلاً قبل الترشيح — مالوش بونص', reject: false }
-          : { key: 'afterHire', text: 'الاستمارة اترفعت بعد التعيين — مالوش بونص', reject: false };
+          ? { key: 'oldRider', text: 'مندوب شغال عندنا أصلاً قبل الترشيح — مالوش بونص', reject: true }
+          : { key: 'afterHire', text: 'الاستمارة اترفعت بعد التعيين — مالوش بونص', reject: true };
       } else if (rr && rr.hireDate && cfg.PROGRAM_START_DATE && rr.hireDate < cfg.PROGRAM_START_DATE) {
-        a.autoReason = { key: 'beforeStart', text: 'اتعيّن قبل بداية البرنامج — مالوش بونص', reject: false };
+        a.autoReason = { key: 'beforeStart', text: 'اتعيّن قبل بداية البرنامج — مالوش بونص', reject: true };
       }
     }
     if (a.phone && !firstByPhone[a.phone]) firstByPhone[a.phone] = a;
@@ -1365,7 +1365,9 @@ function findAutoReasons(world) {
     var want = a.autoReason ? a.autoReason.text : '';
     // The program owns cells that are empty or hold one of its own texts; it refreshes or clears them.
     var writeReason = (!a.reason || isAutoReason(a.reason)) && a.reason !== want;
-    var reject = !!(a.autoReason && a.autoReason.reject && a.status !== STATUS_REJECTED && a.status !== STATUS_HIRED);
+    // Every candidate with a reason becomes "مرفوض" in the sheet — even one who works but earns no bonus —
+    // so "قيد التعيين" and "اشتغل" only list people who still count. ("مستني يظهر في Hiring tracker" is not a reason to reject.)
+    var reject = !!(a.autoReason && a.autoReason.reject && a.status !== STATUS_REJECTED);
     if (writeReason || reject) out.push({ row: a.row, phone: a.phone, text: want, reject: reject, writeReason: writeReason });
   });
   return out;
@@ -1374,6 +1376,7 @@ function findAutoReasons(world) {
 /** The application a hired rider came from (New Applicants), if any — made on or before the hire day. */
 function riderApp(rider, world) {
   var app = (world.appsByCode && world.appsByCode[rider.code]) || null;
+  if (app && app.status === STATUS_REJECTED) return null;       // rejected in the sheet = no bonus
   return app && appliedBeforeHire(app, rider) ? app : null;
 }
 
@@ -1469,7 +1472,7 @@ function buildDashboard(world, user) {
     .filter(function (a) { return appOwnerKey(a.refCode) === key && a.timestamp && a.timestamp >= start; })
     .map(function (a) {
       var hired = hiredFrom(a, world);
-      var status = hired ? (hired.started ? STATUS_HIRED : 'قيد التعيين') : (a.status || STATUSES[0]);
+      var status = a.status === STATUS_REJECTED ? STATUS_REJECTED : hired ? (hired.started ? STATUS_HIRED : 'قيد التعيين') : (a.status || STATUSES[0]);
       var since = a.statusUpdated || a.timestamp;
       var waiting = diffDays(since, today);
       return {
@@ -1637,7 +1640,7 @@ function buildAdminData(world, users) {
     var key = appOwnerKey(a.refCode);
     var p = person(key);
     var hired = hiredFrom(a, world);
-    var status = hired ? (hired.started ? STATUS_HIRED : 'قيد التعيين') : (a.status || STATUSES[0]);
+    var status = a.status === STATUS_REJECTED ? STATUS_REJECTED : hired ? (hired.started ? STATUS_HIRED : 'قيد التعيين') : (a.status || STATUSES[0]);
     var since = a.statusUpdated || a.timestamp;
     var waiting = since ? diffDays(since, today) : 0;
     var flags = [];

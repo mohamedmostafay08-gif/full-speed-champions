@@ -230,7 +230,7 @@ test('automatic reasons: duplicate from another referrer, same-referrer copy, af
   assert.equal(by['اترفعت بعد التعيين'], 'afterHire');     // hired 8 Nov, applied 20 Nov
   assert.equal(by['اتعين قبل البرنامج'], 'beforeStart');   // hired 29 Oct
   const todo = L.findAutoReasons(w);
-  assert.equal(todo.filter((t) => t.reject).length, 1);   // only the other referrer's duplicate becomes "مرفوض"
+  assert.equal(todo.filter((t) => t.reject).length, 4);   // every reason → "مرفوض" (first application stays as is)
   assert.equal(L.reasonOf({ reason: '', autoReason: null, note: 'البطاقة منتهية' }, 'مرفوض'), 'البطاقة منتهية');
 });
 
@@ -263,4 +263,12 @@ test('real-sheet cases: referrer own phone, existing rider in Headcount, rejecti
   assert.equal(todo[4].text, '');                               // stale auto text cleared
   assert.ok(!todo[5]);                                          // hand-written reason untouched
   assert.equal(L.reasonOf(a['سبب مكتوب باليد'], 'مرفوض'), 'مش عنده بطاقة');
+});
+
+test('a candidate rejected in the sheet earns no bonus, even if hired', () => {
+  const w = world();
+  const app = w.applicants.find((a) => a.name === 'محمود اشرف');
+  assert.equal(L.riderOwner(w.ridersByCode['5037565'], w), '1948971');
+  app.status = 'مرفوض';
+  assert.equal(L.riderOwner(w.ridersByCode['5037565'], w), '');
 });
