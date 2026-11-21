@@ -178,8 +178,10 @@
     adminUserAction: function (p) {
       var u = users.filter(function (x) { return (x.type === 'external' ? x.phone : x.code) === p.key; })[0];
       if (!u) return { ok: false, error: 'الشخص ده لسه ما فعّلش حسابه في البرنامج.' };
+      if (p.action === 'setpass' && String(p.password || '').length < 6) return { ok: false, error: 'كلمة السر قصيرة — 6 حروف على الأقل.', fields: { password: 'على الأقل 6.' } };
+      if (p.action === 'delete') { users = users.filter(function (x) { return x !== u; }); log('مسح حساب', u.name); return ok(); }
       if (p.action === 'block') u.status = 'blocked'; if (p.action === 'unblock') u.status = 'active'; if (p.action === 'phone') u.phone = canonicalPhone(p.phone) || u.phone;
-      log({ reset: 'عمل كلمة سر مؤقتة', block: 'أوقف حساب', unblock: 'فعّل حساب', logout: 'خرّج حساب من كل الأجهزة', phone: 'غيّر رقم موبايل' }[p.action], u.name);
+      log({ reset: 'عمل كلمة سر مؤقتة', block: 'أوقف حساب', unblock: 'فعّل حساب', logout: 'خرّج حساب من كل الأجهزة', phone: 'غيّر رقم موبايل', setpass: 'غيّر كلمة سر حساب' }[p.action], u.name);
       return ok(p.action === 'reset' ? { temp: temp(), phone: u.phone } : {});
     },
     adminSaveSettings: function (p) {

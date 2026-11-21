@@ -384,6 +384,21 @@ function adminUserAction_(p) {
           sh.getRange(u.row, col('Status')).setValue('active');
           audit_(a, 'فعّل حساب', label, 'blocked', 'active');
           return ok_({});
+        case 'setpass':
+          var pw = String(p.password || '');
+          var min = loadConfig_().MIN_PASSWORD_LENGTH;
+          if (pw.length < min) return fail_('كلمة السر قصيرة — ' + min + ' حروف على الأقل.', { password: 'على الأقل ' + min + '.' });
+          sh.getRange(u.row, col('Password Hash')).setValue(hashPassword_(pw));
+          endAllSessions_(type, key);
+          audit_(a, 'غيّر كلمة سر حساب', label, '', '');
+          return ok_({});
+        case 'delete':
+          // The account only: referrals, hires and bonus stay (they hang on the code/phone). They can activate again.
+          if (a.role !== 'owner') return fail_('مسح الحسابات للمدير بس.');
+          endAllSessions_(type, key);
+          sh.deleteRow(u.row);
+          audit_(a, 'مسح حساب', label, 'موجود', 'اتمسح');
+          return ok_({});
         case 'logout':
           endAllSessions_(type, key);
           audit_(a, 'خرّج حساب من كل الأجهزة', label, '', '');

@@ -139,6 +139,9 @@ function readSession_(token) {
   var hit = cache.get('sess:' + hash);
   if (hit) {
     var s = JSON.parse(hit);
+    // Password changed / account deleted or blocked since this was cached → the session is gone.
+    var cut = cache.get('revoked:' + s.type + ':' + s.code);
+    if (cut && (!s.created || s.created < Number(cut))) return null;
     return s.expires > Date.now() ? s : null;
   }
   var rows = rowsToRecords(values_(TABS.SESSIONS), COLUMNS.SESSIONS);
@@ -147,7 +150,8 @@ function readSession_(token) {
     var exp = rows[i].expires instanceof Date ? rows[i].expires.getTime() : 0;
     if (exp <= Date.now()) return null;
     var t = cleanText(rows[i].type);
-    var sess = { type: t.replace(/:master$/, ''), master: /:master$/.test(t), code: cleanCode(rows[i].code), expires: exp };
+    var sess = { type: t.replace(/:master$/, ''), master: /:master$/.test(t), code: cleanCode(rows[i].code), expires: exp,
+      created: rows[i].created instanceof Date ? rows[i].created.getTime() : 0 };
     cache.put('sess:' + hash, JSON.stringify(sess), 600);
     return sess;
   }
@@ -167,6 +171,7 @@ function endSession_(token) {
 
 /** Ends every session of one account (after a password change). */
 function endAllSessions_(type, code) {
+  CacheService.getScriptCache().put('revoked:' + type + ':' + code, String(Date.now()), 21600);
   var sh = tab_(TABS.SESSIONS);
   var vals = sh.getDataRange().getValues();
   var keep = vals.filter(function (r, i) { return i === 0 || !(cleanCode(r[1]) === code && r[2] === type); });

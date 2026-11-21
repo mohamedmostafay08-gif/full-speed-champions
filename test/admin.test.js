@@ -174,6 +174,18 @@ test('rider accounts: reset password, block, unblock', () => {
   assert.match(env.api('login', { type: 'internal', code: '4722422', password: reset.data.temp }).error, /موقوف/);
   env.api('adminUserAction', { token, type: 'internal', key: '4722422', action: 'unblock' });
   assert.equal(env.api('login', { type: 'internal', code: '4722422', password: reset.data.temp }).ok, true);
+  // set a chosen password: old sessions end, the new one works
+  const live = env.api('login', { type: 'internal', code: '4722422', password: reset.data.temp }).data.token;
+  assert.equal(env.api('session', { token: live }).ok, true);          // now cached
+  assert.equal(env.api('adminUserAction', { token, type: 'internal', key: '4722422', action: 'setpass', password: '123' }).ok, false);
+  assert.equal(env.api('adminUserAction', { token, type: 'internal', key: '4722422', action: 'setpass', password: 'Ziad-New-1' }).ok, true);
+  assert.equal(env.api('session', { token: live }).ok, false);
+  assert.equal(env.api('login', { type: 'internal', code: '4722422', password: 'Ziad-New-1' }).ok, true);
+  // delete the account (owner only): login now asks to activate, the referrals stay
+  assert.equal(env.api('adminUserAction', { token, type: 'internal', key: '4722422', action: 'delete' }).ok, true);
+  assert.match(env.api('login', { type: 'internal', code: '4722422', password: 'Ziad-New-1' }).error, /فعّل/);
+  assert.ok(env.sheets['New Applicants'].rows.some((r) => String(r[1]) === '4722422'));
+  assert.ok(env.sheets['FS Audit'].rows.some((r) => r[2] === 'مسح حساب'));
 });
 
 test('settings, tiers, announcement and campaigns reach the rider app', () => {
