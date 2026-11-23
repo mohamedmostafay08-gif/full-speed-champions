@@ -133,6 +133,8 @@ test('candidate validation: new to Full Speed, adult, valid ID', () => {
   assert.match(sameId.errors.nationalId, /مترشح قبل كده/);
   const minor = L.validateCandidate({ ...base, nationalId: '31001010100017' }, w);
   assert.match(minor.errors.nationalId, /18/);
+  const today = L.validateCandidate({ ...base, idExpiry: '2026-11-11', vehicle: 'عجلة' }, w);   // world today = 11 Nov
+  assert.match(today.errors.idExpiry, /النهارده/);
   const expired = L.validateCandidate({ ...base, idExpiry: '2025-01-01', vehicle: 'عجلة' }, w);
   assert.match(expired.errors.idExpiry, /منتهية/);
 });

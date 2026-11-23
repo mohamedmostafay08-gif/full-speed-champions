@@ -1515,11 +1515,11 @@ function validateCandidate(form, world, owner) {
   if (VEHICLES.indexOf(vehicle) === -1) errors.vehicle = 'اختار هيشتغل بإيه (موتوسيكل، عجلة، مشي).';
   var idExp = parseSheetDate(form.idExpiry);
   if (!idExp) errors.idExpiry = 'تاريخ انتهاء البطاقة مطلوب.';
-  else if (idExp < world.today) errors.idExpiry = 'البطاقة منتهية.';
+  else if (idExp <= world.today) errors.idExpiry = 'البطاقة منتهية أو بتخلص النهارده — اكتب تاريخ الانتهاء الصح من على البطاقة.';
   var licExp = parseSheetDate(form.licenseExpiry);
   if (vehicle === 'موتوسيكل') {
     if (!licExp) errors.licenseExpiry = 'الرخصة مطلوبة للموتوسيكل.';
-    else if (licExp < world.today) errors.licenseExpiry = 'الرخصة منتهية.';
+    else if (licExp <= world.today) errors.licenseExpiry = 'الرخصة منتهية أو بتخلص النهارده — اكتب تاريخ الانتهاء الصح من على الرخصة.';
   }
 
   if (!Object.keys(errors).length) {
@@ -1614,17 +1614,68 @@ function loadConfig_() {
 
 function loadWorld_() {
   if (WORLD_) return WORLD_;
+  var cfg = loadConfig_();
+  var hiring = rowsToRecords(values_(TABS.HIRING), COLUMNS.HIRING);
+  var riders = rowsToRecords(values_(TABS.RIDERS), COLUMNS.RIDERS);
   var raw = {
-    hiring: rowsToRecords(values_(TABS.HIRING), COLUMNS.HIRING),
-    riders: rowsToRecords(values_(TABS.RIDERS), COLUMNS.RIDERS),
+    hiring: hiring,
+    riders: riders,
     headcount: rowsToRecords(values_(TABS.HEADCOUNT), COLUMNS.HEADCOUNT),
     applicants: rowsToRecords(values_(TABS.APPLICANTS), COLUMNS.APPLICANTS),
-    dailyOrders: rowsToRecords(values_(TABS.DAILY_ORDERS), COLUMNS.DAILY_ORDERS),
+    dailyOrders: dailyOrdersFor_(hiring, riders, cfg),
     campaigns: rowsToRecords(values_(TABS.CAMPAIGNS), COLUMNS.CAMPAIGNS),
     payouts: rowsToRecords(values_(TABS.PAYOUTS), COLUMNS.PAYOUTS)
   };
-  WORLD_ = buildWorld(raw, loadConfig_(), new Date());
+  WORLD_ = buildWorld(raw, cfg, new Date());
   return WORLD_;
+}
+
+/**
+ * Daily orders is the biggest tab (every company rider, every day). Only the
+ * riders hired since the program start matter, so only their rows are kept,
+ * and that short list is cached for 10 minutes instead of re-reading the whole
+ * tab on every open.
+ */
+function dailyOrdersFor_(hiring, riders, cfg) {
+  var start = cfg.PROGRAM_START_DATE, codes = {};
+  hiring.concat(riders).forEach(function (r) {
+    var d = parseSheetDate(r.hireDate), c = cleanCode(r.code);
+    if (c && (!d || !start || d >= start)) codes[c] = 1;
+  });
+  var key = 'daily:' + Object.keys(codes).length;
+  var hit = cacheGetBig_(key);
+  if (hit) return hit;
+  var vals = values_(TABS.DAILY_ORDERS);
+  if (!vals.length) return [];
+  var map = mapHeaders(vals[0], COLUMNS.DAILY_ORDERS), out = [];
+  for (var i = 1; i < vals.length; i++) {
+    var c = cleanCode(vals[i][map.code]);
+    if (!c || !codes[c]) continue;
+    var dt = parseSheetDate(vals[i][map.date]);
+    out.push({ date: dt ? Utilities.formatDate(dt, Session.getScriptTimeZone(), 'yyyy-MM-dd') : '', code: c, orders: Number(vals[i][map.orders]) || 0 });
+  }
+  cachePutBig_(key, out, 600);
+  return out;
+}
+
+/** CacheService holds 100 KB per key: long values are split across numbered keys. */
+function cachePutBig_(key, value, seconds) {
+  try {
+    var s = JSON.stringify(value), size = 90000, parts = {}, n = Math.ceil(s.length / size) || 1;
+    for (var i = 0; i < n; i++) parts[key + ':' + i] = s.slice(i * size, (i + 1) * size);
+    parts[key + ':n'] = String(n);
+    CacheService.getScriptCache().putAll(parts, seconds);
+  } catch (e) { /* too big for the cache: just read the sheet next time */ }
+}
+function cacheGetBig_(key) {
+  try {
+    var cache = CacheService.getScriptCache(), n = parseInt(cache.get(key + ':n') || '0', 10);
+    if (!n) return null;
+    var keys = []; for (var i = 0; i < n; i++) keys.push(key + ':' + i);
+    var got = cache.getAll(keys), s = '';
+    for (var j = 0; j < n; j++) { if (got[keys[j]] === undefined || got[keys[j]] === null) return null; s += got[keys[j]]; }
+    return JSON.parse(s);
+  } catch (e) { return null; }
 }
 
 /** Forget cached reads after a write in the same request. */
@@ -1755,7 +1806,7 @@ function syncApplicants() {
       }
     });
     if (hires.length) log_('sync', hires.length + ' مرشح اتسجلوا "اشتغل" تلقائياً');
-    if (written || rejected) log_('sync', 'سبب الرفض اتكتب لـ ' + written + ' مرشح' + (rejected ? '، و' + rejected + ' اترفضوا لأنهم مترشحين قبل كده' : ''));
+    if (written || rejected) log_('sync', 'سبب الرفض اتكتب لـ ' + written + ' مرشح' + (rejected ? '، و' + rejected + ' اتحوّلوا "مرفوض" (السبب مكتوب جنب كل واحد)' : ''));
     invalidate_();
   } finally {
     lock.releaseLock();
@@ -1860,6 +1911,7 @@ function setupFullSpeed() {
 
     report = report.concat(upgradeApplicants_());
     report = report.concat(migrateLegacyUsers_());
+    report = report.concat(fillUserDetails_());
     report = report.concat(removeLegacyTabs_());
     report = report.concat(installTriggers_());
 
@@ -1958,6 +2010,27 @@ function upgradeApplicants_() {
 }
 
 /** Copies accounts from the old Passwords / External Partners tabs. Old tabs are left as they are. */
+/** Riders moved over from the old program have no name/phone in FS Users: copy them from Headcount. */
+function fillUserDetails_() {
+  var sh = tab_(TABS.USERS); if (!sh || sh.getLastRow() < 2) return [];
+  var vals = sh.getRange(1, 1, sh.getLastRow(), USER_HEADERS_.length).getValues();
+  var hc = {};
+  rowsToRecords(values_(TABS.HEADCOUNT), COLUMNS.HEADCOUNT).forEach(function (h) { var c = cleanCode(h.code); if (c) hc[c] = h; });
+  var iName = USER_HEADERS_.indexOf('Name'), iPhone = USER_HEADERS_.indexOf('Phone'), filled = 0;
+  for (var i = 1; i < vals.length; i++) {
+    if (cleanText(vals[i][0]) !== 'internal') continue;
+    var h = hc[cleanCode(vals[i][1])]; if (!h) continue;
+    var changed = false;
+    if (!cleanText(vals[i][iName]) && cleanText(h.name)) { vals[i][iName] = safeCell(cleanText(h.name)); changed = true; }
+    var ph = canonicalPhone(h.phone);
+    if (!cleanText(vals[i][iPhone]) && ph) { vals[i][iPhone] = "'" + ph; changed = true; }
+    if (changed) filled++;
+  }
+  if (!filled) return [];
+  sh.getRange(1, 1, vals.length, USER_HEADERS_.length).setValues(vals);
+  return ['الاسم والموبايل اتكتبوا لـ ' + filled + ' حساب من Headcount'];
+}
+
 function migrateLegacyUsers_() {
   var existing = readUsers_();
   var have = {};
@@ -2128,6 +2201,26 @@ function checkMaster_(password) {
   try { setConfig_('MASTER_PASSWORD', hashPassword_(stored)); CFG_ = null; } catch (e) { /* hash on the next try */ }
   return ok;
 }
+
+/** Too easy to guess: short, one repeated digit, a run like 1234 / 4321, or a common word. */
+function isWeakPassword_(password) {
+  var p = String(password || ''), min = loadConfig_().MIN_PASSWORD_LENGTH || 6;
+  if (p.length < min) return true;
+  if (/^(.)\1+$/.test(p)) return true;
+  if (/^(password|qwerty|asdfgh|fullspeed|talabat|1q2w3e)/i.test(p)) return true;
+  if (/^\d+$/.test(p)) {
+    var up = true, down = true;
+    for (var i = 1; i < p.length; i++) {
+      if ((+p[i] - +p[i - 1] + 10) % 10 !== 1) up = false;
+      if ((+p[i - 1] - +p[i] + 10) % 10 !== 1) down = false;
+    }
+    if (up || down) return true;
+  }
+  return false;
+}
+
+/** Remembered for a week after a login with a weak password: the app asks for a new one before anything else. */
+function weakKey_(type, code) { return 'weakpw:' + type + ':' + code; }
 
 function verifyPassword_(password, stored) {
   var parts = String(stored || '').split('$');
@@ -2442,6 +2535,8 @@ function login_(p) {
     return fail_(left ? 'كلمة المرور غلط. باقي ' + left + ' محاولات.' : 'محاولات كتير غلط. الحساب اتقفل ' + cfg.LOCK_MINUTES + ' دقيقة.');
   }
   clearFailures_(type, code);
+  var cache = CacheService.getScriptCache(), wk = weakKey_(type, code);
+  if (isWeakPassword_(p.password)) cache.put(wk, '1', 21600); else cache.remove(wk);
 
   return withLock_(function () {
     updateUserCells_(user.row, { hash: check.upgrade || null, lastLogin: new Date() });
@@ -2464,7 +2559,7 @@ function activate_(p) {
   var fields = {};
 
   if (password.length < cfg.MIN_PASSWORD_LENGTH) fields.password = 'كلمة المرور ' + cfg.MIN_PASSWORD_LENGTH + ' حروف أو أرقام على الأقل.';
-  if (/^(\d)\1+$/.test(password) || /^(123456|1234567|12345678|654321|password)$/i.test(password)) fields.password = 'كلمة المرور سهلة أوي، اختار حاجة أصعب.';
+  if (password.length >= cfg.MIN_PASSWORD_LENGTH && isWeakPassword_(password)) fields.password = 'كلمة المرور سهلة أوي (زي 1234 أو 123456)، اختار حاجة أصعب.';
   if (!phone) fields.phone = 'رقم موبايل مصري صحيح (11 رقم).';
 
   if (type === 'internal') {
@@ -2543,6 +2638,7 @@ function dashboardFor_(user) {
   invalidate_();
   var world = loadWorld_(), dash = buildDashboard(world, user);
   if (user.viaMaster) dash.asMaster = true;
+  else if (CacheService.getScriptCache().get(weakKey_(user.type, user.type === 'external' ? user.phone : user.code))) dash.mustChangePassword = true;
   try { dash.leaderboard = buildLeaderboard(world, readUsers_(), ownerKey(user)); } catch (e) { log_('error', 'leaderboard: ' + e); }
   return dash;
 }
@@ -2562,13 +2658,18 @@ function changePassword_(p) {
   var user = currentUser_(p.token);
   if (!user) return fail_('SESSION_EXPIRED');
   if (user.viaMaster) return fail_('إنت داخل بالـ master password — كلمة سر الطيار بيغيّرها الطيار بنفسه أو من لوحة الإدارة.');
-  if (!verifyPassword_(String(p.current || ''), user.hash).ok) return fail_('كلمة المرور الحالية غلط.', { current: 'غلط.' });
+  var key0 = user.type === 'external' ? user.phone : user.code, wk = weakKey_(user.type, key0);
+  var forced = !!CacheService.getScriptCache().get(wk);       // just signed in with a weak password: no need to type it again
+  if (!forced && !verifyPassword_(String(p.current || ''), user.hash).ok) return fail_('كلمة المرور الحالية غلط.', { current: 'غلط.' });
   var next = String(p.next || '');
   if (next.length < cfg.MIN_PASSWORD_LENGTH) return fail_('كلمة المرور الجديدة قصيرة.', { next: 'على الأقل ' + cfg.MIN_PASSWORD_LENGTH + '.' });
+  if (isWeakPassword_(next)) return fail_('كلمة المرور دي سهلة أوي (زي 1234 أو 123456). اختار حاجة أصعب.', { next: 'سهلة أوي.' });
+  if (next === String(p.current || '')) return fail_('اختار كلمة مرور مختلفة عن القديمة.', { next: 'نفس القديمة.' });
   return withLock_(function () {
     updateUserCells_(user.row, { hash: hashPassword_(next) });
     var key = user.type === 'external' ? user.phone : user.code;
     endAllSessions_(user.type, key);
+    CacheService.getScriptCache().remove(wk);
     return ok_({ token: createSession_(user, cfg) });
   });
 }

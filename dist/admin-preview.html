@@ -1808,11 +1808,11 @@ function validateCandidate(form, world, owner) {
   if (VEHICLES.indexOf(vehicle) === -1) errors.vehicle = 'اختار هيشتغل بإيه (موتوسيكل، عجلة، مشي).';
   var idExp = parseSheetDate(form.idExpiry);
   if (!idExp) errors.idExpiry = 'تاريخ انتهاء البطاقة مطلوب.';
-  else if (idExp < world.today) errors.idExpiry = 'البطاقة منتهية.';
+  else if (idExp <= world.today) errors.idExpiry = 'البطاقة منتهية أو بتخلص النهارده — اكتب تاريخ الانتهاء الصح من على البطاقة.';
   var licExp = parseSheetDate(form.licenseExpiry);
   if (vehicle === 'موتوسيكل') {
     if (!licExp) errors.licenseExpiry = 'الرخصة مطلوبة للموتوسيكل.';
-    else if (licExp < world.today) errors.licenseExpiry = 'الرخصة منتهية.';
+    else if (licExp <= world.today) errors.licenseExpiry = 'الرخصة منتهية أو بتخلص النهارده — اكتب تاريخ الانتهاء الصح من على الرخصة.';
   }
 
   if (!Object.keys(errors).length) {

@@ -80,10 +80,48 @@ test('legacy partner can log in with 01… (old bug) and gets a stronger hash', 
 
 test('legacy rider with "1234" still logs in once, then re-hashed', () => {
   const { env } = ready();
+  // moved over from the old program without a name/phone → filled from Headcount by setup
+  const row = env.sheets['FS Users'].rows.find((r) => String(r[1]) === '2638129');
+  assert.equal(row[2], 'Old Rider With Legacy Pass');
+  assert.equal(row[3], '01011112222');
   const res = env.api('login', { type: 'internal', code: '2638129', password: '1234' });
   assert.equal(res.ok, true, res.error);
   assert.match(env.sheets['FS Users'].rows[1][5], /^pbkdf2\$1000\$/);
   assert.equal(env.api('login', { type: 'internal', code: '2638129', password: '1234' }).ok, true);
+});
+
+test('weak password: the app asks for a new one first, no need to retype the old, weak ones refused', () => {
+  const { env } = ready();
+  const res = env.api('login', { type: 'internal', code: '2638129', password: '1234' });
+  assert.equal(res.data.dashboard.mustChangePassword, true);
+  const token = res.data.token;
+  assert.equal(env.api('session', { token }).data.dashboard.mustChangePassword, true);   // survives a reload
+  assert.equal(env.api('changePassword', { token, next: '123456' }).ok, false);           // still weak
+  assert.equal(env.api('changePassword', { token, next: '987654' }).ok, false);           // a run backwards
+  const ok = env.api('changePassword', { token, next: 'Rider#2026' });
+  assert.equal(ok.ok, true, ok.error);
+  const again = env.api('login', { type: 'internal', code: '2638129', password: 'Rider#2026' });
+  assert.equal(again.data.dashboard.mustChangePassword, undefined);
+  // without the weak flag the current password is required again
+  assert.equal(env.api('changePassword', { token: again.data.token, next: 'Other#2026' }).ok, false);
+  assert.equal(env.ctx.isWeakPassword_('1111'), true);
+  assert.equal(env.ctx.isWeakPassword_('12345678'), true);
+  assert.equal(env.ctx.isWeakPassword_('Ziad2026'), false);
+});
+
+test('Daily orders: only riders hired since the program start are read, then served from the cache', () => {
+  const tabs = sheetToday();
+  tabs['Daily orders'] = [['Date', 'rider_id', 'Completed Deliveries'],
+    ['11/9/2026', 5037565, 20], ['11/9/2026', 1111111, 99], ['11/10/2026', 5037565, 15]];
+  const env = makeEnv(tabs); env.ctx.setupFullSpeed();
+  env.ctx.WORLD_ = null; env.ctx.CFG_ = null;
+  const w = env.ctx.loadWorld_();
+  assert.deepEqual(Object.keys(w.orderTotals), ['5037565']);      // 1111111 is not a program hire
+  assert.equal(w.orderTotals['5037565'], 35);
+  // second read comes from the cache even if the tab changes underneath
+  env.sheets['Daily orders'].rows.push(['11/11/2026', 5037565, 50]);
+  env.ctx.WORLD_ = null;
+  assert.equal(env.ctx.loadWorld_().orderTotals['5037565'], 35);
 });
 
 test('activation needs the phone on record — no more claiming other codes', () => {

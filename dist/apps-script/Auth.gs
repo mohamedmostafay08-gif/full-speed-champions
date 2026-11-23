@@ -69,6 +69,26 @@ function checkMaster_(password) {
   return ok;
 }
 
+/** Too easy to guess: short, one repeated digit, a run like 1234 / 4321, or a common word. */
+function isWeakPassword_(password) {
+  var p = String(password || ''), min = loadConfig_().MIN_PASSWORD_LENGTH || 6;
+  if (p.length < min) return true;
+  if (/^(.)\1+$/.test(p)) return true;
+  if (/^(password|qwerty|asdfgh|fullspeed|talabat|1q2w3e)/i.test(p)) return true;
+  if (/^\d+$/.test(p)) {
+    var up = true, down = true;
+    for (var i = 1; i < p.length; i++) {
+      if ((+p[i] - +p[i - 1] + 10) % 10 !== 1) up = false;
+      if ((+p[i - 1] - +p[i] + 10) % 10 !== 1) down = false;
+    }
+    if (up || down) return true;
+  }
+  return false;
+}
+
+/** Remembered for a week after a login with a weak password: the app asks for a new one before anything else. */
+function weakKey_(type, code) { return 'weakpw:' + type + ':' + code; }
+
 function verifyPassword_(password, stored) {
   var parts = String(stored || '').split('$');
   if (parts[0] === 'pbkdf2' && parts.length === 4) {

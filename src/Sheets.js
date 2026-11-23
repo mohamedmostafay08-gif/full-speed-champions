@@ -38,17 +38,68 @@ function loadConfig_() {
 
 function loadWorld_() {
   if (WORLD_) return WORLD_;
+  var cfg = loadConfig_();
+  var hiring = rowsToRecords(values_(TABS.HIRING), COLUMNS.HIRING);
+  var riders = rowsToRecords(values_(TABS.RIDERS), COLUMNS.RIDERS);
   var raw = {
-    hiring: rowsToRecords(values_(TABS.HIRING), COLUMNS.HIRING),
-    riders: rowsToRecords(values_(TABS.RIDERS), COLUMNS.RIDERS),
+    hiring: hiring,
+    riders: riders,
     headcount: rowsToRecords(values_(TABS.HEADCOUNT), COLUMNS.HEADCOUNT),
     applicants: rowsToRecords(values_(TABS.APPLICANTS), COLUMNS.APPLICANTS),
-    dailyOrders: rowsToRecords(values_(TABS.DAILY_ORDERS), COLUMNS.DAILY_ORDERS),
+    dailyOrders: dailyOrdersFor_(hiring, riders, cfg),
     campaigns: rowsToRecords(values_(TABS.CAMPAIGNS), COLUMNS.CAMPAIGNS),
     payouts: rowsToRecords(values_(TABS.PAYOUTS), COLUMNS.PAYOUTS)
   };
-  WORLD_ = buildWorld(raw, loadConfig_(), new Date());
+  WORLD_ = buildWorld(raw, cfg, new Date());
   return WORLD_;
+}
+
+/**
+ * Daily orders is the biggest tab (every company rider, every day). Only the
+ * riders hired since the program start matter, so only their rows are kept,
+ * and that short list is cached for 10 minutes instead of re-reading the whole
+ * tab on every open.
+ */
+function dailyOrdersFor_(hiring, riders, cfg) {
+  var start = cfg.PROGRAM_START_DATE, codes = {};
+  hiring.concat(riders).forEach(function (r) {
+    var d = parseSheetDate(r.hireDate), c = cleanCode(r.code);
+    if (c && (!d || !start || d >= start)) codes[c] = 1;
+  });
+  var key = 'daily:' + Object.keys(codes).length;
+  var hit = cacheGetBig_(key);
+  if (hit) return hit;
+  var vals = values_(TABS.DAILY_ORDERS);
+  if (!vals.length) return [];
+  var map = mapHeaders(vals[0], COLUMNS.DAILY_ORDERS), out = [];
+  for (var i = 1; i < vals.length; i++) {
+    var c = cleanCode(vals[i][map.code]);
+    if (!c || !codes[c]) continue;
+    var dt = parseSheetDate(vals[i][map.date]);
+    out.push({ date: dt ? Utilities.formatDate(dt, Session.getScriptTimeZone(), 'yyyy-MM-dd') : '', code: c, orders: Number(vals[i][map.orders]) || 0 });
+  }
+  cachePutBig_(key, out, 600);
+  return out;
+}
+
+/** CacheService holds 100 KB per key: long values are split across numbered keys. */
+function cachePutBig_(key, value, seconds) {
+  try {
+    var s = JSON.stringify(value), size = 90000, parts = {}, n = Math.ceil(s.length / size) || 1;
+    for (var i = 0; i < n; i++) parts[key + ':' + i] = s.slice(i * size, (i + 1) * size);
+    parts[key + ':n'] = String(n);
+    CacheService.getScriptCache().putAll(parts, seconds);
+  } catch (e) { /* too big for the cache: just read the sheet next time */ }
+}
+function cacheGetBig_(key) {
+  try {
+    var cache = CacheService.getScriptCache(), n = parseInt(cache.get(key + ':n') || '0', 10);
+    if (!n) return null;
+    var keys = []; for (var i = 0; i < n; i++) keys.push(key + ':' + i);
+    var got = cache.getAll(keys), s = '';
+    for (var j = 0; j < n; j++) { if (got[keys[j]] === undefined || got[keys[j]] === null) return null; s += got[keys[j]]; }
+    return JSON.parse(s);
+  } catch (e) { return null; }
 }
 
 /** Forget cached reads after a write in the same request. */
@@ -179,7 +230,7 @@ function syncApplicants() {
       }
     });
     if (hires.length) log_('sync', hires.length + ' مرشح اتسجلوا "اشتغل" تلقائياً');
-    if (written || rejected) log_('sync', 'سبب الرفض اتكتب لـ ' + written + ' مرشح' + (rejected ? '، و' + rejected + ' اترفضوا لأنهم مترشحين قبل كده' : ''));
+    if (written || rejected) log_('sync', 'سبب الرفض اتكتب لـ ' + written + ' مرشح' + (rejected ? '، و' + rejected + ' اتحوّلوا "مرفوض" (السبب مكتوب جنب كل واحد)' : ''));
     invalidate_();
   } finally {
     lock.releaseLock();
@@ -284,6 +335,7 @@ function setupFullSpeed() {
 
     report = report.concat(upgradeApplicants_());
     report = report.concat(migrateLegacyUsers_());
+    report = report.concat(fillUserDetails_());
     report = report.concat(removeLegacyTabs_());
     report = report.concat(installTriggers_());
 
@@ -382,6 +434,27 @@ function upgradeApplicants_() {
 }
 
 /** Copies accounts from the old Passwords / External Partners tabs. Old tabs are left as they are. */
+/** Riders moved over from the old program have no name/phone in FS Users: copy them from Headcount. */
+function fillUserDetails_() {
+  var sh = tab_(TABS.USERS); if (!sh || sh.getLastRow() < 2) return [];
+  var vals = sh.getRange(1, 1, sh.getLastRow(), USER_HEADERS_.length).getValues();
+  var hc = {};
+  rowsToRecords(values_(TABS.HEADCOUNT), COLUMNS.HEADCOUNT).forEach(function (h) { var c = cleanCode(h.code); if (c) hc[c] = h; });
+  var iName = USER_HEADERS_.indexOf('Name'), iPhone = USER_HEADERS_.indexOf('Phone'), filled = 0;
+  for (var i = 1; i < vals.length; i++) {
+    if (cleanText(vals[i][0]) !== 'internal') continue;
+    var h = hc[cleanCode(vals[i][1])]; if (!h) continue;
+    var changed = false;
+    if (!cleanText(vals[i][iName]) && cleanText(h.name)) { vals[i][iName] = safeCell(cleanText(h.name)); changed = true; }
+    var ph = canonicalPhone(h.phone);
+    if (!cleanText(vals[i][iPhone]) && ph) { vals[i][iPhone] = "'" + ph; changed = true; }
+    if (changed) filled++;
+  }
+  if (!filled) return [];
+  sh.getRange(1, 1, vals.length, USER_HEADERS_.length).setValues(vals);
+  return ['الاسم والموبايل اتكتبوا لـ ' + filled + ' حساب من Headcount'];
+}
+
 function migrateLegacyUsers_() {
   var existing = readUsers_();
   var have = {};

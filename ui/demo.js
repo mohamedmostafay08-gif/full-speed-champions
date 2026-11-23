@@ -68,6 +68,7 @@
   }
 
   var session = null;
+  var weak = false;
   var dash = function () { return wire(buildDashboard(world(), session)); };
   var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
 
@@ -86,12 +87,17 @@
     login: function (p) {
       if (!p.code || !p.password) return { ok: false, error: 'اكتب الكود وكلمة المرور.' };
       session = p.type === 'external' ? PARTNER : ME;
-      return { ok: true, data: { token: 'demo', dashboard: dash() } };
+      weak = /^(1234|123456|0000|1111)$/.test(String(p.password));   // try 1234 to see the "stronger password" screen
+      var d = dash(); if (weak) d.mustChangePassword = true;
+      return { ok: true, data: { token: 'demo', dashboard: d } };
     },
     activate: function (p) { return handlers.login({ type: p.type, code: p.code || p.phone, password: p.password }); },
-    session: function () { return session ? { ok: true, data: { dashboard: dash() } } : { ok: false, error: 'SESSION_EXPIRED' }; },
+    session: function () { if (!session) return { ok: false, error: 'SESSION_EXPIRED' }; var d = dash(); if (weak) d.mustChangePassword = true; return { ok: true, data: { dashboard: d } }; },
     logout: function () { session = null; return { ok: true, data: {} }; },
-    changePassword: function () { return { ok: true, data: { token: 'demo' } }; },
+    changePassword: function (p) {
+      if (/^(1234|123456|0000|1111|12345678)$/.test(String(p.next || '')) || String(p.next || '').length < 6) return { ok: false, error: 'كلمة المرور دي سهلة أوي (زي 1234 أو 123456). اختار حاجة أصعب.', fields: { next: 'سهلة أوي.' } };
+      weak = false; return { ok: true, data: { token: 'demo' } };
+    },
     submitCandidate: function (p) {
       var err = save(p.form, session.type === 'external' ? session.phone : session.code);
       return err || { ok: true, data: { dashboard: dash(), message: 'تم تسجيل ' + String(p.form.fullName).split(' ')[0] + ' ✅ هنكلمه قريب.' } };

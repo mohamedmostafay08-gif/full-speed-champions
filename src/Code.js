@@ -178,6 +178,8 @@ function login_(p) {
     return fail_(left ? 'كلمة المرور غلط. باقي ' + left + ' محاولات.' : 'محاولات كتير غلط. الحساب اتقفل ' + cfg.LOCK_MINUTES + ' دقيقة.');
   }
   clearFailures_(type, code);
+  var cache = CacheService.getScriptCache(), wk = weakKey_(type, code);
+  if (isWeakPassword_(p.password)) cache.put(wk, '1', 21600); else cache.remove(wk);
 
   return withLock_(function () {
     updateUserCells_(user.row, { hash: check.upgrade || null, lastLogin: new Date() });
@@ -200,7 +202,7 @@ function activate_(p) {
   var fields = {};
 
   if (password.length < cfg.MIN_PASSWORD_LENGTH) fields.password = 'كلمة المرور ' + cfg.MIN_PASSWORD_LENGTH + ' حروف أو أرقام على الأقل.';
-  if (/^(\d)\1+$/.test(password) || /^(123456|1234567|12345678|654321|password)$/i.test(password)) fields.password = 'كلمة المرور سهلة أوي، اختار حاجة أصعب.';
+  if (password.length >= cfg.MIN_PASSWORD_LENGTH && isWeakPassword_(password)) fields.password = 'كلمة المرور سهلة أوي (زي 1234 أو 123456)، اختار حاجة أصعب.';
   if (!phone) fields.phone = 'رقم موبايل مصري صحيح (11 رقم).';
 
   if (type === 'internal') {
@@ -279,6 +281,7 @@ function dashboardFor_(user) {
   invalidate_();
   var world = loadWorld_(), dash = buildDashboard(world, user);
   if (user.viaMaster) dash.asMaster = true;
+  else if (CacheService.getScriptCache().get(weakKey_(user.type, user.type === 'external' ? user.phone : user.code))) dash.mustChangePassword = true;
   try { dash.leaderboard = buildLeaderboard(world, readUsers_(), ownerKey(user)); } catch (e) { log_('error', 'leaderboard: ' + e); }
   return dash;
 }
@@ -298,13 +301,18 @@ function changePassword_(p) {
   var user = currentUser_(p.token);
   if (!user) return fail_('SESSION_EXPIRED');
   if (user.viaMaster) return fail_('إنت داخل بالـ master password — كلمة سر الطيار بيغيّرها الطيار بنفسه أو من لوحة الإدارة.');
-  if (!verifyPassword_(String(p.current || ''), user.hash).ok) return fail_('كلمة المرور الحالية غلط.', { current: 'غلط.' });
+  var key0 = user.type === 'external' ? user.phone : user.code, wk = weakKey_(user.type, key0);
+  var forced = !!CacheService.getScriptCache().get(wk);       // just signed in with a weak password: no need to type it again
+  if (!forced && !verifyPassword_(String(p.current || ''), user.hash).ok) return fail_('كلمة المرور الحالية غلط.', { current: 'غلط.' });
   var next = String(p.next || '');
   if (next.length < cfg.MIN_PASSWORD_LENGTH) return fail_('كلمة المرور الجديدة قصيرة.', { next: 'على الأقل ' + cfg.MIN_PASSWORD_LENGTH + '.' });
+  if (isWeakPassword_(next)) return fail_('كلمة المرور دي سهلة أوي (زي 1234 أو 123456). اختار حاجة أصعب.', { next: 'سهلة أوي.' });
+  if (next === String(p.current || '')) return fail_('اختار كلمة مرور مختلفة عن القديمة.', { next: 'نفس القديمة.' });
   return withLock_(function () {
     updateUserCells_(user.row, { hash: hashPassword_(next) });
     var key = user.type === 'external' ? user.phone : user.code;
     endAllSessions_(user.type, key);
+    CacheService.getScriptCache().remove(wk);
     return ok_({ token: createSession_(user, cfg) });
   });
 }

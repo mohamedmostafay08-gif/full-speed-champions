@@ -651,6 +651,8 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
     });
   }
 
+  function tomorrowIso() { var d = new Date(); d.setDate(d.getDate() + 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
   function startSession(token, dash) {
     S.token = token; store('fs_token', token);
     S.dash = dash; S.view = 'home';
@@ -691,7 +693,35 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
     renderApp(); window.scrollTo(0, 0); buzz();
   }
 
+  /* Signed in with a weak password (1234, 123456…): a new one first, before anything else. */
+  function renderForcePassword() {
+    document.getElementById('dock').hidden = true;
+    app.innerHTML = '<section class="auth">' + brand() +
+      '<form class="card" id="forcePw" novalidate style="display:grid;gap:12px">' +
+      '<h2 class="section" style="justify-content:center">🔒 محتاجين كلمة سر أقوى</h2>' +
+      '<p class="muted" style="margin:0;text-align:center;font-size:14px">كلمة السر بتاعتك سهلة أوي (زي 1234 أو 123456) وأي حد يعرف كودك يقدر يدخل ويشوف مرشحينك وبونصك. اختار واحدة جديدة وهتكمّل على طول.</p>' +
+      pwField('fp-new', 'كلمة السر الجديدة', 'new-password', 'حروف وأرقام — 6 على الأقل، ومش أرقام ورا بعض') +
+      '<button class="btn btn-primary" type="submit">حفظ وكمّل</button>' +
+      '<button class="btn btn-ghost btn-sm" type="button" id="fpOut">خروج</button></form></section>';
+    bindPwToggles(app);
+    var f = document.getElementById('forcePw');
+    f.querySelector('input').name = 'next';
+    f.onsubmit = async function (e) {
+      e.preventDefault();
+      var btn = f.querySelector('[type=submit]'); busy(btn, true);
+      var res = await call('changePassword', { token: S.token, next: f.querySelector('input').value });
+      busy(btn, false);
+      if (!res.ok) { showErrors(f, res.fields); return; }
+      S.token = res.data.token; store('fs_token', S.token);
+      S.dash.mustChangePassword = false;
+      toast('كلمة السر اتغيرت ✓');
+      renderApp(); refresh(true);
+    };
+    document.getElementById('fpOut').onclick = function () { call('logout', { token: S.token }, { quiet: true }); signOut(); };
+  }
+
   function renderApp() {
+    if (S.dash && S.dash.mustChangePassword && !S.dash.asMaster) return renderForcePassword();
     var dock = document.getElementById('dock');
     dock.hidden = false;
     dock.querySelectorAll('[data-go]').forEach(function (b) {
@@ -1062,8 +1092,8 @@ details.links code { display: block; direction: ltr; text-align: left; font: 500
       '<div class="field"><label for="c-zone">منطقة الشغل</label><select id="c-zone" name="zone" required>' + opts + '</select></div>' +
       '<div class="field"><label for="c-address">العنوان</label><input id="c-address" name="address" enterkeyhint="next" placeholder="المحافظة - المنطقة - الشارع" required></div>' +
       '<div class="field"><label for="c-veh">هيشتغل بإيه؟</label><select id="c-veh" name="vehicle" required><option value="">اختار…</option><option>موتوسيكل</option><option>عجلة</option><option>مشي</option></select></div>' +
-      '<div class="row2"><div class="field"><label for="c-idexp">انتهاء البطاقة</label><input id="c-idexp" name="idExpiry" type="date" required></div>' +
-      '<div class="field"><label for="c-licexp">انتهاء الرخصة</label><input id="c-licexp" name="licenseExpiry" type="date"><span class="hint" id="licHint">مطلوبة للموتوسيكل بس</span></div></div>' +
+      '<div class="row2"><div class="field"><label for="c-idexp">انتهاء البطاقة</label><input id="c-idexp" name="idExpiry" type="date" required min="' + tomorrowIso() + '"></div>' +
+      '<div class="field"><label for="c-licexp">انتهاء الرخصة</label><input id="c-licexp" name="licenseExpiry" type="date" min="' + tomorrowIso() + '"><span class="hint" id="licHint">مطلوبة للموتوسيكل بس</span></div></div>' +
       '<div class="field"><label for="c-plate">رقم اللوحة</label><input id="c-plate" name="plate" enterkeyhint="done" placeholder="سيبها فاضية لو عجلة"></div>';
   }
 
